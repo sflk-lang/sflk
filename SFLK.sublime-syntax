@@ -1,0 +1,22 @@
+%YAML 1.2
+---
+name: SFLK
+file_extensions: [sflk, Sflk, SFLK]
+scope: source.sflk
+
+contexts:
+
+  main:
+    - match: '<'
+      scope: keyword.operator.assignment.flk
+    - match: 'pr'
+      scope: keyword.other.sflk
+    - match: '"'
+      scope: punctuation.definition.string.begin.sflk
+      push: string_litteral
+
+  string_litteral:
+    - meta_scope: string.quoted.double.sflk
+    - match: '"'
+      scope: punctuation.definition.string.end.sflk
+      pop: true
