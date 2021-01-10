@@ -9,6 +9,8 @@ contexts:
   main:
     - match: '<'
       scope: keyword.operator.assignment.flk
+    - match: '\+'
+      scope: keyword.operator.arithmetic.sflk
     - match: 'pr'
       scope: keyword.other.sflk
     - match: '"'

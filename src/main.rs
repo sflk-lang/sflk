@@ -48,11 +48,12 @@ impl std::fmt::Display for ParsingError {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Tok {
 	Word(String),
 	StringLitteral(String),
 	OpToLeft,
+	OpPlus,
 	Void,
 }
 
@@ -62,32 +63,40 @@ impl std::fmt::Display for Tok {
 			Tok::Word(word) => write!(f, "{}", word),
 			Tok::StringLitteral(string) => write!(f, "\"{}\"", string),
 			Tok::OpToLeft => write!(f, "<"),
+			Tok::OpPlus => write!(f, "+"),
 			Tok::Void => write!(f, ""),
 		}
 	}
 }
 
-#[derive(Debug)]
-enum Inst {
-	Nop,
-	PushConst(Obj),
-	AssignVar,
-	ReadVar,
-	Print,
-	PushCx,
+impl Tok {
+	fn is_void(&self) -> bool {
+		match self {
+			Tok::Void => true,
+			_ => false,
+		}
+	}
+
+	fn is_bin_op(&self) -> bool {
+		match self {
+			Tok::OpPlus => true,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug)]
-struct StmtEx {
-	insts: Vec<Inst>,
+enum Expr {
+	Const(Obj),
+	Var(String),
+	Plus(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug)]
 enum Stmt {
 	Nop,
-	Assign(String, String),
-	PrintVar(String),
-	PrintJej,
+	Assign(String, Expr),
+	Print(Expr),
 }
 
 #[derive(Debug)]
@@ -95,89 +104,152 @@ struct Prog {
 	stmts: Vec<Stmt>,
 }
 
-trait Parsable: CodeStream {
-	fn disc_ws(&mut self);
-	fn parse_word_string(&mut self) -> String;
-	fn parse_string_litteral_string(&mut self) -> String;
-	fn parse_tok(&mut self) -> Result<Tok, ParsingError>;
-	fn parse_stmt(&mut self) -> Result<Stmt, ParsingError>;
-	fn parse_prog(&mut self) -> Result<Prog, ParsingError>;
+struct TokStream<Cs: CodeStream> {
+	cs: Cs,
+	tok_opt: Option<Tok>,
 }
 
-impl<T> Parsable for T where T: CodeStream {
+impl<Cs: CodeStream> TokStream<Cs> {
+	fn from(cs: Cs) -> TokStream<Cs> {
+		TokStream {
+			cs: cs,
+			tok_opt: None,
+		}
+	}
+}
+
+impl<Cs: CodeStream> TokStream<Cs> {
 	fn disc_ws(&mut self) {
 		loop {
-			match self.peek() {
-				Some(ch) if ch.is_ascii_whitespace() => self.disc(),
+			match self.cs.peek() {
+				Some(ch) if ch.is_ascii_whitespace() => self.cs.disc(),
 				_ => break,
 			}
 		}
 	}
 
 	fn parse_word_string(&mut self) -> String {
-		std::assert!(self.peek().map_or(false, |ch| ch.is_ascii_alphabetic()));
+		std::assert!(self.cs.peek().map_or(false, |ch| ch.is_ascii_alphabetic()));
 		let mut word_string = String::new();
-		while let Some(ch) = self.peek() {
+		while let Some(ch) = self.cs.peek() {
 			if !ch.is_ascii_alphabetic() {
 				break;
 			}
 			word_string.push(ch);
-			self.disc();
+			self.cs.disc();
 		}
 		word_string
 	}
 
 	fn parse_string_litteral_string(&mut self) -> String {
-		std::assert!(self.peek().map_or(false, |ch| ch == '\"'));
-		self.disc(); // Initial `"` character
+		std::assert!(self.cs.peek().map_or(false, |ch| ch == '\"'));
+		self.cs.disc(); // Initial `"` character
 		let mut string_litteral_string = String::new();
-		while let Some(ch) = self.peek() {
+		while let Some(ch) = self.cs.peek() {
 			if ch == '\"' {
-				self.disc();
+				self.cs.disc();
 				break;
 			}
 			string_litteral_string.push(ch);
-			self.disc();
+			self.cs.disc();
 		}
 		string_litteral_string
 	}
 
 	fn parse_tok(&mut self) -> Result<Tok, ParsingError> {
 		self.disc_ws();
-		match self.peek() {
+		match self.cs.peek() {
 			Some(ch) if ch.is_ascii_alphabetic() =>
 				Ok(Tok::Word(self.parse_word_string())),
 			Some(ch) if ch == '\"' =>
 				Ok(Tok::StringLitteral(self.parse_string_litteral_string())),
 			Some(ch) if ch == '<' => {
-				self.disc();
+				self.cs.disc();
 				Ok(Tok::OpToLeft)
+			},
+			Some(ch) if ch == '+' => {
+				self.cs.disc();
+				Ok(Tok::OpPlus)
 			},
 			None => Ok(Tok::Void),
 			Some(ch) => {
-				self.disc();
+				self.cs.disc();
 				Err(ParsingError::UnexpectedCharacter(ch))
 			},
 		}
 	}
+}
+
+impl<Cs: CodeStream> TokStream<Cs> {
+	fn peek(&mut self) -> Result<&Tok, ParsingError> {
+		if self.tok_opt.is_none() {
+			self.tok_opt = Some(self.parse_tok()?);
+		}
+		if let Some(tok) = &self.tok_opt {
+			Ok(tok)
+		} else {
+			unreachable!()
+		}
+	}
+
+	fn disc(&mut self) -> Result<(), ParsingError> {
+		if self.tok_opt.is_none() {
+			self.parse_tok()?;
+		} else {
+			self.tok_opt = None;
+		}
+		Ok(())
+	}
+
+	fn pop(&mut self) -> Result<Tok, ParsingError> {
+		match &self.tok_opt {
+			Some(tok) => {
+				let tok_copy = tok.clone();
+				self.tok_opt = None;
+				Ok(tok_copy)
+			},
+			None => self.parse_tok(),
+		}
+	}
+}
+
+impl<Cs: CodeStream> TokStream<Cs> {
+	fn parse_expr_left(&mut self) -> Result<Expr, ParsingError> {
+		match self.pop()? {
+			Tok::Word(word) =>
+				Ok(Expr::Var(word)),
+			Tok::StringLitteral(string) =>
+				Ok(Expr::Const(Obj::String(string))),
+			tok =>
+				Err(ParsingError::UnexpectedToken(tok)),
+		}
+	}
+
+	fn parse_expr(&mut self) -> Result<Expr, ParsingError> {
+		let mut expr = self.parse_expr_left()?;
+		while self.peek()?.is_bin_op() {
+			let op = self.peek()?.to_owned();
+			self.disc()?;
+			match op {
+				Tok::OpPlus =>
+					expr = Expr::Plus(Box::new(expr),
+						Box::new(self.parse_expr_left()?)),
+				_ => unreachable!(),
+			}
+		}
+
+		Ok(expr)
+	}
 
 	fn parse_stmt(&mut self) -> Result<Stmt, ParsingError> {
-		match self.parse_tok()? {
-			Tok::Word(word) if word == "prjej" =>
-				Ok(Stmt::PrintJej),
+		match self.pop()? {
 			Tok::Word(word) if word == "nop" =>
 				Ok(Stmt::Nop),
-			Tok::Word(left_word) if left_word == "pr" =>
-				match self.parse_tok()? {
-					Tok::Word(right_word) => Ok(Stmt::PrintVar(right_word)),
-					tok => Err(ParsingError::UnexpectedToken(tok)),
-				},
-			Tok::Word(left_word) => match self.parse_tok()? {
-				Tok::OpToLeft => match self.parse_tok()? {
-					Tok::StringLitteral(right_string) =>
-						Ok(Stmt::Assign(left_word, right_string)),
-					tok => Err(ParsingError::UnexpectedToken(tok)),
-				},
+			Tok::Word(word) if word == "pr" =>
+				Ok(Stmt::Print(self.parse_expr()?)),
+			Tok::Word(word) => match self.pop()? {
+				Tok::OpToLeft =>
+					Ok(Stmt::Assign(word, self.parse_expr()?)),
 				tok => Err(ParsingError::UnexpectedToken(tok)),
 			},
 			tok => Err(ParsingError::UnexpectedToken(tok)),
@@ -186,7 +258,7 @@ impl<T> Parsable for T where T: CodeStream {
 
 	fn parse_prog(&mut self) -> Result<Prog, ParsingError> {
 		let mut stmts: Vec<Stmt> = Vec::new();
-		while {self.disc_ws(); self.peek().is_some()} {
+		while !self.peek()?.is_void() {
 			stmts.push(self.parse_stmt()?);
 		}
 		Ok(Prog {
@@ -210,6 +282,16 @@ impl std::fmt::Display for Obj {
 	}
 }
 
+impl Obj {
+	fn op_plus(left: &Obj, right: &Obj) -> Obj {
+		match (left, right) {
+			(Obj::String(string_left), Obj::String(string_right)) =>
+				Obj::String(string_left.to_owned() + string_right),
+			_ => panic!("o shit"),
+		}
+	}
+}
+
 struct Cx {
 	i: usize,
 	vars: HashMap<String, Obj>,
@@ -217,6 +299,14 @@ struct Cx {
 
 struct Mem {
 	cxs: Vec<Cx>,
+}
+
+impl Mem {
+	fn new() -> Mem {
+		Mem {
+			cxs: Vec::new(),
+		}
+	}
 }
 
 impl Mem {
@@ -231,6 +321,10 @@ impl Mem {
 
 impl Mem {
 	fn exec_prog(&mut self, prog: &Prog) {
+		self.cxs.push(Cx {
+			i: 0,
+			vars: HashMap::new(),
+		});
 		while self.cx().i < prog.stmts.len() {
 			self.exec_stmt(&prog.stmts[self.cx().i]);
 			self.cx_mut().i += 1;
@@ -240,49 +334,25 @@ impl Mem {
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Nop => (),
-			Stmt::Assign(varname, value) => {
-				self.cx_mut().vars.insert(varname.to_string(),
-					Obj::String(value.to_string()));
+			Stmt::Assign(varname, expr) => {
+				let value = self.eval_expr(expr);
+				self.cx_mut().vars.insert(varname.to_string(), value);
 				()
 			},
-			Stmt::PrintVar(varname) =>
-				println!("{}",
-					self.cx_mut().vars.get(varname)
-						.map_or("empty".to_string(), |val| val.to_string())),
-			Stmt::PrintJej => println!("jej"),
+			Stmt::Print(expr) =>
+				println!("{}", self.eval_expr(expr).to_string()),
 		}
 	}
 
-	fn exec_stmt_ex(&mut self, stmt: &StmtEx) {
-		let mut stack: Vec<Obj> = Vec::new();
-		for inst in &stmt.insts {
-			match inst {
-				Inst::Nop => (),
-				Inst::PushConst(obj) => stack.push(obj.clone()),
-				Inst::AssignVar => {
-					std::assert!(stack.len() >= 2);
-					let varname = stack.pop().unwrap().to_string();
-					let value = stack.pop().unwrap();
-					self.cx_mut().vars.insert(varname, value);
-				},
-				Inst::ReadVar => {
-					std::assert!(stack.len() >= 1);
-					let varname = stack.pop().unwrap().to_string();
-					stack.push(self.cx_mut().vars.get(&varname)
-						.map_or(Obj::String("none".to_string()),
-							|obj| obj.clone())
-					);
-				},
-				Inst::Print => {
-					std::assert!(stack.len() >= 1);
-					let string = stack.pop().unwrap().to_string();
-					print!("{}", string);
-				},
-				Inst::PushCx => self.cxs.push(Cx {
-					i: 0,
-					vars: HashMap::new(),
-				}),
-			}
+	fn eval_expr(&mut self, expr: &Expr) -> Obj {
+		match expr {
+			Expr::Const(obj) => obj.clone(),
+			Expr::Var(varname) =>
+				self.cx_mut().vars.get(varname)
+					.unwrap_or(&Obj::String("none".to_string()))
+					.clone(),
+			Expr::Plus(left, right) =>
+				Obj::op_plus(&self.eval_expr(left), &self.eval_expr(right)),
 		}
 	}
 }
@@ -316,7 +386,7 @@ fn main() {
 	let src = std::fs::read_to_string(&settings.src_filename)
 		.expect(&format!("source file `{}` couldn't be read",
 			&settings.src_filename));
-	let prog = CodeStreamString::from(&src)
+	let prog = TokStream::from(CodeStreamString::from(&src))
 		.parse_prog()
 		.expect("gura flat");
 
@@ -324,20 +394,6 @@ fn main() {
 		println!("\x1b[32m{:?}\x1b[39m", prog);
 	}
 
-	let mut mem = Mem {
-		cxs: vec![Cx {
-			i: 0,
-			vars: HashMap::new(),
-		}],
-	};
+	let mut mem = Mem::new();
 	mem.exec_prog(&prog);
-
-	let mut mem = Mem {
-		cxs: Vec::new(),
-	};
-	mem.exec_stmt_ex(&StmtEx {insts: vec![
-		Inst::PushConst(Obj::String("owo".to_string())),
-		Inst::Print,
-	],});
-	println!("");
 }
