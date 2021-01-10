@@ -35,6 +35,7 @@ impl CodeStream for CodeStreamString {
 enum ParsingError {
 	UnexpectedCharacter(char),
 	UnexpectedToken(Tok),
+	UnexpectedEndOfFileInComment,
 }
 
 impl std::fmt::Display for ParsingError {
@@ -44,6 +45,8 @@ impl std::fmt::Display for ParsingError {
 				write!(f, "unexpected character `{}`", ch),
 			ParsingError::UnexpectedToken(tok) =>
 				write!(f, "unexpected token `{}`", tok),
+			ParsingError::UnexpectedEndOfFileInComment =>
+				write!(f, "unexpected end-of-file in comment"),
 		}
 	}
 }
@@ -119,13 +122,25 @@ impl<Cs: CodeStream> TokStream<Cs> {
 }
 
 impl<Cs: CodeStream> TokStream<Cs> {
-	fn disc_ws(&mut self) {
+	fn disc_ws(&mut self) -> Result<(), ParsingError> {
+		let mut comment_mode = false;
 		loop {
 			match self.cs.peek() {
-				Some(ch) if ch.is_ascii_whitespace() => self.cs.disc(),
-				_ => break,
+				Some('#') if !comment_mode =>
+					comment_mode = true,
+				Some(ch) if !(ch.is_ascii_whitespace() || comment_mode) =>
+					break,
+				Some('#') if comment_mode =>
+					comment_mode = false,
+				None if comment_mode =>
+					return Err(ParsingError::UnexpectedEndOfFileInComment),
+				None if !comment_mode =>
+					break,
+				_ => (),
 			}
+			self.cs.disc();
 		}
+		Ok(())
 	}
 
 	fn parse_word_string(&mut self) -> String {
@@ -157,7 +172,7 @@ impl<Cs: CodeStream> TokStream<Cs> {
 	}
 
 	fn parse_tok(&mut self) -> Result<Tok, ParsingError> {
-		self.disc_ws();
+		self.disc_ws()?;
 		match self.cs.peek() {
 			Some(ch) if ch.is_ascii_alphabetic() =>
 				Ok(Tok::Word(self.parse_word_string())),

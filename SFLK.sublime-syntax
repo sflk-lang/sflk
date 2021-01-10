@@ -7,6 +7,9 @@ scope: source.sflk
 contexts:
 
   main:
+    - match: '#'
+      scope: punctuation.definition.comment.begin.sflk
+      push: comment
     - match: '<'
       scope: keyword.operator.assignment.flk
     - match: '\+'
@@ -16,6 +19,12 @@ contexts:
     - match: '"'
       scope: punctuation.definition.string.begin.sflk
       push: string_litteral
+
+  comment:
+    - meta_scope: comment.block.sflk
+    - match: '#'
+      scope: punctuation.definition.comment.end.sflk
+      pop: true
 
   string_litteral:
     - meta_scope: string.quoted.double.sflk
