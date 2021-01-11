@@ -10,6 +10,11 @@ contexts:
     - match: '#'
       scope: punctuation.definition.comment.begin.sflk
       push: comment
+    - match: '\('
+      scope: punctuation.section.braces.begin.sflk
+      push: paren
+    - match: '\)'
+      scope: invalid.illegal.sflk
     - match: '"'
       scope: punctuation.definition.string.begin.sflk
       push: string_litteral
@@ -29,6 +34,12 @@ contexts:
     - match: '#'
       scope: punctuation.definition.comment.end.sflk
       pop: true
+
+  paren:
+    - match: '\)'
+      scope: punctuation.section.braces.end.sflk
+      pop: true
+    - include: main
 
   string_litteral:
     - meta_scope: string.quoted.double.sflk
