@@ -51,12 +51,16 @@ impl std::fmt::Display for ParsingError {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Tok {
 	Word(String),
 	StringLitteral(String),
+	IntegerLitteral(String),
 	OpToLeft,
 	OpPlus,
+	OpMinus,
+	ParenLeft,
+	ParenRight,
 	Void,
 }
 
@@ -65,24 +69,22 @@ impl std::fmt::Display for Tok {
 		match self {
 			Tok::Word(word) => write!(f, "{}", word),
 			Tok::StringLitteral(string) => write!(f, "\"{}\"", string),
+			Tok::IntegerLitteral(integer) => write!(f, "{}", integer),
 			Tok::OpToLeft => write!(f, "<"),
 			Tok::OpPlus => write!(f, "+"),
+			Tok::OpMinus => write!(f, "-"),
+			Tok::ParenLeft => write!(f, "("),
+			Tok::ParenRight => write!(f, ")"),
 			Tok::Void => write!(f, ""),
 		}
 	}
 }
 
 impl Tok {
-	fn is_void(&self) -> bool {
-		match self {
-			Tok::Void => true,
-			_ => false,
-		}
-	}
-
 	fn is_bin_op(&self) -> bool {
 		match self {
 			Tok::OpPlus => true,
+			Tok::OpMinus => true,
 			_ => false,
 		}
 	}
@@ -93,6 +95,7 @@ enum Expr {
 	Const(Obj),
 	Var(String),
 	Plus(Box<Expr>, Box<Expr>),
+	Minus(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug)]
@@ -144,7 +147,8 @@ impl<Cs: CodeStream> TokStream<Cs> {
 	}
 
 	fn parse_word_string(&mut self) -> String {
-		std::assert!(self.cs.peek().map_or(false, |ch| ch.is_ascii_alphabetic()));
+		std::assert!(self.cs.peek()
+			.map_or(false, |ch| ch.is_ascii_alphabetic()));
 		let mut word_string = String::new();
 		while let Some(ch) = self.cs.peek() {
 			if !ch.is_ascii_alphabetic() {
@@ -154,6 +158,20 @@ impl<Cs: CodeStream> TokStream<Cs> {
 			self.cs.disc();
 		}
 		word_string
+	}
+
+	fn parse_integer_string(&mut self) -> String {
+		std::assert!(self.cs.peek()
+			.map_or(false, |ch| ch.is_ascii_digit()));
+		let mut integer_string = String::new();
+		while let Some(ch) = self.cs.peek() {
+			if !ch.is_ascii_digit() {
+				break;
+			}
+			integer_string.push(ch);
+			self.cs.disc();
+		}
+		integer_string
 	}
 
 	fn parse_string_litteral_string(&mut self) -> String {
@@ -176,6 +194,8 @@ impl<Cs: CodeStream> TokStream<Cs> {
 		match self.cs.peek() {
 			Some(ch) if ch.is_ascii_alphabetic() =>
 				Ok(Tok::Word(self.parse_word_string())),
+			Some(ch) if ch.is_ascii_digit() =>
+				Ok(Tok::IntegerLitteral(self.parse_integer_string())),
 			Some(ch) if ch == '\"' =>
 				Ok(Tok::StringLitteral(self.parse_string_litteral_string())),
 			Some(ch) if ch == '<' => {
@@ -185,6 +205,18 @@ impl<Cs: CodeStream> TokStream<Cs> {
 			Some(ch) if ch == '+' => {
 				self.cs.disc();
 				Ok(Tok::OpPlus)
+			},
+			Some(ch) if ch == '-' => {
+				self.cs.disc();
+				Ok(Tok::OpMinus)
+			},
+			Some(ch) if ch == '(' => {
+				self.cs.disc();
+				Ok(Tok::ParenLeft)
+			},
+			Some(ch) if ch == ')' => {
+				self.cs.disc();
+				Ok(Tok::ParenRight)
 			},
 			None => Ok(Tok::Void),
 			Some(ch) => {
@@ -228,6 +260,11 @@ impl<Cs: CodeStream> TokStream<Cs> {
 	}
 }
 
+enum ExprEnd {
+	None,
+	Paren,
+}
+
 impl<Cs: CodeStream> TokStream<Cs> {
 	fn parse_expr_left(&mut self) -> Result<Expr, ParsingError> {
 		match self.pop()? {
@@ -235,12 +272,17 @@ impl<Cs: CodeStream> TokStream<Cs> {
 				Ok(Expr::Var(word)),
 			Tok::StringLitteral(string) =>
 				Ok(Expr::Const(Obj::String(string))),
+			Tok::IntegerLitteral(string) =>
+				Ok(Expr::Const(Obj::Integer(str::parse(&string)
+					.expect("TODO: implement bigints")))),
+			Tok::ParenLeft =>
+				self.parse_expr(&ExprEnd::Paren),
 			tok =>
 				Err(ParsingError::UnexpectedToken(tok)),
 		}
 	}
 
-	fn parse_expr(&mut self) -> Result<Expr, ParsingError> {
+	fn parse_expr(&mut self, end: &ExprEnd) -> Result<Expr, ParsingError> {
 		let mut expr = self.parse_expr_left()?;
 		while self.peek()?.is_bin_op() {
 			let op = self.peek()?.to_owned();
@@ -249,10 +291,19 @@ impl<Cs: CodeStream> TokStream<Cs> {
 				Tok::OpPlus =>
 					expr = Expr::Plus(Box::new(expr),
 						Box::new(self.parse_expr_left()?)),
+				Tok::OpMinus =>
+					expr = Expr::Minus(Box::new(expr),
+						Box::new(self.parse_expr_left()?)),
 				_ => unreachable!(),
 			}
 		}
-
+		match end {
+			ExprEnd::None => (),
+			ExprEnd::Paren => match self.pop()? {
+				Tok::ParenRight => (),
+				tok => return Err(ParsingError::UnexpectedToken(tok)),
+			},
+		}
 		Ok(expr)
 	}
 
@@ -261,10 +312,10 @@ impl<Cs: CodeStream> TokStream<Cs> {
 			Tok::Word(word) if word == "nop" =>
 				Ok(Stmt::Nop),
 			Tok::Word(word) if word == "pr" =>
-				Ok(Stmt::Print(self.parse_expr()?)),
+				Ok(Stmt::Print(self.parse_expr(&ExprEnd::None)?)),
 			Tok::Word(word) => match self.pop()? {
 				Tok::OpToLeft =>
-					Ok(Stmt::Assign(word, self.parse_expr()?)),
+					Ok(Stmt::Assign(word, self.parse_expr(&ExprEnd::None)?)),
 				tok => Err(ParsingError::UnexpectedToken(tok)),
 			},
 			tok => Err(ParsingError::UnexpectedToken(tok)),
@@ -273,7 +324,7 @@ impl<Cs: CodeStream> TokStream<Cs> {
 
 	fn parse_prog(&mut self) -> Result<Prog, ParsingError> {
 		let mut stmts: Vec<Stmt> = Vec::new();
-		while !self.peek()?.is_void() {
+		while *self.peek()? != Tok::Void {
 			stmts.push(self.parse_stmt()?);
 		}
 		Ok(Prog {
@@ -287,12 +338,14 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 enum Obj {
 	String(String),
+	Integer(isize),
 }
 
 impl std::fmt::Display for Obj {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			Obj::String(string) => write!(f, "\"{}\"", string),
+			Obj::String(string) => write!(f, "{}", string),
+			Obj::Integer(integer) => write!(f, "{}", integer),
 		}
 	}
 }
@@ -302,6 +355,16 @@ impl Obj {
 		match (left, right) {
 			(Obj::String(string_left), Obj::String(string_right)) =>
 				Obj::String(string_left.to_owned() + string_right),
+			(Obj::Integer(integer_left), Obj::Integer(integer_right)) =>
+				Obj::Integer(integer_left + integer_right),
+			_ => panic!("o shit"),
+		}
+	}
+
+	fn op_minus(left: &Obj, right: &Obj) -> Obj {
+		match (left, right) {
+			(Obj::Integer(integer_left), Obj::Integer(integer_right)) =>
+				Obj::Integer(integer_left - integer_right),
 			_ => panic!("o shit"),
 		}
 	}
@@ -368,6 +431,8 @@ impl Mem {
 					.clone(),
 			Expr::Plus(left, right) =>
 				Obj::op_plus(&self.eval_expr(left), &self.eval_expr(right)),
+			Expr::Minus(left, right) =>
+				Obj::op_minus(&self.eval_expr(left), &self.eval_expr(right)),
 		}
 	}
 }

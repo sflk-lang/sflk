@@ -10,15 +10,19 @@ contexts:
     - match: '#'
       scope: punctuation.definition.comment.begin.sflk
       push: comment
-    - match: '<'
-      scope: keyword.operator.assignment.flk
-    - match: '\+'
-      scope: keyword.operator.arithmetic.sflk
-    - match: 'pr'
-      scope: keyword.other.sflk
     - match: '"'
       scope: punctuation.definition.string.begin.sflk
       push: string_litteral
+    - match: '[0-9]+'
+      scope: constant.numeric.integer.decimal.sflk
+    - match: '<'
+      scope: keyword.operator.assignment.flk
+    - match: '\+|\-'
+      scope: keyword.operator.arithmetic.sflk
+    - match: 'pr'
+      scope: keyword.other.sflk
+    - match: '[a-zA-Z]+'
+      scope: variable.sflk
 
   comment:
     - meta_scope: comment.block.sflk

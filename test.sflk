@@ -1,4 +1,4 @@
 
-jej < "uwu"
-lul < jej + " a"
-pr lul
+pr  3  - (1  +  1) # prints 1 #
+pr (3  -  1) +  1  # prints 3 #
+pr  3  -  1  +  1  # prints 3 #
