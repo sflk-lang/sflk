@@ -1,50 +1,139 @@
+/*
+use std::rc::Rc;
 
-trait CodeStream {
-	fn peek(& self) -> Option<char>;
-	fn disc(&mut self);
+#[derive(Debug)]
+struct CharLoc {
+	source_name: Option<Rc<String>>,
+	line: usize,
+	column: usize,
 }
 
-struct CodeStreamString {
-	string: String,
-	index: usize,
-}
+impl CharLoc {
+	fn new(source_name: Option<Rc<String>>) -> CharLoc {
+		CharLoc {
+			source_name: source_name,
+			line: 1,
+			column: 1,
+		}
+	}
 
-impl CodeStreamString {
-	fn from(string: &str) -> Self {
-		CodeStreamString {
-			string: string.to_string(),
-			index: 0,
+	fn pass(&mut self, ch: char) {
+		if ch == '\n' {
+			self.line += 1;
+			self.column = 1;
+		} else {
+			self.column += 1;
+		}
+	}
+
+	fn no_source(&self) -> CharLoc {
+		CharLoc {
+			source_name: None,
+			line: self.line,
+			column: self.column,
 		}
 	}
 }
 
-impl CodeStream for CodeStreamString {
-	fn peek(& self) -> Option<char> {
-		self.string[self.index..].chars().next()
-	}
-
-	fn disc(&mut self) {
-		match self.peek() {
-			Some(ch) => self.index += ch.len_utf8(),
-			None => (),
+impl std::fmt::Display for CharLoc {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self.source_name {
+			opt if opt.map_or(true, |_| f.alternate()) =>
+				write!(f, "line {} col {}",
+					self.line, self.column),
+			Some(source_name) =>
+				write!(f, "{}: line {} col {}",
+					source_name, self.line, self.column),
 		}
 	}
 }
 
 #[derive(Debug)]
+struct StringLoc {
+	beg: CharLoc,
+	end: CharLoc, // excluded
+}
+
+impl StringLoc {
+	fn new(beg: CharLoc, end: CharLoc) -> StringLoc {
+		StringLoc {
+			beg: beg,
+			end: end,
+		}
+	}
+}
+
+impl std::fmt::Display for StringLoc {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self.beg.source_name {
+			opt if opt.map_or(true, |_| f.alternate()) =>
+				write!(f, "from {:#} to (excl) {:#}",
+					self.beg, self.end),
+			Some(source_name) =>
+				write!(f, "{}: from {:#} to (excl) {:#}",
+					source_name, self.beg, self.end),
+		}
+	}
+}
+
+trait CharStream {
+	fn peek(&self) -> Option<char>;
+	fn disc(&mut self);
+	fn loc(&self) -> CharLoc;
+}
+
+struct CharStreamString {
+	string: String,
+	index: usize,
+	loc: CharLoc,
+}
+
+impl CharStreamString {
+	fn new(string: &str) -> Self {
+		CharStreamString {
+			string: string.to_string(),
+			index: 0,
+			loc: CharLoc::new(Some(Rc::new("source_code".to_string()))),
+		}
+	}
+}
+
+impl CharStream for CharStreamString {
+	fn peek(&self) -> Option<char> {
+		self.string[self.index..].chars().next()
+	}
+
+	fn disc(&mut self) {
+		match self.peek() {
+			Some(ch) => {
+				self.index += ch.len_utf8();
+				self.loc.pass(ch);
+			},
+			None => (),
+		}
+	}
+
+	fn loc(&self) -> CharLoc {
+		self.loc
+	}
+}
+
+#[derive(Debug)]
 enum ParsingError {
-	UnexpectedCharacter(char),
-	UnexpectedToken(Tok),
+	UnexpectedCharacter(char, CharLoc),
+	UnexpectedToken(Tok, StringLoc),
 	UnexpectedEndOfFileInComment,
 }
 
 impl std::fmt::Display for ParsingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			ParsingError::UnexpectedCharacter(ch) =>
-				write!(f, "unexpected character `{}`", ch),
-			ParsingError::UnexpectedToken(tok) =>
-				write!(f, "unexpected token `{}`", tok),
+			ParsingError::UnexpectedCharacter(ch, loc) =>
+				write!(f, "unexpected character `{}` at {}",
+					ch, loc),
+			ParsingError::UnexpectedToken(tok, loc) =>
+				write!(f, "unexpected token `{}` beginning at {}",
+					tok, loc.beg),
 			ParsingError::UnexpectedEndOfFileInComment =>
 				write!(f, "unexpected end-of-file in comment"),
 		}
@@ -56,7 +145,7 @@ enum Tok {
 	Word(String),
 	StringLitteral(String),
 	IntegerLitteral(String),
-	OpToLeft,
+	OpLeft,
 	OpPlus,
 	OpMinus,
 	ParenLeft,
@@ -70,7 +159,7 @@ impl std::fmt::Display for Tok {
 			Tok::Word(word) => write!(f, "{}", word),
 			Tok::StringLitteral(string) => write!(f, "\"{}\"", string),
 			Tok::IntegerLitteral(integer) => write!(f, "{}", integer),
-			Tok::OpToLeft => write!(f, "<"),
+			Tok::OpLeft => write!(f, "<"),
 			Tok::OpPlus => write!(f, "+"),
 			Tok::OpMinus => write!(f, "-"),
 			Tok::ParenLeft => write!(f, "("),
@@ -110,21 +199,21 @@ struct Prog {
 	stmts: Vec<Stmt>,
 }
 
-struct TokStream<Cs: CodeStream> {
-	cs: Cs,
-	tok_opt: Option<Tok>,
+struct TokStream {
+	cs: Box<dyn CharStream>,
+	tok_loc_stack: Vec<(Tok, StringLoc)>,
 }
 
-impl<Cs: CodeStream> TokStream<Cs> {
-	fn from(cs: Cs) -> TokStream<Cs> {
+impl TokStream {
+	fn from(cs: Box<dyn CharStream>) -> TokStream {
 		TokStream {
 			cs: cs,
-			tok_opt: None,
+			tok_loc_stack: Vec::new(),
 		}
 	}
 }
 
-impl<Cs: CodeStream> TokStream<Cs> {
+impl TokStream {
 	fn disc_ws(&mut self) -> Result<(), ParsingError> {
 		let mut comment_mode = false;
 		loop {
@@ -174,7 +263,7 @@ impl<Cs: CodeStream> TokStream<Cs> {
 		integer_string
 	}
 
-	fn parse_string_litteral_string(&mut self) -> String {
+	fn parse_string_string(&mut self) -> String {
 		std::assert!(self.cs.peek().map_or(false, |ch| ch == '\"'));
 		self.cs.disc(); // Initial `"` character
 		let mut string_litteral_string = String::new();
@@ -189,72 +278,91 @@ impl<Cs: CodeStream> TokStream<Cs> {
 		string_litteral_string
 	}
 
-	fn parse_tok(&mut self) -> Result<Tok, ParsingError> {
+	fn parse_tok(&mut self) -> Result<(Tok, StringLoc), ParsingError> {
 		self.disc_ws()?;
+		let beg = self.cs.loc();
 		match self.cs.peek() {
-			Some(ch) if ch.is_ascii_alphabetic() =>
-				Ok(Tok::Word(self.parse_word_string())),
-			Some(ch) if ch.is_ascii_digit() =>
-				Ok(Tok::IntegerLitteral(self.parse_integer_string())),
-			Some(ch) if ch == '\"' =>
-				Ok(Tok::StringLitteral(self.parse_string_litteral_string())),
+			Some(ch) if ch.is_ascii_alphabetic() => {
+				let tok = Tok::Word(self.parse_word_string());
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
+			},
+			Some(ch) if ch.is_ascii_digit() => {
+				let tok = Tok::IntegerLitteral(self.parse_integer_string());
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
+			},
+			Some(ch) if ch == '\"' => {
+				let tok = Tok::StringLitteral(self.parse_string_string());
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
+			},
 			Some(ch) if ch == '<' => {
 				self.cs.disc();
-				Ok(Tok::OpToLeft)
+				let tok = Tok::OpLeft;
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
 			},
 			Some(ch) if ch == '+' => {
 				self.cs.disc();
-				Ok(Tok::OpPlus)
+				let tok = Tok::OpPlus;
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
 			},
 			Some(ch) if ch == '-' => {
 				self.cs.disc();
-				Ok(Tok::OpMinus)
+				let tok = Tok::OpMinus;
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
 			},
 			Some(ch) if ch == '(' => {
 				self.cs.disc();
-				Ok(Tok::ParenLeft)
+				let tok = Tok::ParenLeft;
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
 			},
 			Some(ch) if ch == ')' => {
 				self.cs.disc();
-				Ok(Tok::ParenRight)
+				let tok = Tok::ParenRight;
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
 			},
-			None => Ok(Tok::Void),
+			None => {
+				let tok = Tok::Void;
+				let end = self.cs.loc();
+				Ok((tok, StringLoc::new(beg, end)))
+			},
 			Some(ch) => {
 				self.cs.disc();
-				Err(ParsingError::UnexpectedCharacter(ch))
+				Err(ParsingError::UnexpectedCharacter(ch, beg))
 			},
 		}
 	}
 }
 
-impl<Cs: CodeStream> TokStream<Cs> {
-	fn peek(&mut self) -> Result<&Tok, ParsingError> {
-		if self.tok_opt.is_none() {
-			self.tok_opt = Some(self.parse_tok()?);
+impl TokStream {
+	fn peek(&mut self) -> Result<&(Tok, StringLoc), ParsingError> {
+		if self.tok_loc_stack.is_empty() {
+			let tok_loc = self.parse_tok()?;
+			self.tok_loc_stack.push(tok_loc);
 		}
-		if let Some(tok) = &self.tok_opt {
-			Ok(tok)
-		} else {
-			unreachable!()
-		}
+		Ok(self.tok_loc_stack.last().unwrap())
 	}
 
 	fn disc(&mut self) -> Result<(), ParsingError> {
-		if self.tok_opt.is_none() {
-			self.parse_tok()?;
-		} else {
-			self.tok_opt = None;
+		match self.tok_loc_stack.pop() {
+			None => {
+				self.parse_tok()?;
+				()
+			},
+			Some(_) => (),
 		}
 		Ok(())
 	}
 
-	fn pop(&mut self) -> Result<Tok, ParsingError> {
-		match &self.tok_opt {
-			Some(tok) => {
-				let tok_copy = tok.clone();
-				self.tok_opt = None;
-				Ok(tok_copy)
-			},
+	fn pop(&mut self) -> Result<(Tok, StringLoc), ParsingError> {
+		match self.tok_loc_stack.pop() {
+			Some(tok_loc) => Ok(tok_loc),
 			None => self.parse_tok(),
 		}
 	}
@@ -265,26 +373,28 @@ enum ExprEnd {
 	Paren,
 }
 
-impl<Cs: CodeStream> TokStream<Cs> {
-	fn parse_expr_left(&mut self) -> Result<Expr, ParsingError> {
+impl TokStream {
+	fn parse_expr_left(&mut self) -> Result<(Expr, StringLoc), ParsingError> {
 		match self.pop()? {
-			Tok::Word(word) =>
-				Ok(Expr::Var(word)),
-			Tok::StringLitteral(string) =>
-				Ok(Expr::Const(Obj::String(string))),
-			Tok::IntegerLitteral(string) =>
-				Ok(Expr::Const(Obj::Integer(str::parse(&string)
-					.expect("TODO: implement bigints")))),
-			Tok::ParenLeft =>
+			(Tok::Word(word), loc) =>
+				Ok((Expr::Var(word), loc)),
+			(Tok::StringLitteral(string), loc) =>
+				Ok((Expr::Const(Obj::String(string)), loc)),
+			(Tok::IntegerLitteral(string), loc) =>
+				Ok((Expr::Const(Obj::Integer(str::parse(&string)
+					.expect("TODO: implement bigints"))), loc)),
+			(Tok::ParenLeft, loc) => 
 				self.parse_expr(&ExprEnd::Paren),
-			tok =>
-				Err(ParsingError::UnexpectedToken(tok)),
+			(tok, loc) =>
+				Err(ParsingError::UnexpectedToken(tok, loc)),
 		}
 	}
 
-	fn parse_expr(&mut self, end: &ExprEnd) -> Result<Expr, ParsingError> {
+	fn parse_expr(&mut self, end: &ExprEnd) -> Result<
+		(Expr, StringLoc), ParsingError
+	> {
 		let mut expr = self.parse_expr_left()?;
-		while self.peek()?.is_bin_op() {
+		while self.peek()?.0.is_bin_op() {
 			let op = self.peek()?.to_owned();
 			self.disc()?;
 			match op {
@@ -314,7 +424,7 @@ impl<Cs: CodeStream> TokStream<Cs> {
 			Tok::Word(word) if word == "pr" =>
 				Ok(Stmt::Print(self.parse_expr(&ExprEnd::None)?)),
 			Tok::Word(word) => match self.pop()? {
-				Tok::OpToLeft =>
+				Tok::OpLeft =>
 					Ok(Stmt::Assign(word, self.parse_expr(&ExprEnd::None)?)),
 				tok => Err(ParsingError::UnexpectedToken(tok)),
 			},
@@ -460,13 +570,15 @@ impl Settings {
 	}
 }
 
+mod parser;
+
 fn main() {
 	let settings = Settings::from_args();
 
 	let src = std::fs::read_to_string(&settings.src_filename)
 		.expect(&format!("source file `{}` couldn't be read",
 			&settings.src_filename));
-	let prog = TokStream::from(CodeStreamString::from(&src))
+	let prog = TokStream::from(Box::new(CharStreamString::new(&src)))
 		.parse_prog()
 		.expect("gura flat");
 
@@ -476,4 +588,46 @@ fn main() {
 
 	let mut mem = Mem::new();
 	mem.exec_prog(&prog);
+
+	parser::uwu();
+}
+*/
+
+
+struct Settings {
+	src_filename: String,
+	debug_mode: bool,
+}
+
+impl Settings {
+	fn from_args() -> Settings {
+		let mut args = std::env::args();
+		args.next();
+		let src_filename = args.next().expect("no source file provided");
+		let mut debug_mode = false;
+		for arg in args {
+			if arg == "-d" {
+				debug_mode = true;
+			}
+		}
+		Settings {
+			src_filename: src_filename,
+			debug_mode: debug_mode,
+		}
+	}
+}
+
+mod parser;
+
+fn main() {
+	let settings = Settings::from_args();
+
+	let src = std::fs::read_to_string(&settings.src_filename)
+		.expect(&format!("source file `{}` couldn't be read",
+			&settings.src_filename));
+	let scu = parser::SourceCodeUnit::from_str(
+		&src, "test name".to_string());
+	if settings.debug_mode {
+		dbg!(scu);
+	}
 }
