@@ -608,26 +608,37 @@ impl Settings {
 		for arg in args {
 			if arg == "-d" {
 				debug_mode = true;
+			} else {
+				panic!("unknown command line argument `{}`", arg);
 			}
 		}
 		Settings {
-			src_filename: src_filename,
-			debug_mode: debug_mode,
+			src_filename,
+			debug_mode,
 		}
 	}
 }
 
+use std::rc::Rc;
 mod parser;
 
-fn main() {
+fn main() -> Result<(), parser::ParsingError> {
 	let settings = Settings::from_args();
 
-	let src = std::fs::read_to_string(&settings.src_filename)
-		.expect(&format!("source file `{}` couldn't be read",
-			&settings.src_filename));
-	let scu = parser::SourceCodeUnit::from_str(
-		&src, "test name".to_string());
+	let scu = Rc::new(parser::SourceCodeUnit::from_filename(
+		&settings.src_filename));
 	if settings.debug_mode {
-		dbg!(scu);
+		dbg!(&scu);
 	}
+
+	let mut rh = parser::ReadingHead::from_scu(Rc::clone(&scu));
+	loop {
+		let (tok, _) = rh.read_cur_tok()?;
+		if tok.is_void() {
+			break;
+		}
+		dbg!(tok);
+	}
+
+	Ok(())
 }
