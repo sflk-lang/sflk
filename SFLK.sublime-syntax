@@ -24,7 +24,7 @@ contexts:
       scope: keyword.operator.assignment.flk
     - match: '\+|\-'
       scope: keyword.operator.arithmetic.sflk
-    - match: 'pr'
+    - match: '\b(pr|do)\b'
       scope: keyword.other.sflk
     - match: '[a-zA-Z]+'
       scope: variable.sflk

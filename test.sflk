@@ -1,3 +1,9 @@
 
-x < "uwu"
-pr x + " owo"
+f < {
+	x < 2
+	pr x + 2 # prints 4 #
+}
+do f
+do {
+	pr "uwu" # prints uwu #
+}

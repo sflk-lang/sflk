@@ -18,6 +18,7 @@ impl Block {
 pub enum Stmt {
 	Print {expr: Expr},
 	Assign {varname: String, expr: Expr},
+	Do {expr: Expr},
 }
 
 #[derive(Debug)]
@@ -35,10 +36,13 @@ pub enum Op {
 	//Slash,
 }
 
+use std::rc::Rc;
+
 #[derive(Debug, Clone)]
 pub enum Obj {
 	Integer(isize),
 	String(String),
+	Block(Rc<Block>),
 }
 
 impl std::fmt::Display for Obj {
@@ -46,6 +50,7 @@ impl std::fmt::Display for Obj {
 		match self {
 			Obj::Integer(integer) => write!(f, "{}", integer),
 			Obj::String(string) => write!(f, "{}", string),
+			Obj::Block(_) => write!(f, "{}", "block"),
 		}
 	}
 }
@@ -131,6 +136,7 @@ impl Mem {
 			self.exec_stmt(&block.stmts[self.excx_stack.last().unwrap().i]);
 			self.excx_stack.last_mut().unwrap().i += 1;
 		}
+		self.excx_stack.pop();
 	}
 
 	fn exec_stmt(&mut self, stmt: &Stmt) {
@@ -139,6 +145,10 @@ impl Mem {
 			Stmt::Assign {varname, expr} => {
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
+			},
+			Stmt::Do {expr} => match self.eval_expr(expr) {
+				Obj::Block(block) => self.exec_block(&block),
+				obj => panic!("can't do {} for now", obj),
 			},
 		}
 	}

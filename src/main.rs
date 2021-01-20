@@ -39,7 +39,7 @@ fn main() -> Result<(), parser::ParsingError> {
 	}
 
 	let mut prh = parser::ProgReadingHead::from(
-		tokenizer::TokReadingHead::from_scu(Rc::clone(&scu)));
+		tokenizer::TokReadingHead::from_scu(scu));
 	let (prog, _) = prh.parse_prog()?;
 	if settings.debug_mode {
 		dbg!(&prog);

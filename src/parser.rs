@@ -78,10 +78,21 @@ impl ProgReadingHead {
 }
 
 use crate::{machine::*, tokenizer};
+use std::rc::Rc;
 
 pub enum BlockEnd {
 	Void,
 	Curly,
+}
+
+impl Tok {
+	fn is_block_end(&self, end: &BlockEnd) -> bool {
+		match (end, self) {
+			(BlockEnd::Void, Tok::Void) => true,
+			(BlockEnd::Curly, Tok::Right(s)) if s == "}" => true,
+			_ => false,
+		}
+	}
 }
 
 pub enum ExprEnd {
@@ -97,22 +108,14 @@ impl ProgReadingHead {
 	pub fn parse_block(&mut self, end: BlockEnd) -> Result<(Block, Loc), ParsingError> {
 		let mut stmts: Vec<Stmt> = Vec::new();
 		let mut loc = self.peek_tok()?.1.to_owned();
-		while !self.peek_tok()?.0.is_void() {
+		while !self.peek_tok()?.0.is_block_end(&end) {
 			let (stmt, stmt_loc) = self.parse_stmt()?;
 			stmts.push(stmt);
 			loc += stmt_loc;
 		}
+		self.disc_tok()?; // Discard the end tok already peeked in the loop condition
 		let block = Block::new(stmts);
-		match end {
-			BlockEnd::Void => match self.pop_tok()? {
-				(Tok::Void, _) => Ok((block, loc)),
-				(tok, end_loc) => Err(ParsingError::UnexpectedToken {tok, loc: end_loc}),
-			},
-			BlockEnd::Curly => match self.pop_tok()? {
-				(Tok::Right(s), _) if s == "}" => Ok((block, loc)),
-				(tok, end_loc) => Err(ParsingError::UnexpectedToken {tok, loc: end_loc}),
-			},
-		}
+		Ok((block, loc))
 	}
 
 	pub fn parse_stmt(&mut self) -> Result<(Stmt, Loc), ParsingError> {
@@ -121,6 +124,10 @@ impl ProgReadingHead {
 			Tok::Word(s) if s == "pr" => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Print {expr}, loc + expr_loc))
+			},
+			Tok::Word(s) if s == "do" => {
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::Do {expr}, loc + expr_loc))
 			},
 			Tok::Word(left_word) => match self.peek_tok()? {
 				(Tok::ToLeft, _) => {
@@ -145,6 +152,10 @@ impl ProgReadingHead {
 			Tok::String(string) => Ok((Expr::Const {val:
 				Obj::String(string.clone())}, loc)),
 			Tok::Left(left) if left == "(" => self.parse_expr(ExprEnd::Paren),
+			Tok::Left(left) if left == "{" => {
+				let (block, block_loc) = self.parse_block(BlockEnd::Curly)?;
+				Ok((Expr::Const {val: Obj::Block(Rc::new(block))}, block_loc))
+			},
 			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
 		}
 	}
