@@ -1,4 +1,6 @@
 
+use std::cell::UnsafeCell;
+
 use tokenizer::*;
 
 #[derive(Debug)]
@@ -43,7 +45,7 @@ impl ProgReadingHead {
 		self.trh.read_cur_tok()
 	}
 
-	fn peek_tok(&mut self) -> Result<&(Tok, Loc), ParsingError> {
+	pub fn peek_tok(&mut self) -> Result<&(Tok, Loc), ParsingError> {
 		if self.tok_buffer.is_empty() {
 			let tok_loc = self.read_tok_from_trh()?;
 			self.tok_buffer.push(tok_loc);
@@ -77,28 +79,52 @@ impl ProgReadingHead {
 
 use crate::{machine::*, tokenizer};
 
-/*
-enum BlockParserEnd {
+pub enum BlockEnd {
 	Void,
 	Curly,
 }
-*/
 
-pub enum ExprParsingEnd {
+pub enum ExprEnd {
 	Nothing,
 	Paren,
 }
 
 impl ProgReadingHead {
-	/*
-	fn parse_block_content(&mut self, parser_end: BlockParserEnd) -> Result<(Block, Loc), ParsingError> {
-		let mut stmts: Vec<Stmt> = Vec::new();
-		loop {
-			let (tok, loc) = self.read_cur_tok()?;
-		}
-		Ok((Block::new(stmts), ???))
+	pub fn parse_prog(&mut self) -> Result<(Prog, Loc), ParsingError> {
+		self.parse_block(BlockEnd::Void)
 	}
-	*/
+
+	pub fn parse_block(&mut self, end: BlockEnd) -> Result<(Block, Loc), ParsingError> {
+		let mut stmts: Vec<Stmt> = Vec::new();
+		let mut loc = self.peek_tok()?.1.to_owned();
+		while !self.peek_tok()?.0.is_void() {
+			let (stmt, stmt_loc) = self.parse_stmt()?;
+			stmts.push(stmt);
+			loc += stmt_loc;
+		}
+		let block = Block::new(stmts);
+		match end {
+			BlockEnd::Void => match self.pop_tok()? {
+				(Tok::Void, _) => Ok((block, loc)),
+				(tok, end_loc) => Err(ParsingError::UnexpectedToken {tok, loc: end_loc}),
+			},
+			BlockEnd::Curly => match self.pop_tok()? {
+				(Tok::Right(s), _) if s == "}" => Ok((block, loc)),
+				(tok, end_loc) => Err(ParsingError::UnexpectedToken {tok, loc: end_loc}),
+			},
+		}
+	}
+
+	pub fn parse_stmt(&mut self) -> Result<(Stmt, Loc), ParsingError> {
+		let (tok, loc) = self.pop_tok()?;
+		match tok {
+			Tok::Word(s) if s == "pr" => {
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::Print {expr}, loc + expr_loc))
+			},
+			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
+		}
+	}
 
 	fn parse_expr_left(&mut self) -> Result<(Expr, Loc), ParsingError> {
 		let (tok, loc) = self.pop_tok()?;
@@ -106,12 +132,12 @@ impl ProgReadingHead {
 			//Tok::Word(word) => Ok((Expr::Var {varname: word}, loc)),
 			Tok::Integer(integer) => Ok((Expr::Const {val:
 				Obj::Integer(str::parse(&integer).expect("integer parsing error"))}, loc)),
-			Tok::Left(left) if left == "(" => self.parse_expr(ExprParsingEnd::Paren),
+			Tok::Left(left) if left == "(" => self.parse_expr(ExprEnd::Paren),
 			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
 		}
 	}
 
-	pub fn parse_expr(&mut self, parsing_end: ExprParsingEnd) -> Result<(Expr, Loc), ParsingError> {
+	pub fn parse_expr(&mut self, end: ExprEnd) -> Result<(Expr, Loc), ParsingError> {
 		let (mut expr, mut loc) = self.parse_expr_left()?;
 		while self.peek_tok()?.0.is_bin_op() {
 			let (op, _) = self.pop_tok()?;
@@ -132,37 +158,12 @@ impl ProgReadingHead {
 				_ => unreachable!(),
 			}
 		}
-		match parsing_end {
-			ExprParsingEnd::Nothing => Ok((expr, loc)),
-			ExprParsingEnd::Paren => match self.pop_tok()? {
+		match end {
+			ExprEnd::Nothing => Ok((expr, loc)),
+			ExprEnd::Paren => match self.pop_tok()? {
 				(Tok::Right(s), _) if s == ")" => Ok((expr, loc)),
 				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok}),
 			}
 		}
-		/*
-		let mut expr = self.parse_expr_left()?;
-		while self.peek()?.0.is_bin_op() {
-			let op = self.peek()?.to_owned();
-			self.disc()?;
-			match op {
-				Tok::OpPlus =>
-					expr = Expr::Plus(Box::new(expr),
-						Box::new(self.parse_expr_left()?)),
-				Tok::OpMinus =>
-					expr = Expr::Minus(Box::new(expr),
-						Box::new(self.parse_expr_left()?)),
-				_ => unreachable!(),
-			}
-		}
-		match end {
-			ExprEnd::None => (),
-			ExprEnd::Paren => match self.pop()? {
-				Tok::ParenRight => (),
-				tok => return Err(ParsingError::UnexpectedToken(tok)),
-			},
-		}
-		Ok(expr)
-		*/
 	}
 }
-

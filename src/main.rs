@@ -625,8 +625,6 @@ mod parser;
 mod machine;
 
 fn main() -> Result<(), parser::ParsingError> {
-	println!("TODO: split parser into tokenizer + parser");
-
 	let settings = Settings::from_args();
 
 	let scu = Rc::new(tokenizer::SourceCodeUnit::from_filename(
@@ -636,10 +634,13 @@ fn main() -> Result<(), parser::ParsingError> {
 	}
 
 	let mut prh = parser::ProgReadingHead::from(tokenizer::TokReadingHead::from_scu(Rc::clone(&scu)));
-	loop {
-		let (expr, _) = prh.parse_expr(parser::ExprParsingEnd::Nothing)?;
-		dbg!(expr);
+	let (prog, _) = prh.parse_prog()?;
+	if settings.debug_mode {
+		dbg!(&prog);
 	}
+
+	let mut mem = machine::Mem::new();
+	mem.exec_prog(&prog);
 
 	Ok(())
 }
