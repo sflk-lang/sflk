@@ -37,14 +37,15 @@ pub enum Op {
 
 #[derive(Debug, Clone)]
 pub enum Obj {
-	//String(String),
 	Integer(isize),
+	String(String),
 }
 
 impl std::fmt::Display for Obj {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
 			Obj::Integer(integer) => write!(f, "{}", integer),
+			Obj::String(string) => write!(f, "{}", string),
 		}
 	}
 }
@@ -53,12 +54,17 @@ impl Obj {
 	fn op_plus(&self, other: &Obj) -> Obj {
 		match (self, other) {
 			(Obj::Integer(left), Obj::Integer(right)) => Obj::Integer(left + right),
+			(Obj::String(left), Obj::String(right)) => Obj::String(left.to_owned() + right),
+			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
+				obj_left, obj_right),
 		}
 	}
 
 	fn op_minus(&self, other: &Obj) -> Obj {
 		match (self, other) {
 			(Obj::Integer(left), Obj::Integer(right)) => Obj::Integer(left - right),
+			(obj_left, obj_right) => panic!("minus not yet supported between {} and {}",
+				obj_left, obj_right),
 		}
 	}
 }

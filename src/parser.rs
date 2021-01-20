@@ -142,6 +142,8 @@ impl ProgReadingHead {
 			Tok::Word(word) => Ok((Expr::Var {varname: word}, loc)),
 			Tok::Integer(integer) => Ok((Expr::Const {val:
 				Obj::Integer(str::parse(&integer).expect("integer parsing error"))}, loc)),
+			Tok::String(string) => Ok((Expr::Const {val:
+				Obj::String(string.clone())}, loc)),
 			Tok::Left(left) if left == "(" => self.parse_expr(ExprEnd::Paren),
 			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
 		}

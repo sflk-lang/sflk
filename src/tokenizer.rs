@@ -43,6 +43,7 @@ impl SourceCodeUnit {
 #[derive(Debug)]
 pub enum TokenizingError {
 	EofInComment {loc: Loc},
+	EofInString {loc: Loc},
 	UnexpectedCharacter {ch: char, loc: Loc},
 }
 
@@ -51,6 +52,9 @@ impl std::fmt::Display for TokenizingError {
 		match self {
 			TokenizingError::EofInComment {loc} =>
 				write!(f, "end-of-file in comment started at line {}",
+					loc.line_start),
+			TokenizingError::EofInString {loc} =>
+				write!(f, "end-of-file in string literal started at line {}",
 					loc.line_start),
 			TokenizingError::UnexpectedCharacter {ch, loc} =>
 				write!(f, "unexpected character `{}` at line {}",
@@ -165,6 +169,7 @@ impl TokReadingHead {
 pub enum Tok {
 	Word(String),
 	Integer(String),
+	String(String),
 	BinOp(String),
 	Left(String),
 	Right(String),
@@ -177,6 +182,7 @@ impl std::fmt::Display for Tok {
 		match self {
 			Tok::Word(s) => write!(f, "{}", s),
 			Tok::Integer(s) => write!(f, "{}", s),
+			Tok::String(s) => write!(f, "\"{}\"", s),
 			Tok::BinOp(s) => write!(f, "{}", s),
 			Tok::Left(s) => write!(f, "{}", s),
 			Tok::Right(s) => write!(f, "{}", s),
@@ -213,6 +219,10 @@ impl TokReadingHead {
 			Some(ch) if ch.is_ascii_digit() => {
 				let (integer, loc) = self.read_cur_integer();
 				Ok((Tok::Integer(integer), loc))
+			},
+			Some(ch) if ch == '\"' => {
+				let (string, loc) = self.read_cur_string()?;
+				Ok((Tok::String(string), loc))
 			},
 			Some(ch) if ch == '+' || ch == '-' || ch == '*' || ch == '/' => {
 				self.goto_next_char();
@@ -265,5 +275,30 @@ impl TokReadingHead {
 		std::assert!(integer_string.len() >= 1);
 		loc.raw_length = integer_string.bytes().len();
 		(integer_string, loc)
+	}
+
+	fn read_cur_string(&mut self) -> Result<(String, Loc), TokenizingError> {
+		let mut string_string = String::new();
+		let mut loc = self.cur_char_loc();
+		std::assert_eq!(self.peek_cur_char(), Some('\"'));
+		self.goto_next_char();
+		loop {
+			match self.peek_cur_char() {
+				None => {
+					loc.raw_length = string_string.bytes().len()+1;
+					return Err(TokenizingError::EofInString {loc});
+				},
+				Some('\"') => {
+					self.goto_next_char();
+					break;
+				},
+				Some(ch) => {
+					string_string.push(ch);
+					self.goto_next_char();
+				},
+			}
+		}
+		loc.raw_length = string_string.bytes().len()+2;
+		Ok((string_string, loc))
 	}
 }
