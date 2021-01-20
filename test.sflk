@@ -1,9 +1,6 @@
 
-f < {
-	x < 2
-	pr x + 2 # prints 4 #
-}
-do f
-do {
-	pr "uwu" # prints uwu #
-}
+pr "u" + ("wu" * 3) # prints uwuwuwu #
+pr "lalala" / "la"  # prints 3 #
+pr (100/10) - (2*5) # prints 0 #
+pr  100/10  -  2*5  # prints 40 #
+# operations are computed from left to right #

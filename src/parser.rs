@@ -1,6 +1,4 @@
 
-use std::char::ToLowercase;
-
 use tokenizer::*;
 
 #[derive(Debug)]
@@ -171,6 +169,8 @@ impl ProgReadingHead {
 						op: match &op_string[..] {
 							"+" => Op::Plus,
 							"-" => Op::Minus,
+							"*" => Op::Star,
+							"/" => Op::Slash,
 							_ => panic!("operator bad"),
 						},
 						left: Box::new(expr),

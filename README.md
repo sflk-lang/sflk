@@ -24,7 +24,15 @@ do {
 }
 ```
 
+```sflk
+pr "u" + ("wu" * 3) # prints uwuwuwu #
+pr "lalala" / "la"  # prints 3 #
+pr (100/10) - (2*5) # prints 0 #
+pr  100/10  -  2*5  # prints 40 #
+# operations are computed from left to right #
+```
+
 It has
 assignment, +, -, strings, integers, print, parenthesis, comments,
-code blocks.
+code blocks, *, /.
 And more is comming soon!

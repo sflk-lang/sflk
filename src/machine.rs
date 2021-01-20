@@ -32,8 +32,8 @@ pub enum Expr {
 pub enum Op {
 	Plus,
 	Minus,
-	//Star,
-	//Slash,
+	Star,
+	Slash,
 }
 
 use std::rc::Rc;
@@ -58,8 +58,10 @@ impl std::fmt::Display for Obj {
 impl Obj {
 	fn op_plus(&self, other: &Obj) -> Obj {
 		match (self, other) {
-			(Obj::Integer(left), Obj::Integer(right)) => Obj::Integer(left + right),
-			(Obj::String(left), Obj::String(right)) => Obj::String(left.to_owned() + right),
+			(Obj::Integer(left), Obj::Integer(right)) =>
+				Obj::Integer(left + right),
+			(Obj::String(left), Obj::String(right)) =>
+				Obj::String(left.to_owned() + right),
 			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
 				obj_left, obj_right),
 		}
@@ -67,8 +69,31 @@ impl Obj {
 
 	fn op_minus(&self, other: &Obj) -> Obj {
 		match (self, other) {
-			(Obj::Integer(left), Obj::Integer(right)) => Obj::Integer(left - right),
+			(Obj::Integer(left), Obj::Integer(right)) =>
+				Obj::Integer(left - right),
 			(obj_left, obj_right) => panic!("minus not yet supported between {} and {}",
+				obj_left, obj_right),
+		}
+	}
+
+	fn op_star(&self, other: &Obj) -> Obj {
+		match (self, other) {
+			(Obj::Integer(left), Obj::Integer(right)) =>
+				Obj::Integer(left * right),
+			(Obj::String(left), Obj::Integer(right)) =>
+				Obj::String(left.repeat(*right as usize)),
+			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
+				obj_left, obj_right),
+		}
+	}
+
+	fn op_slash(&self, other: &Obj) -> Obj {
+		match (self, other) {
+			(Obj::Integer(left), Obj::Integer(right)) =>
+				Obj::Integer(left / right),
+			(Obj::String(left), Obj::String(right)) =>
+				Obj::Integer(left.matches(right).count() as isize),
+			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
 				obj_left, obj_right),
 		}
 	}
@@ -160,6 +185,8 @@ impl Mem {
 			Expr::BinOp {op, left, right} => match op {
 				Op::Plus => Obj::op_plus(&self.eval_expr(left), &self.eval_expr(right)),
 				Op::Minus => Obj::op_minus(&self.eval_expr(left), &self.eval_expr(right)),
+				Op::Star => Obj::op_star(&self.eval_expr(left), &self.eval_expr(right)),
+				Op::Slash => Obj::op_slash(&self.eval_expr(left), &self.eval_expr(right)),
 			}
 		}
 	}

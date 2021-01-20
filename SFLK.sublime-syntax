@@ -11,9 +11,14 @@ contexts:
       scope: punctuation.definition.comment.begin.sflk
       push: comment
     - match: '\('
-      scope: punctuation.section.braces.begin.sflk
+      scope: punctuation.section.parens.begin.sflk
       push: paren
     - match: '\)'
+      scope: invalid.illegal.sflk
+    - match: '\{'
+      scope: punctuation.section.braces.begin.sflk
+      push: curly
+    - match: '\}'
       scope: invalid.illegal.sflk
     - match: '"'
       scope: punctuation.definition.string.begin.sflk
@@ -22,7 +27,7 @@ contexts:
       scope: constant.numeric.integer.decimal.sflk
     - match: '<'
       scope: keyword.operator.assignment.flk
-    - match: '\+|\-'
+    - match: '\+|\-|\*|/'
       scope: keyword.operator.arithmetic.sflk
     - match: '\b(pr|do)\b'
       scope: keyword.other.sflk
@@ -37,6 +42,12 @@ contexts:
 
   paren:
     - match: '\)'
+      scope: punctuation.section.parens.end.sflk
+      pop: true
+    - include: main
+
+  curly:
+    - match: '\}'
       scope: punctuation.section.braces.end.sflk
       pop: true
     - include: main
