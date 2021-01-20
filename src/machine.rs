@@ -17,12 +17,12 @@ impl Block {
 #[derive(Debug)]
 pub enum Stmt {
 	Print {expr: Expr},
-	//Assign {varname: String, expr: Expr},
+	Assign {varname: String, expr: Expr},
 }
 
 #[derive(Debug)]
 pub enum Expr {
-	//Var {varname: String},
+	Var {varname: String},
 	Const {val: Obj},
 	BinOp {op: Op, left: Box<Expr>, right: Box<Expr>},
 }
@@ -63,12 +63,32 @@ impl Obj {
 	}
 }
 
+use std::collections::HashMap;
+
 struct Cx {
+	varmap: HashMap<String, Obj>,
+}
+
+impl Cx {
+	fn new() -> Cx {
+		Cx {
+			varmap: HashMap::new(),
+		}
+	}
 }
 
 struct ExCx {
 	cx: Cx,
 	i: usize,
+}
+
+impl ExCx {
+	fn new() -> ExCx {
+		ExCx {
+			cx: Cx::new(),
+			i: 0,
+		}
+	}
 }
 
 pub struct Mem {
@@ -84,12 +104,23 @@ impl Mem {
 }
 
 impl Mem {
+	fn varset(&mut self, varname: &str, val: Obj) {
+		self.excx_stack.last_mut().unwrap().cx.varmap.insert(varname.to_string(), val);
+		()
+	}
+
+	fn varget(&self, varname: &str) -> &Obj {
+		self.excx_stack.last().unwrap().cx.varmap.get(varname).expect("change this")
+	}
+}
+
+impl Mem {
 	pub fn exec_prog(&mut self, prog: &Prog) {
 		self.exec_block(prog as &Block);
 	}
 
 	fn exec_block(&mut self, block: &Block) {
-		self.excx_stack.push(ExCx {cx: Cx {}, i: 0});
+		self.excx_stack.push(ExCx::new());
 		while self.excx_stack.last().unwrap().i < block.stmts.len() {
 			self.exec_stmt(&block.stmts[self.excx_stack.last().unwrap().i]);
 			self.excx_stack.last_mut().unwrap().i += 1;
@@ -99,11 +130,16 @@ impl Mem {
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Print {expr} => println!("{}", self.eval_expr(expr)),
+			Stmt::Assign {varname, expr} => {
+				let val = self.eval_expr(expr);
+				self.varset(varname, val);
+			},
 		}
 	}
 
 	fn eval_expr(&mut self, expr: &Expr) -> Obj {
 		match expr {
+			Expr::Var {varname} => self.varget(varname).clone(),
 			Expr::Const {val} => val.clone(),
 			Expr::BinOp {op, left, right} => match op {
 				Op::Plus => Obj::op_plus(&self.eval_expr(left), &self.eval_expr(right)),

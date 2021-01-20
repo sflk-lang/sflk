@@ -1,5 +1,5 @@
 
-use std::cell::UnsafeCell;
+use std::char::ToLowercase;
 
 use tokenizer::*;
 
@@ -122,6 +122,16 @@ impl ProgReadingHead {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Print {expr}, loc + expr_loc))
 			},
+			Tok::Word(left_word) => match self.peek_tok()? {
+				(Tok::ToLeft, _) => {
+					self.disc_tok()?;
+					let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+					Ok((Stmt::Assign {varname: left_word, expr}, loc + expr_loc))
+				},
+				(tok, loc) => Err(ParsingError::UnexpectedToken {
+					tok: tok.clone(), loc: loc.clone()
+				}),
+			}
 			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
 		}
 	}
@@ -129,7 +139,7 @@ impl ProgReadingHead {
 	fn parse_expr_left(&mut self) -> Result<(Expr, Loc), ParsingError> {
 		let (tok, loc) = self.pop_tok()?;
 		match tok {
-			//Tok::Word(word) => Ok((Expr::Var {varname: word}, loc)),
+			Tok::Word(word) => Ok((Expr::Var {varname: word}, loc)),
 			Tok::Integer(integer) => Ok((Expr::Const {val:
 				Obj::Integer(str::parse(&integer).expect("integer parsing error"))}, loc)),
 			Tok::Left(left) if left == "(" => self.parse_expr(ExprEnd::Paren),

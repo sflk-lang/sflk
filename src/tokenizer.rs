@@ -168,6 +168,7 @@ pub enum Tok {
 	BinOp(String),
 	Left(String),
 	Right(String),
+	ToLeft,
 	Void,
 }
 
@@ -179,6 +180,7 @@ impl std::fmt::Display for Tok {
 			Tok::BinOp(s) => write!(f, "{}", s),
 			Tok::Left(s) => write!(f, "{}", s),
 			Tok::Right(s) => write!(f, "{}", s),
+			Tok::ToLeft => write!(f, "<"),
 			Tok::Void => write!(f, ""),
 		}
 	}
@@ -223,6 +225,10 @@ impl TokReadingHead {
 			Some(ch) if ch == ')' || ch == ']' || ch == '}' => {
 				self.goto_next_char();
 				Ok((Tok::Right(ch.to_string()), self.cur_char_loc()))
+			},
+			Some(ch) if ch == '<' => {
+				self.goto_next_char();
+				Ok((Tok::ToLeft, self.cur_char_loc()))
 			},
 			Some(ch) => Err(TokenizingError::UnexpectedCharacter {
 				ch, loc: self.cur_char_loc(),
