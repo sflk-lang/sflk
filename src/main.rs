@@ -620,24 +620,25 @@ impl Settings {
 }
 
 use std::rc::Rc;
+mod tokenizer;
 mod parser;
+mod machine;
 
 fn main() -> Result<(), parser::ParsingError> {
+	println!("TODO: split parser into tokenizer + parser");
+
 	let settings = Settings::from_args();
 
-	let scu = Rc::new(parser::SourceCodeUnit::from_filename(
+	let scu = Rc::new(tokenizer::SourceCodeUnit::from_filename(
 		&settings.src_filename));
 	if settings.debug_mode {
 		dbg!(&scu);
 	}
 
-	let mut rh = parser::ReadingHead::from_scu(Rc::clone(&scu));
+	let mut prh = parser::ProgReadingHead::from(tokenizer::TokReadingHead::from_scu(Rc::clone(&scu)));
 	loop {
-		let (tok, _) = rh.read_cur_tok()?;
-		if tok.is_void() {
-			break;
-		}
-		dbg!(tok);
+		let (expr, _) = prh.parse_expr(parser::ExprParsingEnd::Nothing)?;
+		dbg!(expr);
 	}
 
 	Ok(())
