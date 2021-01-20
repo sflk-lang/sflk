@@ -127,11 +127,27 @@ impl ProgReadingHead {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Do {expr}, loc + expr_loc))
 			},
+			Tok::Word(s) if s == "redo" => {
+				Ok((Stmt::Redo, loc))
+			},
+			Tok::Word(s) if s == "end" => {
+				Ok((Stmt::End, loc))
+			},
+			Tok::Word(s) if s == "if" => {
+				let (cond_expr, cond_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				let (stmt, stmt_loc) = self.parse_stmt()?;
+				Ok((Stmt::If {cond_expr, stmt: Box::new(stmt)}, loc + cond_loc + stmt_loc))
+			},
 			Tok::Word(left_word) => match self.peek_tok()? {
 				(Tok::ToLeft, _) => {
 					self.disc_tok()?;
 					let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 					Ok((Stmt::Assign {varname: left_word, expr}, loc + expr_loc))
+				},
+				(Tok::ToLeftTilde, _) => {
+					self.disc_tok()?;
+					let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+					Ok((Stmt::AssignIfFree {varname: left_word, expr}, loc + expr_loc))
 				},
 				(tok, loc) => Err(ParsingError::UnexpectedToken {
 					tok: tok.clone(), loc: loc.clone()

@@ -174,6 +174,7 @@ pub enum Tok {
 	Left(String),
 	Right(String),
 	ToLeft,
+	ToLeftTilde,
 	Void,
 }
 
@@ -187,6 +188,7 @@ impl std::fmt::Display for Tok {
 			Tok::Left(s) => write!(f, "{}", s),
 			Tok::Right(s) => write!(f, "{}", s),
 			Tok::ToLeft => write!(f, "<"),
+			Tok::ToLeftTilde => write!(f, "<~"),
 			Tok::Void => write!(f, ""),
 		}
 	}
@@ -238,7 +240,13 @@ impl TokReadingHead {
 			},
 			Some(ch) if ch == '<' => {
 				self.goto_next_char();
-				Ok((Tok::ToLeft, self.cur_char_loc()))
+				match self.peek_cur_char() {
+					Some('~') => {
+						self.goto_next_char();
+						Ok((Tok::ToLeftTilde, self.cur_char_loc()))
+					},
+					_ => Ok((Tok::ToLeft, self.cur_char_loc())),
+				}
 			},
 			Some(ch) => Err(TokenizingError::UnexpectedCharacter {
 				ch, loc: self.cur_char_loc(),

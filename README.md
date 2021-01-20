@@ -32,7 +32,15 @@ pr  100/10  -  2*5  # prints 40 #
 # operations are computed from left to right #
 ```
 
+```sflk
+# counts from 9 down to 1 #
+x <~ 9
+pr x
+x < x -1
+if x redo
+```
+
 It has
-assignment, +, -, strings, integers, print, parenthesis, comments,
-code blocks, *, /.
+assignment, `+`, `-`, strings, integers, print, parenthesis, comments,
+code blocks, `*`, `/`.
 And more is comming soon!

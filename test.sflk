@@ -1,6 +1,6 @@
 
-pr "u" + ("wu" * 3) # prints uwuwuwu #
-pr "lalala" / "la"  # prints 3 #
-pr (100/10) - (2*5) # prints 0 #
-pr  100/10  -  2*5  # prints 40 #
-# operations are computed from left to right #
+# counts from 9 down to 1 #
+x <~ 9
+pr x
+x < x -1
+if x redo

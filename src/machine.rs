@@ -18,7 +18,11 @@ impl Block {
 pub enum Stmt {
 	Print {expr: Expr},
 	Assign {varname: String, expr: Expr},
+	AssignIfFree {varname: String, expr: Expr},
 	Do {expr: Expr},
+	Redo,
+	End,
+	If {cond_expr: Expr, stmt: Box<Stmt>},
 }
 
 #[derive(Debug)]
@@ -99,6 +103,16 @@ impl Obj {
 	}
 }
 
+impl Obj {
+	fn as_cond(&self) -> bool {
+		match self {
+			Obj::Integer(integer) => *integer != 0,
+			Obj::String(string) => string.len() != 0,
+			Obj::Block(_) => true,
+		}
+	}
+}
+
 use std::collections::HashMap;
 
 struct Cx {
@@ -116,6 +130,7 @@ impl Cx {
 struct ExCx {
 	cx: Cx,
 	i: usize,
+	running: bool,
 }
 
 impl ExCx {
@@ -123,6 +138,7 @@ impl ExCx {
 		ExCx {
 			cx: Cx::new(),
 			i: 0,
+			running: true,
 		}
 	}
 }
@@ -140,13 +156,29 @@ impl Mem {
 }
 
 impl Mem {
+	fn top_excx(&self) -> &ExCx {
+		self.excx_stack.last().unwrap()
+	}
+
+	fn top_excx_mut(&mut self) -> &mut ExCx {
+		self.excx_stack.last_mut().unwrap()
+	}
+}
+
+impl Mem {
 	fn varset(&mut self, varname: &str, val: Obj) {
-		self.excx_stack.last_mut().unwrap().cx.varmap.insert(varname.to_string(), val);
+		self.top_excx_mut().cx.varmap.insert(varname.to_string(), val);
 		()
 	}
 
+	fn varset_if_free(&mut self, varname: &str, val: Obj) {
+		if self.top_excx().cx.varmap.get(varname).is_none() {
+			self.top_excx_mut().cx.varmap.insert(varname.to_string(), val);
+		}
+	}
+
 	fn varget(&self, varname: &str) -> &Obj {
-		self.excx_stack.last().unwrap().cx.varmap.get(varname).expect("change this")
+		self.top_excx().cx.varmap.get(varname).expect("change this")
 	}
 }
 
@@ -157,23 +189,51 @@ impl Mem {
 
 	fn exec_block(&mut self, block: &Block) {
 		self.excx_stack.push(ExCx::new());
-		while self.excx_stack.last().unwrap().i < block.stmts.len() {
-			self.exec_stmt(&block.stmts[self.excx_stack.last().unwrap().i]);
-			self.excx_stack.last_mut().unwrap().i += 1;
+		while self.top_excx().running {
+			self.exec_stmt(&block.stmts[self.top_excx().i]);
+			if self.top_excx().i >= block.stmts.len() {
+				self.top_excx_mut().running = false;
+			}
 		}
 		self.excx_stack.pop();
 	}
 
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
-			Stmt::Print {expr} => println!("{}", self.eval_expr(expr)),
+			Stmt::Print {expr} => {
+				println!("{}", self.eval_expr(expr));
+				self.top_excx_mut().i += 1;
+			},
 			Stmt::Assign {varname, expr} => {
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
+				self.top_excx_mut().i += 1;
 			},
-			Stmt::Do {expr} => match self.eval_expr(expr) {
-				Obj::Block(block) => self.exec_block(&block),
-				obj => panic!("can't do {} for now", obj),
+			Stmt::AssignIfFree {varname, expr} => {
+				let val = self.eval_expr(expr);
+				self.varset_if_free(varname, val);
+				self.top_excx_mut().i += 1;
+			},
+			Stmt::Do {expr} => {
+				match self.eval_expr(expr) {
+					Obj::Block(block) => self.exec_block(&block),
+					obj => panic!("can't do {} for now", obj),
+				};
+				self.top_excx_mut().i += 1;
+			},
+			Stmt::Redo => {
+				self.top_excx_mut().i = 0;
+			},
+			Stmt::End => {
+				self.top_excx_mut().running = false;
+			},
+			Stmt::If {cond_expr, stmt} => {
+				let cond_val = self.eval_expr(cond_expr);
+				if cond_val.as_cond() {
+					self.exec_stmt(stmt);
+				} else {
+					self.top_excx_mut().i += 1;
+				}
 			},
 		}
 	}
