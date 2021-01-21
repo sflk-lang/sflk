@@ -40,7 +40,17 @@ x < x -1
 if x redo 0 # 0 is the current execution context #
 ```
 
+```sflk
+x <~ 4 do {
+    imp 1 # import variables from 1 context below #
+        pr x
+        x < x -1
+    exp 1 # export variables to 1 context below #
+} if x redo 0
+# prints numbers from 4 down to 1 #
+```
+
 It has
 assignment, `+`, `-`, strings, integers, print, parenthesis, comments,
-code blocks, `*`, `/`, assignment if free, loops.
+code blocks, `*`, `/`, assignment if free, loops, .
 And more is comming soon!
