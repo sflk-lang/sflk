@@ -1,0 +1,7 @@
+
+- display parse-time errors nicely
+- display runtime errors nicely
+- statements as expression ( x < pr y < 4 + do ({pr 1} + {pr "uwu"}) )
+- read and write to variables of other contexts with more precision
+- good loop and conditional syntaxes
+- bock call syntax ( something like `do f<<(x<8)` )

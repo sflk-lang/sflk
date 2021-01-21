@@ -20,8 +20,10 @@ pub enum Stmt {
 	Assign {varname: String, expr: Expr},
 	AssignIfFree {varname: String, expr: Expr},
 	Do {expr: Expr},
-	Redo,
-	End,
+	Imp {expr: Expr},
+	Exp {expr: Expr},
+	Redo {expr: Expr},
+	End {expr: Expr},
 	If {cond_expr: Expr, stmt: Box<Stmt>},
 }
 
@@ -47,6 +49,7 @@ pub enum Obj {
 	Integer(isize),
 	String(String),
 	Block(Rc<Block>),
+	//Cx(Cx),
 }
 
 impl std::fmt::Display for Obj {
@@ -54,7 +57,8 @@ impl std::fmt::Display for Obj {
 		match self {
 			Obj::Integer(integer) => write!(f, "{}", integer),
 			Obj::String(string) => write!(f, "{}", string),
-			Obj::Block(_) => write!(f, "{}", "block"),
+			Obj::Block(_) => write!(f, "{}", "block"), // change this
+			//Obj::Cx(cx) => write!(f, "{:?}", cx), // change this
 		}
 	}
 }
@@ -109,12 +113,14 @@ impl Obj {
 			Obj::Integer(integer) => *integer != 0,
 			Obj::String(string) => string.len() != 0,
 			Obj::Block(_) => true,
+			//Obj::Cx(cx) => !cx.varmap.is_empty(),
 		}
 	}
 }
 
 use std::collections::HashMap;
 
+#[derive(Debug, Clone)]
 struct Cx {
 	varmap: HashMap<String, Obj>,
 }
@@ -124,6 +130,12 @@ impl Cx {
 		Cx {
 			varmap: HashMap::new(),
 		}
+	}
+}
+
+impl Cx {
+	fn import(&mut self, other: Cx) {
+		self.varmap.extend(other.varmap);
 	}
 }
 
@@ -156,29 +168,30 @@ impl Mem {
 }
 
 impl Mem {
-	fn top_excx(&self) -> &ExCx {
-		self.excx_stack.last().unwrap()
+	fn excx(&self, i_from_top: usize) -> &ExCx {
+		self.excx_stack.get(self.excx_stack.len() - 1 - i_from_top).unwrap()
 	}
 
-	fn top_excx_mut(&mut self) -> &mut ExCx {
-		self.excx_stack.last_mut().unwrap()
+	fn excx_mut(&mut self, i_from_top: usize) -> &mut ExCx {
+		let i_max = self.excx_stack.len() - 1;
+		self.excx_stack.get_mut(i_max - i_from_top).unwrap()
 	}
 }
 
 impl Mem {
 	fn varset(&mut self, varname: &str, val: Obj) {
-		self.top_excx_mut().cx.varmap.insert(varname.to_string(), val);
+		self.excx_mut(0).cx.varmap.insert(varname.to_string(), val);
 		()
 	}
 
 	fn varset_if_free(&mut self, varname: &str, val: Obj) {
-		if self.top_excx().cx.varmap.get(varname).is_none() {
-			self.top_excx_mut().cx.varmap.insert(varname.to_string(), val);
+		if self.excx(0).cx.varmap.get(varname).is_none() {
+			self.excx_mut(0).cx.varmap.insert(varname.to_string(), val);
 		}
 	}
 
 	fn varget(&self, varname: &str) -> &Obj {
-		self.top_excx().cx.varmap.get(varname).expect("change this")
+		self.excx(0).cx.varmap.get(varname).expect("change this")
 	}
 }
 
@@ -189,11 +202,14 @@ impl Mem {
 
 	fn exec_block(&mut self, block: &Block) {
 		self.excx_stack.push(ExCx::new());
-		while self.top_excx().running {
-			self.exec_stmt(&block.stmts[self.top_excx().i]);
-			if self.top_excx().i >= block.stmts.len() {
-				self.top_excx_mut().running = false;
+		loop {
+			if self.excx(0).i >= block.stmts.len() {
+				self.excx_mut(0).running = false;
 			}
+			if !self.excx_mut(0).running {
+				break;
+			}
+			self.exec_stmt(&block.stmts[self.excx(0).i]);
 		}
 		self.excx_stack.pop();
 	}
@@ -202,37 +218,73 @@ impl Mem {
 		match stmt {
 			Stmt::Print {expr} => {
 				println!("{}", self.eval_expr(expr));
-				self.top_excx_mut().i += 1;
+				self.excx_mut(0).i += 1;
 			},
 			Stmt::Assign {varname, expr} => {
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
-				self.top_excx_mut().i += 1;
+				self.excx_mut(0).i += 1;
 			},
 			Stmt::AssignIfFree {varname, expr} => {
 				let val = self.eval_expr(expr);
 				self.varset_if_free(varname, val);
-				self.top_excx_mut().i += 1;
+				self.excx_mut(0).i += 1;
 			},
 			Stmt::Do {expr} => {
 				match self.eval_expr(expr) {
 					Obj::Block(block) => self.exec_block(&block),
 					obj => panic!("can't do {} for now", obj),
 				};
-				self.top_excx_mut().i += 1;
+				self.excx_mut(0).i += 1;
 			},
-			Stmt::Redo => {
-				self.top_excx_mut().i = 0;
+			Stmt::Imp {expr} => {
+				let val = self.eval_expr(expr);
+				if let Obj::Integer(integer) = val {
+					let cx_to_import = self.excx(integer as usize).cx.clone();
+					self.excx_mut(0).cx.import(cx_to_import);
+					self.excx_mut(0).i += 1;
+				} else {
+					panic!("imp expected integer but found {}", val)
+				}
 			},
-			Stmt::End => {
-				self.top_excx_mut().running = false;
+			Stmt::Exp {expr} => {
+				let val = self.eval_expr(expr);
+				if let Obj::Integer(integer) = val {
+					let cx_to_export = self.excx(0).cx.clone();
+					self.excx_mut(integer as usize).cx.import(cx_to_export);
+					self.excx_mut(0).i += 1;
+				} else {
+					panic!("exp expected integer but found {}", val)
+				}
+			},
+			Stmt::Redo {expr} => {
+				let val = self.eval_expr(expr);
+				if let Obj::Integer(integer) = val {
+					self.excx_mut(integer as usize).i = 0;
+					if integer != 0 {
+						self.excx_mut(0).i += 1;
+					}
+				} else {
+					panic!("redo expected integer but found {}", val)
+				}
+			},
+			Stmt::End {expr} => {
+				let val = self.eval_expr(expr);
+				if let Obj::Integer(integer) = val {
+					self.excx_mut(integer as usize).running = false;
+					if integer != 0 {
+						self.excx_mut(0).i += 1;
+					}
+				} else {
+					panic!("redo expected integer but found {}", val)
+				}
 			},
 			Stmt::If {cond_expr, stmt} => {
 				let cond_val = self.eval_expr(cond_expr);
 				if cond_val.as_cond() {
 					self.exec_stmt(stmt);
 				} else {
-					self.top_excx_mut().i += 1;
+					self.excx_mut(0).i += 1;
 				}
 			},
 		}

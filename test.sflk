@@ -1,6 +1,7 @@
 
-# counts from 9 down to 1 #
-x <~ 9
-pr x
-x < x -1
-if x redo
+x <~ 4 do {
+	imp 1
+		pr x
+		x < x -1
+	exp 1
+} if x redo 0

@@ -127,11 +127,21 @@ impl ProgReadingHead {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Do {expr}, loc + expr_loc))
 			},
+			Tok::Word(s) if s == "imp" => {
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::Imp {expr}, loc + expr_loc))
+			},
+			Tok::Word(s) if s == "exp" => {
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::Exp {expr}, loc + expr_loc))
+			},
 			Tok::Word(s) if s == "redo" => {
-				Ok((Stmt::Redo, loc))
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::Redo {expr}, loc + expr_loc))
 			},
 			Tok::Word(s) if s == "end" => {
-				Ok((Stmt::End, loc))
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::End {expr}, loc + expr_loc))
 			},
 			Tok::Word(s) if s == "if" => {
 				let (cond_expr, cond_loc) = self.parse_expr(ExprEnd::Nothing)?;

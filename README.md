@@ -34,13 +34,13 @@ pr  100/10  -  2*5  # prints 40 #
 
 ```sflk
 # counts from 9 down to 1 #
-x <~ 9
+x <~ 9 # assign only if x is free #
 pr x
 x < x -1
-if x redo
+if x redo 0 # 0 is the current execution context #
 ```
 
 It has
 assignment, `+`, `-`, strings, integers, print, parenthesis, comments,
-code blocks, `*`, `/`.
+code blocks, `*`, `/`, assignment if free, loops.
 And more is comming soon!
