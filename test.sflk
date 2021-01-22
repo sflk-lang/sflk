@@ -1,8 +1,4 @@
 
-x <~ 4 do {
-	imp 1 # import variables from 1 context below #
-		pr x
-		x < x -1
-	exp 1 # export variables to 1 context below #
-} if x redo 0
-# prints numbers from 4 down to 1 #
+f < { pr "uwu" }
+g < { pr "owo" }
+do f + g # prints what you belive it prints ^^ #

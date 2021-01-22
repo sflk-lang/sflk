@@ -28,21 +28,19 @@ use std::rc::Rc;
 mod tokenizer;
 mod parser;
 mod machine;
+mod stringtree;
 
 fn main() -> Result<(), parser::ParsingError> {
 	let settings = Settings::from_args();
 
 	let scu = Rc::new(tokenizer::SourceCodeUnit::from_filename(
 		&settings.src_filename));
-	if settings.debug_mode {
-		dbg!(&scu);
-	}
 
 	let mut prh = parser::ProgReadingHead::from(
 		tokenizer::TokReadingHead::from_scu(scu));
 	let (prog, _) = prh.parse_prog()?;
 	if settings.debug_mode {
-		dbg!(&prog);
+		stringtree::StringTree::from(&prog).print();
 	}
 
 	let mut mem = machine::Mem::new();

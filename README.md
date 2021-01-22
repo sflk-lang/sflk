@@ -50,6 +50,12 @@ x <~ 4 do {
 # prints numbers from 4 down to 1 #
 ```
 
+```sflk
+f < { pr "uwu" }
+g < { pr "owo" }
+do f + g # prints what you belive it prints ^^ #
+```
+
 It has
 assignment, `+`, `-`, strings, integers, print, parenthesis, comments,
 code blocks, `*`, `/`, assignment if free, loops, .

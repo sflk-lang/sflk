@@ -3,7 +3,7 @@ pub type Prog = Block;
 
 #[derive(Debug)]
 pub struct Block {
-	stmts: Vec<Stmt>,
+	pub stmts: Vec<Stmt>,
 }
 
 impl Block {
@@ -14,7 +14,7 @@ impl Block {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
 	Print {expr: Expr},
 	Assign {varname: String, expr: Expr},
@@ -27,19 +27,30 @@ pub enum Stmt {
 	If {cond_expr: Expr, stmt: Box<Stmt>},
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
 	Var {varname: String},
 	Const {val: Obj},
 	BinOp {op: Op, left: Box<Expr>, right: Box<Expr>},
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Op {
 	Plus,
 	Minus,
 	Star,
 	Slash,
+}
+
+impl std::fmt::Display for Op {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			Op::Plus => write!(f, "plus"),
+			Op::Minus => write!(f, "minus"),
+			Op::Star => write!(f, "star"),
+			Op::Slash => write!(f, "slash"),
+		}
+	}
 }
 
 use std::rc::Rc;
@@ -70,6 +81,9 @@ impl Obj {
 				Obj::Integer(left + right),
 			(Obj::String(left), Obj::String(right)) =>
 				Obj::String(left.to_owned() + right),
+			(Obj::Block(left), Obj::Block(right)) => 
+				Obj::Block(Rc::new(Block::new(
+					left.stmts.iter().chain(right.stmts.iter()).cloned().collect()))),
 			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
 				obj_left, obj_right),
 		}
