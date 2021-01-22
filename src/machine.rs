@@ -14,6 +14,20 @@ impl Block {
 	}
 }
 
+impl Block {
+	fn clone_multiply(&self, n: usize) -> Block {
+		let mut stmts = Vec::new();
+		for _ in 0..n {
+			for stmt in &self.stmts {
+				stmts.push(stmt.clone());
+			}
+		}
+		Block {
+			stmts
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub enum Stmt {
 	Print {expr: Expr},
@@ -105,6 +119,8 @@ impl Obj {
 				Obj::Integer(left * right),
 			(Obj::String(left), Obj::Integer(right)) =>
 				Obj::String(left.repeat(*right as usize)),
+			(Obj::Block(left), Obj::Integer(right)) =>
+				Obj::Block(Rc::new(left.clone_multiply(*right as usize))),
 			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
 				obj_left, obj_right),
 		}

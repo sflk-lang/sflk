@@ -11,6 +11,7 @@ pub struct StringTree {
 
 const STYLE_NORMAL: StyleBegEnd = ("", "");
 const STYLE_CYAN: StyleBegEnd = ("\x1b[36m", "\x1b[39m");
+const STYLE_BOLD: StyleBegEnd = ("\x1b[4m", "\x1b[24m");
 
 impl StringTree {
 	fn new_leaf(main: String, style: StyleBegEnd) -> StringTree {
@@ -43,9 +44,24 @@ impl From<&Expr> for StringTree {
 	}
 }
 
-fn escape(string: &str) -> String {
-	string
-		.replace("\"", "\\\"")
+fn escape(string: &str, style: &StyleBegEnd) -> String {
+	let mut ret = String::new();
+	string.chars().for_each(|ch| match ch {
+		'\"' => ret.extend(format!("{}\\\"{}", style.0, style.1).chars()),
+		'\\' => ret.extend(format!("{}\\\\{}", style.0, style.1).chars()),
+		'\n' => ret.extend(format!("{}\\n{}", style.0, style.1).chars()),
+		'\t' => ret.extend(format!("{}\\t{}", style.0, style.1).chars()),
+		'\x1b' => ret.extend(format!("{}\\e{}", style.0, style.1).chars()),
+		'\x07' => ret.extend(format!("{}\\a{}", style.0, style.1).chars()),
+		'\x08' => ret.extend(format!("{}\\b{}", style.0, style.1).chars()),
+		'\x0b' => ret.extend(format!("{}\\v{}", style.0, style.1).chars()),
+		'\x0c' => ret.extend(format!("{}\\f{}", style.0, style.1).chars()),
+		'\r' => ret.extend(format!("{}\\r{}", style.0, style.1).chars()),
+		ch if (ch as u32) < (' ' as u32) =>
+			ret.extend(format!("{}\\x{:02x}{}", style.0, ch as u32, style.1).chars()),
+		ch => ret.push(ch),
+	});
+	ret
 }
 
 impl From<&Obj> for StringTree {
@@ -54,7 +70,7 @@ impl From<&Obj> for StringTree {
 			Obj::Integer(integer) => StringTree::new_leaf(
 				format!("integer {}", integer), STYLE_NORMAL),
 			Obj::String(string) => StringTree::new_leaf(
-				format!("string \"{}\"", escape(&string)), STYLE_NORMAL),
+				format!("string \"{}\"", escape(&string, &STYLE_BOLD)), STYLE_NORMAL),
 			Obj::Block(block) => StringTree::from(&**block),
 		}
 	}

@@ -331,33 +331,36 @@ impl TokReadingHead {
 			Some('f') => {self.goto_next_char(); Ok(("\x0c".to_string(), loc_beg))},
 			Some('r') => {self.goto_next_char(); Ok(("\r".to_string(), loc_beg))},
 			Some('x') => {
-				/* TODO:
-				 * put this in an other function 
-				 * and use idiomatic rust comment style */
 				self.goto_next_char();
-				let ch1 = self.peek_cur_char();
-				self.goto_next_char();
-				let ch2 = self.peek_cur_char();
-				let loc = loc_beg + self.cur_char_loc();
-				self.goto_next_char();
-				match (ch1, ch2) {
-					(Some(ch1), Some(ch2)) => {
-						let digit1 = ch1.to_digit(16);
-						let digit2 = ch2.to_digit(16);
-						if digit1.is_none() || digit2.is_none() {
-							return Err(TokenizingError::InvalidEscapeSequence {
-								sequence: format!("x{}{}", ch1, ch2), loc})
-						} else {
-							let value = digit1.unwrap() * 16 + digit2.unwrap();
-							Ok(((value as u8 as char).to_string(), loc))
-						}
-					},
-					(None, _) | (_, None) => Err(TokenizingError::EofInEscapeSequence {loc}),
-				}
+				let (ch, loc) = self.read_cur_hex_escape_sequence()?;
+				Ok((ch.to_string(), loc))
 			},
 			Some(ch) => Err(TokenizingError::InvalidEscapeSequence {
 				sequence: ch.to_string(), loc: loc_beg}),
 			None => Err(TokenizingError::EofInEscapeSequence {loc: loc_beg}),
+		}
+	}
+
+	fn read_cur_hex_escape_sequence(&mut self) -> Result<(char, Loc), TokenizingError> {
+		let loc_beg = self.cur_char_loc();
+		let ch1 = self.peek_cur_char();
+		self.goto_next_char();
+		let ch2 = self.peek_cur_char();
+		let loc = loc_beg + self.cur_char_loc();
+		self.goto_next_char();
+		match (ch1, ch2) {
+			(Some(ch1), Some(ch2)) => {
+				let digit1 = ch1.to_digit(16);
+				let digit2 = ch2.to_digit(16);
+				if digit1.is_none() || digit2.is_none() {
+					return Err(TokenizingError::InvalidEscapeSequence {
+						sequence: format!("x{}{}", ch1, ch2), loc})
+				} else {
+					let value = digit1.unwrap() * 16 + digit2.unwrap();
+					Ok((value as u8 as char, loc))
+				}
+			},
+			(None, _) | (_, None) => Err(TokenizingError::EofInEscapeSequence {loc}),
 		}
 	}
 }

@@ -2,15 +2,16 @@
 # SFLK programming language
 
 ```sflk
-pr  3  - (1  +  1) # prints 1 # nl
-pr (3  -  1) +  1  # prints 3 # nl
-pr  3  -  1  +  1  # prints 3 # nl
-```
-
-```sflk
 uwu < "o"
 uwu < uwu + "wo"
 pr uwu # prints owo # nl
+```
+
+```sflk
+pr  3  - (1  +  1) # prints 1 # nl
+pr (3  -  1) +  1  # prints 3 # nl
+pr  3  -  1  +  1  # prints 3 # nl
+# default is ((( ) ) ) #
 ```
 
 ```sflk
@@ -19,9 +20,7 @@ f < {
     pr x + 2 # prints 4 # nl
 }
 do f
-do {
-    pr "uwu" # prints uwu # nl
-}
+do { pr "uwu" # prints uwu # nl }
 ```
 
 ```sflk
@@ -55,6 +54,12 @@ x <~ 4 do {
 f < { pr "uwu" pr " " }
 g < { pr "owo" nl }
 do f + g # prints what you want to belive it prints ^^ #
+```
+
+```sflk
+n < 9
+b < { imp 1 x <~ n pr x x < x -1 exp 1 }
+do b * n # prints 987654321 # nl
 ```
 
 It has

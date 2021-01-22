@@ -1,4 +1,4 @@
 
-f < { pr "uwu" pr " " }
-g < { pr "owo" nl }
-do f + g # prints what you want to belive it prints ^^ #
+n < 9
+b < { imp 1 x <~ n pr x x < x -1 exp 1 }
+do b * n # prints 987654321 # nl
