@@ -44,7 +44,9 @@ impl SourceCodeUnit {
 pub enum TokenizingError {
 	EofInComment {loc: Loc},
 	EofInString {loc: Loc},
+	EofInEscapeSequence {loc: Loc},
 	UnexpectedCharacter {ch: char, loc: Loc},
+	InvalidEscapeSequence {sequence: String, loc: Loc},
 }
 
 impl std::fmt::Display for TokenizingError {
@@ -56,9 +58,15 @@ impl std::fmt::Display for TokenizingError {
 			TokenizingError::EofInString {loc} =>
 				write!(f, "end-of-file in string literal started at line {}",
 					loc.line_start),
+			TokenizingError::EofInEscapeSequence {loc} =>
+				write!(f, "end-of-file in escape sequence at line {}",
+					loc.line_start),
 			TokenizingError::UnexpectedCharacter {ch, loc} =>
 				write!(f, "unexpected character `{}` at line {}",
 					ch, loc.line_start),
+			TokenizingError::InvalidEscapeSequence {sequence, loc} =>
+				write!(f, "invalid escape sequence `{}` at line {}",
+					sequence, loc.line_start),
 		}
 	}
 }
@@ -195,13 +203,6 @@ impl std::fmt::Display for Tok {
 }
 
 impl Tok {
-	pub fn is_void(&self) -> bool {
-		match self {
-			Tok::Void => true,
-			_ => false,
-		}
-	}
-
 	pub fn is_bin_op(&self) -> bool {
 		match self {
 			Tok::BinOp(_) => true,
@@ -300,13 +301,63 @@ impl TokReadingHead {
 					self.goto_next_char();
 					break;
 				},
+				Some('\\') => {
+					string_string += &self.read_cur_escape_sequence()?.0;
+				},
 				Some(ch) => {
-					string_string.push(ch);
 					self.goto_next_char();
+					string_string.push(ch);
 				},
 			}
 		}
 		loc.raw_length = string_string.bytes().len()+2;
 		Ok((string_string, loc))
+	}
+
+	fn read_cur_escape_sequence(&mut self) -> Result<(String, Loc), TokenizingError> {
+		let loc_beg = self.cur_char_loc();
+		std::assert_eq!(self.peek_cur_char(), Some('\\'));
+		self.goto_next_char();
+		match self.peek_cur_char() {
+			Some('\n') => {self.goto_next_char(); Ok(("".to_string(), loc_beg))},
+			Some('\\') => {self.goto_next_char(); Ok(("\\".to_string(), loc_beg))},
+			Some('\"') => {self.goto_next_char(); Ok(("\"".to_string(), loc_beg))},
+			Some('n') => {self.goto_next_char(); Ok(("\n".to_string(), loc_beg))},
+			Some('t') => {self.goto_next_char(); Ok(("\t".to_string(), loc_beg))},
+			Some('e') => {self.goto_next_char(); Ok(("\x1b".to_string(), loc_beg))},
+			Some('a') => {self.goto_next_char(); Ok(("\x07".to_string(), loc_beg))},
+			Some('b') => {self.goto_next_char(); Ok(("\x08".to_string(), loc_beg))},
+			Some('v') => {self.goto_next_char(); Ok(("\x0b".to_string(), loc_beg))},
+			Some('f') => {self.goto_next_char(); Ok(("\x0c".to_string(), loc_beg))},
+			Some('r') => {self.goto_next_char(); Ok(("\r".to_string(), loc_beg))},
+			Some('x') => {
+				/* TODO:
+				 * put this in an other function 
+				 * and use idiomatic rust comment style */
+				self.goto_next_char();
+				let ch1 = self.peek_cur_char();
+				self.goto_next_char();
+				let ch2 = self.peek_cur_char();
+				let loc = loc_beg + self.cur_char_loc();
+				self.goto_next_char();
+				match (ch1, ch2) {
+					(Some(ch1), Some(ch2)) => {
+						let digit1 = ch1.to_digit(16);
+						let digit2 = ch2.to_digit(16);
+						if digit1.is_none() || digit2.is_none() {
+							return Err(TokenizingError::InvalidEscapeSequence {
+								sequence: format!("x{}{}", ch1, ch2), loc})
+						} else {
+							let value = digit1.unwrap() * 16 + digit2.unwrap();
+							Ok(((value as u8 as char).to_string(), loc))
+						}
+					},
+					(None, _) | (_, None) => Err(TokenizingError::EofInEscapeSequence {loc}),
+				}
+			},
+			Some(ch) => Err(TokenizingError::InvalidEscapeSequence {
+				sequence: ch.to_string(), loc: loc_beg}),
+			None => Err(TokenizingError::EofInEscapeSequence {loc: loc_beg}),
+		}
 	}
 }

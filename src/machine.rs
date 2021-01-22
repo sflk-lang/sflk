@@ -17,6 +17,7 @@ impl Block {
 #[derive(Debug, Clone)]
 pub enum Stmt {
 	Print {expr: Expr},
+	PrintNewline,
 	Assign {varname: String, expr: Expr},
 	AssignIfFree {varname: String, expr: Expr},
 	Do {expr: Expr},
@@ -231,7 +232,11 @@ impl Mem {
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Print {expr} => {
-				println!("{}", self.eval_expr(expr));
+				print!("{}", self.eval_expr(expr));
+				self.excx_mut(0).i += 1;
+			},
+			Stmt::PrintNewline => {
+				println!("");
 				self.excx_mut(0).i += 1;
 			},
 			Stmt::Assign {varname, expr} => {

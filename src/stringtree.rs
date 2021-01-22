@@ -9,6 +9,8 @@ pub struct StringTree {
 	sub_trees: Vec<StringTree>,
 }
 
+const STYLE_NORMAL: StyleBegEnd = ("", "");
+const STYLE_CYAN: StyleBegEnd = ("\x1b[36m", "\x1b[39m");
 
 impl StringTree {
 	fn new_leaf(main: String, style: StyleBegEnd) -> StringTree {
@@ -31,10 +33,11 @@ impl StringTree {
 impl From<&Expr> for StringTree {
 	fn from(expr: &Expr) -> StringTree {
 		match expr {
-			Expr::Var {varname} => StringTree::new_leaf(format!("variable {}", varname), ("", "")),
+			Expr::Var {varname} => StringTree::new_leaf(
+				format!("variable {}", varname), STYLE_NORMAL),
 			Expr::Const {val} => StringTree::from(val),
 			Expr::BinOp {op, left, right} => StringTree::new_node(
-				format!("op {}", op), ("", ""),
+				format!("op {}", op), STYLE_NORMAL,
 				vec![StringTree::from(&**left), StringTree::from(&**right)]),
 		}
 	}
@@ -49,9 +52,9 @@ impl From<&Obj> for StringTree {
 	fn from(obj: &Obj) -> StringTree {
 		match obj {
 			Obj::Integer(integer) => StringTree::new_leaf(
-				format!("integer {}", integer), ("", "")),
+				format!("integer {}", integer), STYLE_NORMAL),
 			Obj::String(string) => StringTree::new_leaf(
-				format!("string \"{}\"", escape(&string)), ("", "")),
+				format!("string \"{}\"", escape(&string)), STYLE_NORMAL),
 			Obj::Block(block) => StringTree::from(&**block),
 		}
 	}
@@ -59,9 +62,10 @@ impl From<&Obj> for StringTree {
 
 impl From<&Block> for StringTree {
 	fn from(block: &Block) -> StringTree {
-		StringTree::new_node("block".to_owned(), ("", ""), block.stmts.iter()
-			.map(|stmt| StringTree::from(stmt))
-			.collect()
+		StringTree::new_node("block".to_owned(), STYLE_CYAN, 
+			block.stmts.iter()
+				.map(|stmt| StringTree::from(stmt))
+				.collect()
 		)
 	}
 }
@@ -70,31 +74,33 @@ impl From<&Stmt> for StringTree {
 	fn from(stmt: &Stmt) -> StringTree {
 		match stmt {
 			Stmt::Print {expr} => StringTree::new_node(
-				"pr".to_owned(), ("", ""),
+				"pr".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
+			Stmt::PrintNewline => StringTree::new_leaf(
+				"nl".to_owned(), STYLE_NORMAL),
 			Stmt::Assign {varname, expr} => StringTree::new_node(
-				format!("assign to variable {}", varname), ("", ""),
+				format!("assign to variable {}", varname), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::AssignIfFree {varname, expr} => StringTree::new_node(
-				format!("assign if free to variable {}", varname), ("", ""),
+				format!("assign if free to variable {}", varname), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Do {expr} => StringTree::new_node(
-				"do".to_owned(), ("", ""),
+				"do".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Imp {expr} => StringTree::new_node(
-				"imp".to_owned(), ("", ""),
+				"imp".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Exp {expr} => StringTree::new_node(
-				"exp".to_owned(), ("", ""),
+				"exp".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Redo {expr} => StringTree::new_node(
-				"redo".to_owned(), ("", ""),
+				"redo".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::End {expr} => StringTree::new_node(
-				"end".to_owned(), ("", ""),
+				"end".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::If {cond_expr, stmt} => StringTree::new_node(
-				"if".to_owned(), ("", ""),
+				"if".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(cond_expr), StringTree::from(&**stmt)]),
 		}
 	}
@@ -111,7 +117,7 @@ enum Tube {
 }
 
 impl Tube {
-	fn string(&self) -> &'static str {
+	fn str(&self) -> &'static str {
 		match self {
 			Tube::Tube => INDENT_TUBE,
 			Tube::None => INDENT_NONE,
@@ -126,7 +132,7 @@ enum RightTube {
 }
 
 impl RightTube {
-	fn string(&self) -> &'static str {
+	fn str(&self) -> &'static str {
 		match self {
 			RightTube::Tube => INDENT_TUBE,
 			RightTube::Item => INDENT_ITEM,
@@ -142,12 +148,17 @@ impl RightTube {
 	}
 }
 
+/* TODO:
+	make a function that prints a multiline main (it will use the RightTube::Tube)
+	and make some polish on this shitty code uwu
+*/
+
 fn print_indent(indents: &Vec<(StyleBegEnd, Tube)>, right_override: RightTube) {
 	if let Some(((indent_right_style, _), indents_left)) = indents.split_last() {
 		for ((style_beg, style_end), tube) in indents_left {
-			print!("{}{}{}", style_beg, tube.string(), style_end);
+			print!("{}{}{}", style_beg, tube.str(), style_end);
 		}
-		print!("{}{}{}", indent_right_style.0, right_override.string(), indent_right_style.1);
+		print!("{}{}{}", indent_right_style.0, right_override.str(), indent_right_style.1);
 	}
 }
 

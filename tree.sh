@@ -1,2 +1,2 @@
 #!/bin/sh
-tree --dirsfirst -a -I "target|.git" --noreport
+tree --dirsfirst -a -I "target|.git|.vscode" --noreport

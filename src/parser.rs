@@ -123,6 +123,9 @@ impl ProgReadingHead {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Print {expr}, loc + expr_loc))
 			},
+			Tok::Word(s) if s == "nl" => {
+				Ok((Stmt::PrintNewline, loc))
+			},
 			Tok::Word(s) if s == "do" => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Do {expr}, loc + expr_loc))

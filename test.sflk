@@ -1,4 +1,4 @@
 
-f < { pr "uwu" }
-g < { pr "owo" }
-do f + g # prints what you belive it prints ^^ #
+f < { pr "uwu" pr " " }
+g < { pr "owo" nl }
+do f + g # prints what you want to belive it prints ^^ #
