@@ -30,6 +30,7 @@ impl Block {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
+	Nop,
 	Print {expr: Expr},
 	PrintNewline,
 	Assign {varname: String, expr: Expr},
@@ -47,6 +48,13 @@ pub enum Expr {
 	Var {varname: String},
 	Const {val: Obj},
 	BinOp {op: Op, left: Box<Expr>, right: Box<Expr>},
+	Chain {init_expr: Box<Expr>, chain_ops: Vec<ChainOp>}
+}
+
+#[derive(Debug, Clone)]
+pub struct ChainOp {
+	pub op: Op,
+	pub expr: Expr,
 }
 
 #[derive(Debug, Clone)]
@@ -247,6 +255,9 @@ impl Mem {
 
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
+			Stmt::Nop => {
+				self.excx_mut(0).i += 1;
+			},
 			Stmt::Print {expr} => {
 				print!("{}", self.eval_expr(expr));
 				self.excx_mut(0).i += 1;
@@ -334,7 +345,19 @@ impl Mem {
 				Op::Minus => Obj::op_minus(&self.eval_expr(left), &self.eval_expr(right)),
 				Op::Star => Obj::op_star(&self.eval_expr(left), &self.eval_expr(right)),
 				Op::Slash => Obj::op_slash(&self.eval_expr(left), &self.eval_expr(right)),
-			}
+			},
+			Expr::Chain {init_expr, chain_ops} => {
+				let mut val = self.eval_expr(init_expr);
+				for chain_op in chain_ops {
+					val = (match chain_op.op {
+						Op::Plus => Obj::op_plus,
+						Op::Minus => Obj::op_minus,
+						Op::Star => Obj::op_star,
+						Op::Slash => Obj::op_slash,
+					})(&val, &self.eval_expr(&chain_op.expr));
+				}
+				val
+			},
 		}
 	}
 }

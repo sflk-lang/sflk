@@ -31,7 +31,7 @@ contexts:
       scope: keyword.operator.arithmetic.sflk
     - match: '\b(if)\b'
       scope: keyword.control.conditional.if.sflk
-    - match: '\b(pr|nl|do|redo|end|imp|exp)\b'
+    - match: '\b(nop|pr|nl|do|redo|end|imp|exp)\b'
       scope: keyword.other.sflk
     - match: '[a-zA-Z]+'
       scope: variable.sflk

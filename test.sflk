@@ -1,4 +1,4 @@
 
-n < 9
+n < 9 nop
 b < { imp 1 x <~ n pr x x < x -1 exp 1 }
 do b * n # prints 987654321 # nl

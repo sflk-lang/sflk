@@ -1,6 +1,5 @@
 
-- escape strings in the debug tree (and put escape sequence in bold)
-- block * n  should produce  block + block + ... + block
+- represent 0+0+0+0+...+0 as a Chain of operations
 - display parse-time errors nicely
 - display runtime errors nicely (embbed optionnal statement loc ?)
 - BRANCH from this point ( dev branch )

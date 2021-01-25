@@ -40,7 +40,24 @@ impl From<&Expr> for StringTree {
 			Expr::BinOp {op, left, right} => StringTree::new_node(
 				format!("op {}", op), STYLE_NORMAL,
 				vec![StringTree::from(&**left), StringTree::from(&**right)]),
+			Expr::Chain {init_expr, chain_ops} => {
+				// TODO
+				// make this code great again
+				let mut vec = vec![StringTree::from(&**init_expr)];
+				vec.extend(chain_ops.iter().map(|chain_op| StringTree::from(chain_op)));
+				StringTree::new_node(
+					"chain".to_string(), STYLE_NORMAL,
+					vec)
+			},
 		}
+	}
+}
+
+impl From<&ChainOp> for StringTree {
+	fn from(chain_op: &ChainOp) -> StringTree {
+		StringTree::new_node(
+			format!("op {}", chain_op.op), STYLE_NORMAL,
+			vec![StringTree::from(&chain_op.expr)])
 	}
 }
 
@@ -89,6 +106,8 @@ impl From<&Block> for StringTree {
 impl From<&Stmt> for StringTree {
 	fn from(stmt: &Stmt) -> StringTree {
 		match stmt {
+			Stmt::Nop => StringTree::new_leaf(
+				"nop".to_owned(), STYLE_NORMAL),
 			Stmt::Print {expr} => StringTree::new_node(
 				"pr".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
@@ -164,11 +183,6 @@ impl RightTube {
 	}
 }
 
-/* TODO:
-	make a function that prints a multiline main (it will use the RightTube::Tube)
-	and make some polish on this shitty code uwu
-*/
-
 fn print_indent(indents: &Vec<(StyleBegEnd, Tube)>, right_override: RightTube) {
 	if let Some(((indent_right_style, _), indents_left)) = indents.split_last() {
 		for ((style_beg, style_end), tube) in indents_left {
@@ -184,8 +198,18 @@ impl StringTree {
 	}
 
 	fn print_aux(&self, indent_styles: &mut Vec<(StyleBegEnd, Tube)>, is_last: bool) {
-		print_indent(indent_styles, RightTube::from_is_last(is_last));
-		println!("{}{}{}", self.style.0, self.main, self.style.1);
+		// Print self.main with multiple lines main support
+		let mut lines = self.main.lines();
+		if let Some(line) = lines.next() {
+			print_indent(indent_styles, RightTube::from_is_last(is_last));
+			println!("{}{}{}", self.style.0, line, self.style.1);
+		}
+		for line in lines {
+			print_indent(indent_styles, RightTube::Tube);
+			println!("{}{}{}", self.style.0, line, self.style.1);
+		}
+
+		// Manage the indentation changes and recusive printing
 		if is_last && !indent_styles.is_empty() {
 			indent_styles.last_mut().unwrap().1 = Tube::None;
 		}
