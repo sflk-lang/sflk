@@ -37,9 +37,9 @@ impl From<&Expr> for StringTree {
 			Expr::Var {varname} => StringTree::new_leaf(
 				format!("variable {}", varname), STYLE_NORMAL),
 			Expr::Const {val} => StringTree::from(val),
-			Expr::BinOp {op, left, right} => StringTree::new_node(
+			/*Expr::BinOp {op, left, right} => StringTree::new_node(
 				format!("op {}", op), STYLE_NORMAL,
-				vec![StringTree::from(&**left), StringTree::from(&**right)]),
+				vec![StringTree::from(&**left), StringTree::from(&**right)]),*/
 			Expr::Chain {init_expr, chops} => {
 				// TODO
 				// make this code great again
@@ -122,6 +122,9 @@ impl From<&Stmt> for StringTree {
 			Stmt::Do {expr} => StringTree::new_node(
 				"do".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
+			Stmt::Ev {expr} => StringTree::new_node(
+				"ev".to_owned(), STYLE_NORMAL,
+				vec![StringTree::from(expr)]),
 			Stmt::Imp {expr} => StringTree::new_node(
 				"imp".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(expr)]),
@@ -137,6 +140,9 @@ impl From<&Stmt> for StringTree {
 			Stmt::If {cond_expr, stmt} => StringTree::new_node(
 				"if".to_owned(), STYLE_NORMAL,
 				vec![StringTree::from(cond_expr), StringTree::from(&**stmt)]),
+			Stmt::Group {stmts} => StringTree::new_node(
+				"group".to_owned(), STYLE_NORMAL,
+				stmts.iter().map(|stmt| StringTree::from(stmt)).collect()),
 		}
 	}
 }

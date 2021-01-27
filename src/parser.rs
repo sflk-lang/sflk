@@ -81,6 +81,7 @@ use std::rc::Rc;
 pub enum BlockEnd {
 	Void,
 	Curly,
+	Paren,
 }
 
 impl Tok {
@@ -88,6 +89,7 @@ impl Tok {
 		match (end, self) {
 			(BlockEnd::Void, Tok::Void) => true,
 			(BlockEnd::Curly, Tok::Right(s)) if s == "}" => true,
+			(BlockEnd::Paren, Tok::Right(s)) if s == ")" => true,
 			_ => false,
 		}
 	}
@@ -101,6 +103,7 @@ impl From<Tok> for Op {
 				"-" => Op::Minus,
 				"*" => Op::Star,
 				"/" => Op::Slash,
+				">" => Op::ToRight,
 				_ => panic!("operator bad"),
 			},
 			_ => panic!("not even operator"),
@@ -118,7 +121,7 @@ impl ProgReadingHead {
 		self.parse_block(BlockEnd::Void)
 	}
 
-	pub fn parse_block(&mut self, end: BlockEnd) -> Result<(Block, Loc), ParsingError> {
+	fn parse_stmts(&mut self, end: BlockEnd) -> Result<(Vec<Stmt>, Loc), ParsingError> {
 		let mut stmts: Vec<Stmt> = Vec::new();
 		let mut loc = self.peek_tok()?.1.to_owned();
 		while !self.peek_tok()?.0.is_block_end(&end) {
@@ -127,6 +130,11 @@ impl ProgReadingHead {
 			loc += stmt_loc;
 		}
 		self.disc_tok()?; // Discard the end tok already peeked in the loop condition
+		Ok((stmts, loc))
+	}
+
+	pub fn parse_block(&mut self, end: BlockEnd) -> Result<(Block, Loc), ParsingError> {
+		let (stmts, loc) = self.parse_stmts(end)?;
 		let block = Block::new(stmts);
 		Ok((block, loc))
 	}
@@ -148,6 +156,10 @@ impl ProgReadingHead {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Do {expr}, loc + expr_loc))
 			},
+			Tok::Word(s) if s == "ev" => {
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::Ev {expr}, loc + expr_loc))
+			}
 			Tok::Word(s) if s == "imp" => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Imp {expr}, loc + expr_loc))
@@ -183,7 +195,11 @@ impl ProgReadingHead {
 				(tok, loc) => Err(ParsingError::UnexpectedToken {
 					tok: tok.clone(), loc: loc.clone()
 				}),
-			}
+			},
+			Tok::Left(s) if s == "(" => {
+				let (stmts, loc) = self.parse_stmts(BlockEnd::Paren)?;
+				Ok((Stmt::Group {stmts}, loc))
+			},
 			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
 		}
 	}
@@ -256,14 +272,16 @@ impl ProgReadingHead {
 			chops.push(chop);
 			loc += chop_loc;
 		}
-		let chain = Expr::Chain {
+		let expr = if chops.is_empty() {
+			init_expr
+		} else {Expr::Chain {
 			init_expr: Box::new(init_expr),
 			chops,
-		};
+		}};
 		match end {
-			ExprEnd::Nothing => Ok((chain, loc)),
+			ExprEnd::Nothing => Ok((expr, loc)),
 			ExprEnd::Paren => match self.pop_tok()? {
-				(Tok::Right(s), _) if s == ")" => Ok((chain, loc)),
+				(Tok::Right(s), _) if s == ")" => Ok((expr, loc)),
 				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok}),
 			}
 		}

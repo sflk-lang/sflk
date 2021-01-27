@@ -63,6 +63,6 @@ do b * n # prints 987654321 # nl
 ```
 
 It has
-assignment, `+`, `-`, strings, integers, print, parenthesis, comments,
-first class code blocks, `*`, `/`, assignment if free, loops.
+assignments, `+`, `-`, strings, integers, prints, parenthesis, comments,
+first class code blocks, `*`, `/`, assignments if free, loops, nops.
 And more is comming soon!

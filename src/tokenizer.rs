@@ -227,7 +227,7 @@ impl TokReadingHead {
 				let (string, loc) = self.read_cur_string()?;
 				Ok((Tok::String(string), loc))
 			},
-			Some(ch) if ch == '+' || ch == '-' || ch == '*' || ch == '/' => {
+			Some(ch) if ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '>' => {
 				self.goto_next_char();
 				Ok((Tok::BinOp(ch.to_string()), self.cur_char_loc()))
 			},

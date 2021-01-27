@@ -36,18 +36,20 @@ pub enum Stmt {
 	Assign {varname: String, expr: Expr},
 	AssignIfFree {varname: String, expr: Expr},
 	Do {expr: Expr},
+	Ev {expr: Expr},
 	Imp {expr: Expr},
 	Exp {expr: Expr},
 	Redo {expr: Expr},
 	End {expr: Expr},
 	If {cond_expr: Expr, stmt: Box<Stmt>},
+	Group {stmts: Vec<Stmt>},
 }
 
 #[derive(Debug, Clone)]
 pub enum Expr {
 	Var {varname: String},
 	Const {val: Obj},
-	BinOp {op: Op, left: Box<Expr>, right: Box<Expr>},
+	//BinOp {op: Op, left: Box<Expr>, right: Box<Expr>},
 	Chain {init_expr: Box<Expr>, chops: Vec<ChOp>},
 }
 
@@ -63,6 +65,7 @@ pub enum Op {
 	Minus,
 	Star,
 	Slash,
+	ToRight,
 }
 
 impl std::fmt::Display for Op {
@@ -72,6 +75,7 @@ impl std::fmt::Display for Op {
 			Op::Minus => write!(f, "minus"),
 			Op::Star => write!(f, "star"),
 			Op::Slash => write!(f, "slash"),
+			Op::ToRight => write!(f, "to right"),
 		}
 	}
 }
@@ -181,7 +185,7 @@ impl Cx {
 struct ExCx {
 	cx: Cx,
 	i: usize,
-	running: bool,
+	flow: Flow,
 }
 
 impl ExCx {
@@ -189,19 +193,28 @@ impl ExCx {
 		ExCx {
 			cx: Cx::new(),
 			i: 0,
-			running: true,
+			flow: Flow::Next,
 		}
 	}
 }
 
+#[derive(PartialEq, Eq)]
+enum Flow {
+	Next,
+	Restart,
+	End,
+}
+
 pub struct Mem {
 	excx_stack: Vec<ExCx>,
+	debug_mode: bool,
 }
 
 impl Mem {
 	pub fn new() -> Mem {
 		Mem {
 			excx_stack: Vec::new(),
+			debug_mode: false,
 		}
 	}
 }
@@ -239,56 +252,60 @@ impl Mem {
 		self.exec_block(prog as &Block);
 	}
 
-	fn exec_block(&mut self, block: &Block) {
-		self.excx_stack.push(ExCx::new());
+	fn exec_block_excx(&mut self, block: &Block, excx: ExCx) {
+		self.excx_stack.push(excx);
 		loop {
 			if self.excx(0).i >= block.stmts.len() {
-				self.excx_mut(0).running = false;
+				self.excx_mut(0).flow = Flow::End;
 			}
-			if !self.excx_mut(0).running {
+			if self.excx_mut(0).flow == Flow::End {
 				break;
 			}
 			self.exec_stmt(&block.stmts[self.excx(0).i]);
+			match self.excx_mut(0).flow {
+				Flow::Next => self.excx_mut(0).i += 1,
+				Flow::Restart => self.excx_mut(0).i = 0,
+				Flow::End => (),
+			}
 		}
 		self.excx_stack.pop();
 	}
 
+	fn exec_block(&mut self, block: &Block) {
+		self.exec_block_excx(block, ExCx::new());
+	}
+
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
-			Stmt::Nop => {
-				self.excx_mut(0).i += 1;
-			},
+			Stmt::Nop => (),
 			Stmt::Print {expr} => {
 				print!("{}", self.eval_expr(expr));
-				self.excx_mut(0).i += 1;
 			},
 			Stmt::PrintNewline => {
 				println!("");
-				self.excx_mut(0).i += 1;
 			},
 			Stmt::Assign {varname, expr} => {
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
-				self.excx_mut(0).i += 1;
 			},
 			Stmt::AssignIfFree {varname, expr} => {
 				let val = self.eval_expr(expr);
 				self.varset_if_free(varname, val);
-				self.excx_mut(0).i += 1;
 			},
 			Stmt::Do {expr} => {
 				match self.eval_expr(expr) {
 					Obj::Block(block) => self.exec_block(&block),
 					obj => panic!("can't do {} for now", obj),
 				};
-				self.excx_mut(0).i += 1;
+			},
+			Stmt::Ev {expr} => {
+				self.eval_expr(expr);
 			},
 			Stmt::Imp {expr} => {
 				let val = self.eval_expr(expr);
 				if let Obj::Integer(integer) = val {
 					let cx_to_import = self.excx(integer as usize).cx.clone();
 					self.excx_mut(0).cx.import(cx_to_import);
-					self.excx_mut(0).i += 1;
 				} else {
 					panic!("imp expected integer but found {}", val)
 				}
@@ -298,7 +315,6 @@ impl Mem {
 				if let Obj::Integer(integer) = val {
 					let cx_to_export = self.excx(0).cx.clone();
 					self.excx_mut(integer as usize).cx.import(cx_to_export);
-					self.excx_mut(0).i += 1;
 				} else {
 					panic!("exp expected integer but found {}", val)
 				}
@@ -306,10 +322,7 @@ impl Mem {
 			Stmt::Redo {expr} => {
 				let val = self.eval_expr(expr);
 				if let Obj::Integer(integer) = val {
-					self.excx_mut(integer as usize).i = 0;
-					if integer != 0 {
-						self.excx_mut(0).i += 1;
-					}
+					self.excx_mut(integer as usize).flow = Flow::Restart;
 				} else {
 					panic!("redo expected integer but found {}", val)
 				}
@@ -317,10 +330,7 @@ impl Mem {
 			Stmt::End {expr} => {
 				let val = self.eval_expr(expr);
 				if let Obj::Integer(integer) = val {
-					self.excx_mut(integer as usize).running = false;
-					if integer != 0 {
-						self.excx_mut(0).i += 1;
-					}
+					self.excx_mut(integer as usize).flow = Flow::End;
 				} else {
 					panic!("redo expected integer but found {}", val)
 				}
@@ -328,9 +338,15 @@ impl Mem {
 			Stmt::If {cond_expr, stmt} => {
 				let cond_val = self.eval_expr(cond_expr);
 				if cond_val.as_cond() {
+					self.exec_stmt(stmt)
+				}
+			},
+			Stmt::Group {stmts} => {
+				for stmt in stmts {
 					self.exec_stmt(stmt);
-				} else {
-					self.excx_mut(0).i += 1;
+					if self.excx(0).flow != Flow::Next {
+						break;
+					}
 				}
 			},
 		}
@@ -340,21 +356,33 @@ impl Mem {
 		match expr {
 			Expr::Var {varname} => self.varget(varname).clone(),
 			Expr::Const {val} => val.clone(),
-			Expr::BinOp {op, left, right} => match op {
+			/*Expr::BinOp {op, left, right} => match op {
 				Op::Plus => Obj::op_plus(&self.eval_expr(left), &self.eval_expr(right)),
 				Op::Minus => Obj::op_minus(&self.eval_expr(left), &self.eval_expr(right)),
 				Op::Star => Obj::op_star(&self.eval_expr(left), &self.eval_expr(right)),
 				Op::Slash => Obj::op_slash(&self.eval_expr(left), &self.eval_expr(right)),
-			},
+				_ => panic!("look, a tree! *runs away*"),
+			},*/
 			Expr::Chain {init_expr, chops} => {
 				let mut val = self.eval_expr(init_expr);
 				for chop in chops {
-					val = (match chop.op {
-						Op::Plus => Obj::op_plus,
-						Op::Minus => Obj::op_minus,
-						Op::Star => Obj::op_star,
-						Op::Slash => Obj::op_slash,
-					})(&val, &self.eval_expr(&chop.expr));
+					let right = self.eval_expr(&chop.expr);
+					match chop.op {
+						Op::Plus => val = Obj::op_plus(&val, &right),
+						Op::Minus => val = Obj::op_minus(&val, &right),
+						Op::Star => val = Obj::op_star(&val, &right),
+						Op::Slash => val = Obj::op_slash(&val, &right),
+						Op::ToRight => {
+							match right {
+								Obj::Block(block) => {
+									let mut excx = ExCx::new();
+									excx.cx.varmap.insert("v".to_string(), val.clone());
+									self.exec_block_excx(&block, excx);
+								},
+								obj => panic!("can't do {} for now", obj),
+							}
+						},
+					}
 				}
 				val
 			},
