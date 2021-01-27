@@ -1,6 +1,5 @@
 
 x < 1
-if x (pr "uwu " pr x nl)
+if x (pr "uwu " pr x nl) # prints uwu 1 #
 f < {pr v *10 nl}
-ev 8 >{pr v nl} -4 >f
-pr "test" nl
+ev 8 >{pr v nl} -4 >f # print 8 and then 40 #

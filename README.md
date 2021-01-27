@@ -62,6 +62,13 @@ b < { imp 1 x <~ n pr x x < x -1 exp 1 }
 do b * n # prints 987654321 # nl
 ```
 
+```sflk
+x < 1
+if x (pr "uwu " pr x nl) # prints uwu 1 #
+f < {pr v *10 nl}
+ev 8 >{pr v nl} -4 >f # print 8 and then 40 #
+```
+
 It has
 assignments, `+`, `-`, strings, integers, prints, parenthesis, comments,
 first class code blocks, `*`, `/`, assignments if free, loops, nops.
