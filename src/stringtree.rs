@@ -40,11 +40,11 @@ impl From<&Expr> for StringTree {
 			Expr::BinOp {op, left, right} => StringTree::new_node(
 				format!("op {}", op), STYLE_NORMAL,
 				vec![StringTree::from(&**left), StringTree::from(&**right)]),
-			Expr::Chain {init_expr, chain_ops} => {
+			Expr::Chain {init_expr, chops} => {
 				// TODO
 				// make this code great again
 				let mut vec = vec![StringTree::from(&**init_expr)];
-				vec.extend(chain_ops.iter().map(|chain_op| StringTree::from(chain_op)));
+				vec.extend(chops.iter().map(|chop| StringTree::from(chop)));
 				StringTree::new_node(
 					"chain".to_string(), STYLE_NORMAL,
 					vec)
@@ -53,11 +53,11 @@ impl From<&Expr> for StringTree {
 	}
 }
 
-impl From<&ChainOp> for StringTree {
-	fn from(chain_op: &ChainOp) -> StringTree {
+impl From<&ChOp> for StringTree {
+	fn from(chop: &ChOp) -> StringTree {
 		StringTree::new_node(
-			format!("op {}", chain_op.op), STYLE_NORMAL,
-			vec![StringTree::from(&chain_op.expr)])
+			format!("chop {}", chop.op), STYLE_NORMAL,
+			vec![StringTree::from(&chop.expr)])
 	}
 }
 

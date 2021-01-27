@@ -48,11 +48,11 @@ pub enum Expr {
 	Var {varname: String},
 	Const {val: Obj},
 	BinOp {op: Op, left: Box<Expr>, right: Box<Expr>},
-	Chain {init_expr: Box<Expr>, chain_ops: Vec<ChainOp>}
+	Chain {init_expr: Box<Expr>, chops: Vec<ChOp>},
 }
 
 #[derive(Debug, Clone)]
-pub struct ChainOp {
+pub struct ChOp {
 	pub op: Op,
 	pub expr: Expr,
 }
@@ -346,15 +346,15 @@ impl Mem {
 				Op::Star => Obj::op_star(&self.eval_expr(left), &self.eval_expr(right)),
 				Op::Slash => Obj::op_slash(&self.eval_expr(left), &self.eval_expr(right)),
 			},
-			Expr::Chain {init_expr, chain_ops} => {
+			Expr::Chain {init_expr, chops} => {
 				let mut val = self.eval_expr(init_expr);
-				for chain_op in chain_ops {
-					val = (match chain_op.op {
+				for chop in chops {
+					val = (match chop.op {
 						Op::Plus => Obj::op_plus,
 						Op::Minus => Obj::op_minus,
 						Op::Star => Obj::op_star,
 						Op::Slash => Obj::op_slash,
-					})(&val, &self.eval_expr(&chain_op.expr));
+					})(&val, &self.eval_expr(&chop.expr));
 				}
 				val
 			},

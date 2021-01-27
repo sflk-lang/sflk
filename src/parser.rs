@@ -93,6 +93,21 @@ impl Tok {
 	}
 }
 
+impl From<Tok> for Op {
+	fn from(tok: Tok) -> Op {
+		match tok {
+			Tok::BinOp(op_string) => match &op_string[..] {
+				"+" => Op::Plus,
+				"-" => Op::Minus,
+				"*" => Op::Star,
+				"/" => Op::Slash,
+				_ => panic!("operator bad"),
+			},
+			_ => panic!("not even operator"),
+		}
+	}
+}
+
 pub enum ExprEnd {
 	Nothing,
 	Paren,
@@ -190,7 +205,20 @@ impl ProgReadingHead {
 		}
 	}
 
+	fn parse_chop(&mut self) -> Result<(ChOp, Loc), ParsingError> {
+		std::assert!(self.peek_tok()?.0.is_bin_op());
+		let (op_tok, loc) = self.pop_tok()?;
+		let (expr, right_loc) = self.parse_expr_left()?;
+		Ok((ChOp {op: Op::from(op_tok), expr}, loc + right_loc))
+	}
+
 	pub fn parse_expr(&mut self, end: ExprEnd) -> Result<(Expr, Loc), ParsingError> {
+		// TODO:
+		// get rid of this dead code in the comment
+		// it is unreachable because it is in a comment
+		// which is ignored by the compiler
+		// poor code
+		/*
 		let (mut expr, mut loc) = self.parse_expr_left()?;
 		while self.peek_tok()?.0.is_bin_op() {
 			let (op, _) = self.pop_tok()?;
@@ -217,6 +245,25 @@ impl ProgReadingHead {
 			ExprEnd::Nothing => Ok((expr, loc)),
 			ExprEnd::Paren => match self.pop_tok()? {
 				(Tok::Right(s), _) if s == ")" => Ok((expr, loc)),
+				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok}),
+			}
+		}
+		*/
+		let (init_expr, mut loc) = self.parse_expr_left()?;
+		let mut chops: Vec<ChOp> = Vec::new();
+		while self.peek_tok()?.0.is_bin_op() {
+			let (chop, chop_loc) = self.parse_chop()?;
+			chops.push(chop);
+			loc += chop_loc;
+		}
+		let chain = Expr::Chain {
+			init_expr: Box::new(init_expr),
+			chops,
+		};
+		match end {
+			ExprEnd::Nothing => Ok((chain, loc)),
+			ExprEnd::Paren => match self.pop_tok()? {
+				(Tok::Right(s), _) if s == ")" => Ok((chain, loc)),
 				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok}),
 			}
 		}

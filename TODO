@@ -6,6 +6,7 @@
 	- statements as expression ( x < pr y < 4 + do ({pr 1} + {pr "uwu"}) )
 	- debug expression using $ like this:
 		x < y + $(z - a / $b) # dbg b, then dbg (z - a / $b) #
+		oh and $$ is a chainop with nothing on the right maybe
 	- read and write to variables of other contexts with more precision
 	- good loop and conditional syntaxes
 	- bock call syntax ( something like `do f<<(x<8)` )
