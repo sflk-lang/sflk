@@ -368,6 +368,10 @@ impl Mem {
 				for chop in chops {
 					let right = self.eval_expr(&chop.expr);
 					match chop.op {
+						// TODO:
+						// redesign these operations to match something like
+						// fn (&mut Obj, &Obj);
+						// (the current design is legacy now that Expr::Chain is a thing)
 						Op::Plus => val = Obj::op_plus(&val, &right),
 						Op::Minus => val = Obj::op_minus(&val, &right),
 						Op::Star => val = Obj::op_star(&val, &right),
@@ -378,6 +382,8 @@ impl Mem {
 									let mut excx = ExCx::new();
 									excx.cx.varmap.insert("v".to_string(), val.clone());
 									self.exec_block_excx(&block, excx);
+									// TODO:
+									// reduce the indentation level here
 								},
 								obj => panic!("can't do {} for now", obj),
 							}

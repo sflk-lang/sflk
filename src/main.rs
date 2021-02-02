@@ -30,7 +30,7 @@ mod parser;
 mod machine;
 mod stringtree;
 
-fn main() -> Result<(), parser::ParsingError> {
+fn main() {
 	let settings = Settings::from_args();
 
 	let scu = Rc::new(tokenizer::SourceCodeUnit::from_filename(
@@ -38,13 +38,17 @@ fn main() -> Result<(), parser::ParsingError> {
 
 	let mut prh = parser::ProgReadingHead::from(
 		tokenizer::TokReadingHead::from_scu(scu));
-	let (prog, _) = prh.parse_prog()?;
+	let prog = match prh.parse_prog() {
+		Ok((prog, _)) => prog,
+		Err(parsing_error) => {
+			println!("\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}", parsing_error);
+			return;
+		},
+	};
 	if settings.debug_mode {
 		stringtree::StringTree::from(&prog).print();
 	}
 
 	let mut mem = machine::Mem::new();
 	mem.exec_prog(&prog);
-
-	Ok(())
 }

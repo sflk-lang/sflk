@@ -2,9 +2,35 @@
 use tokenizer::*;
 
 #[derive(Debug)]
+pub enum UnexpectedForWhat {
+	ToStartAStatement,
+	ToFollowAVariableNameAtTheStartOfAStatement,
+	ToStartAnExpression,
+	ToEndAnExpression(ExprEnd),
+}
+
+impl Display for UnexpectedForWhat {
+	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+		match self {
+			UnexpectedForWhat::ToStartAStatement =>
+				write!(f, "to start a statement"),
+			UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement =>
+				write!(f, "to follow a variable name at the start of a statement"),
+			UnexpectedForWhat::ToStartAnExpression =>
+				write!(f, "to start an expression"),
+			UnexpectedForWhat::ToEndAnExpression(expr_end) => match expr_end {
+				ExprEnd::Nothing => unreachable!(),
+				ExprEnd::Paren =>
+					write!(f, "to end an expression while `)` was expected"),
+			},
+		}
+	}
+}
+
+#[derive(Debug)]
 pub enum ParsingError {
 	TokenizingError(TokenizingError),
-	UnexpectedToken {tok: Tok, loc: Loc},
+	UnexpectedToken {tok: Tok, loc: Loc, for_what: UnexpectedForWhat},
 }
 
 impl From<TokenizingError> for ParsingError {
@@ -13,13 +39,13 @@ impl From<TokenizingError> for ParsingError {
 	}
 }
 
-impl std::fmt::Display for ParsingError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for ParsingError {
+	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
 		match self {
 			ParsingError::TokenizingError(parsing_error) => write!(f, "{}", parsing_error),
-			ParsingError::UnexpectedToken {tok, loc} =>
-					write!(f, "unexpected token `{}` at line {}",
-						tok, loc.line()),
+			ParsingError::UnexpectedToken {tok, loc, for_what} =>
+				write!(f, "unexpected token `{}` {} (at line {})",
+					tok, for_what, loc.line()),
 		}
 	}
 }
@@ -77,6 +103,7 @@ impl ProgReadingHead {
 
 use crate::{machine::*, tokenizer};
 use std::rc::Rc;
+use std::fmt::{Display, Formatter};
 
 pub enum BlockEnd {
 	Void,
@@ -111,6 +138,7 @@ impl From<Tok> for Op {
 	}
 }
 
+#[derive(Debug)]
 pub enum ExprEnd {
 	Nothing,
 	Paren,
@@ -193,14 +221,16 @@ impl ProgReadingHead {
 					Ok((Stmt::AssignIfFree {varname: left_word, expr}, loc + expr_loc))
 				},
 				(tok, loc) => Err(ParsingError::UnexpectedToken {
-					tok: tok.clone(), loc: loc.clone()
+					tok: tok.clone(), loc: loc.clone(),
+					for_what: UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement
 				}),
 			},
 			Tok::Left(s) if s == "(" => {
 				let (stmts, loc) = self.parse_stmts(BlockEnd::Paren)?;
 				Ok((Stmt::Group {stmts}, loc))
 			},
-			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
+			tok => Err(ParsingError::UnexpectedToken {tok, loc,
+				for_what: UnexpectedForWhat::ToStartAStatement}),
 		}
 	}
 
@@ -217,7 +247,8 @@ impl ProgReadingHead {
 				let (block, block_loc) = self.parse_block(BlockEnd::Curly)?;
 				Ok((Expr::Const {val: Obj::Block(Rc::new(block))}, block_loc))
 			},
-			tok => Err(ParsingError::UnexpectedToken {tok, loc}),
+			tok => Err(ParsingError::UnexpectedToken {tok, loc,
+				for_what: UnexpectedForWhat::ToStartAnExpression}),
 		}
 	}
 
@@ -282,7 +313,8 @@ impl ProgReadingHead {
 			ExprEnd::Nothing => Ok((expr, loc)),
 			ExprEnd::Paren => match self.pop_tok()? {
 				(Tok::Right(s), _) if s == ")" => Ok((expr, loc)),
-				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok}),
+				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok,
+					for_what: UnexpectedForWhat::ToEndAnExpression(end)}),
 			}
 		}
 	}
