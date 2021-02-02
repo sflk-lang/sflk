@@ -1,2 +1,2 @@
 [workspace]
-members = ["sflk-language", "sflk-lsp"]
+members = ["sflk-lang", "sflk-lsp"]
