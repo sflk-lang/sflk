@@ -29,6 +29,10 @@ contexts:
       scope: keyword.operator.assignment.flk
     - match: '\+|\-|\*|/'
       scope: keyword.operator.arithmetic.sflk
+    - match: '(>)\s*([a-zA-Z]+)'
+      captures:
+        1: keyword.operator.sflk
+        2: variable.function.sflk
     - match: '>'
       scope: keyword.operator.sflk
     - match: '\b(if)\b'

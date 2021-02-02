@@ -1,167 +1,8 @@
 
-pub type Prog = Block;
-
-#[derive(Debug)]
-pub struct Block {
-	pub stmts: Vec<Stmt>,
-}
-
-impl Block {
-	pub fn new(stmts: Vec<Stmt>) -> Block {
-		Block {
-			stmts,
-		}
-	}
-}
-
-impl Block {
-	fn clone_multiply(&self, n: usize) -> Block {
-		let mut stmts = Vec::new();
-		for _ in 0..n {
-			for stmt in &self.stmts {
-				stmts.push(stmt.clone());
-			}
-		}
-		Block {
-			stmts
-		}
-	}
-}
-
-#[derive(Debug, Clone)]
-pub enum Stmt {
-	Nop,
-	Print {expr: Expr},
-	PrintNewline,
-	Assign {varname: String, expr: Expr},
-	AssignIfFree {varname: String, expr: Expr},
-	Do {expr: Expr},
-	Ev {expr: Expr},
-	Imp {expr: Expr},
-	Exp {expr: Expr},
-	Redo {expr: Expr},
-	End {expr: Expr},
-	If {cond_expr: Expr, stmt: Box<Stmt>},
-	Group {stmts: Vec<Stmt>},
-}
-
-#[derive(Debug, Clone)]
-pub enum Expr {
-	Var {varname: String},
-	Const {val: Obj},
-	//BinOp {op: Op, left: Box<Expr>, right: Box<Expr>},
-	Chain {init_expr: Box<Expr>, chops: Vec<ChOp>},
-}
-
-#[derive(Debug, Clone)]
-pub struct ChOp {
-	pub op: Op,
-	pub expr: Expr,
-}
-
-#[derive(Debug, Clone)]
-pub enum Op {
-	Plus,
-	Minus,
-	Star,
-	Slash,
-	ToRight,
-}
-
-impl std::fmt::Display for Op {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Op::Plus => write!(f, "plus"),
-			Op::Minus => write!(f, "minus"),
-			Op::Star => write!(f, "star"),
-			Op::Slash => write!(f, "slash"),
-			Op::ToRight => write!(f, "to right"),
-		}
-	}
-}
-
-use std::rc::Rc;
-
-#[derive(Debug, Clone)]
-pub enum Obj {
-	Integer(isize),
-	String(String),
-	Block(Rc<Block>),
-	//Cx(Cx),
-}
-
-impl std::fmt::Display for Obj {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Obj::Integer(integer) => write!(f, "{}", integer),
-			Obj::String(string) => write!(f, "{}", string),
-			Obj::Block(_) => write!(f, "{}", "block"), // change this
-			//Obj::Cx(cx) => write!(f, "{:?}", cx), // change this
-		}
-	}
-}
-
-impl Obj {
-	fn op_plus(&self, other: &Obj) -> Obj {
-		match (self, other) {
-			(Obj::Integer(left), Obj::Integer(right)) =>
-				Obj::Integer(left + right),
-			(Obj::String(left), Obj::String(right)) =>
-				Obj::String(left.to_owned() + right),
-			(Obj::Block(left), Obj::Block(right)) => 
-				Obj::Block(Rc::new(Block::new(
-					left.stmts.iter().chain(right.stmts.iter()).cloned().collect()))),
-			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
-				obj_left, obj_right),
-		}
-	}
-
-	fn op_minus(&self, other: &Obj) -> Obj {
-		match (self, other) {
-			(Obj::Integer(left), Obj::Integer(right)) =>
-				Obj::Integer(left - right),
-			(obj_left, obj_right) => panic!("minus not yet supported between {} and {}",
-				obj_left, obj_right),
-		}
-	}
-
-	fn op_star(&self, other: &Obj) -> Obj {
-		match (self, other) {
-			(Obj::Integer(left), Obj::Integer(right)) =>
-				Obj::Integer(left * right),
-			(Obj::String(left), Obj::Integer(right)) =>
-				Obj::String(left.repeat(*right as usize)),
-			(Obj::Block(left), Obj::Integer(right)) =>
-				Obj::Block(Rc::new(left.clone_multiply(*right as usize))),
-			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
-				obj_left, obj_right),
-		}
-	}
-
-	fn op_slash(&self, other: &Obj) -> Obj {
-		match (self, other) {
-			(Obj::Integer(left), Obj::Integer(right)) =>
-				Obj::Integer(left / right),
-			(Obj::String(left), Obj::String(right)) =>
-				Obj::Integer(left.matches(right).count() as isize),
-			(obj_left, obj_right) => panic!("plus not yet supported between {} and {}",
-				obj_left, obj_right),
-		}
-	}
-}
-
-impl Obj {
-	fn as_cond(&self) -> bool {
-		match self {
-			Obj::Integer(integer) => *integer != 0,
-			Obj::String(string) => string.len() != 0,
-			Obj::Block(_) => true,
-			//Obj::Cx(cx) => !cx.varmap.is_empty(),
-		}
-	}
-}
-
 use std::collections::HashMap;
+use crate::program::{Prog, Block, Stmt, Expr, ChOp, Op};
+use crate::object::Obj;
+
 
 #[derive(Debug, Clone)]
 struct Cx {
@@ -182,6 +23,7 @@ impl Cx {
 	}
 }
 
+
 struct ExCx {
 	cx: Cx,
 	i: usize,
@@ -198,12 +40,14 @@ impl ExCx {
 	}
 }
 
+
 #[derive(PartialEq, Eq)]
 enum Flow {
 	Next,
 	Restart,
 	End,
 }
+
 
 pub struct Mem {
 	excx_stack: Vec<ExCx>,
@@ -252,7 +96,7 @@ impl Mem {
 		self.exec_block(prog as &Block);
 	}
 
-	fn exec_block_excx(&mut self, block: &Block, excx: ExCx) {
+	fn exec_block_excx(&mut self, block: &Block, excx: ExCx) -> ExCx {
 		self.excx_stack.push(excx);
 		loop {
 			if self.excx(0).i >= block.stmts.len() {
@@ -268,7 +112,7 @@ impl Mem {
 				Flow::End => (),
 			}
 		}
-		self.excx_stack.pop();
+		self.excx_stack.pop().unwrap()
 	}
 
 	fn exec_block(&mut self, block: &Block) {
@@ -356,41 +200,35 @@ impl Mem {
 		match expr {
 			Expr::Var {varname} => self.varget(varname).clone(),
 			Expr::Const {val} => val.clone(),
-			/*Expr::BinOp {op, left, right} => match op {
-				Op::Plus => Obj::op_plus(&self.eval_expr(left), &self.eval_expr(right)),
-				Op::Minus => Obj::op_minus(&self.eval_expr(left), &self.eval_expr(right)),
-				Op::Star => Obj::op_star(&self.eval_expr(left), &self.eval_expr(right)),
-				Op::Slash => Obj::op_slash(&self.eval_expr(left), &self.eval_expr(right)),
-				_ => panic!("look, a tree! *runs away*"),
-			},*/
 			Expr::Chain {init_expr, chops} => {
 				let mut val = self.eval_expr(init_expr);
 				for chop in chops {
-					let right = self.eval_expr(&chop.expr);
-					match chop.op {
-						// TODO:
-						// redesign these operations to match something like
-						// fn (&mut Obj, &Obj);
-						// (the current design is legacy now that Expr::Chain is a thing)
-						Op::Plus => val = Obj::op_plus(&val, &right),
-						Op::Minus => val = Obj::op_minus(&val, &right),
-						Op::Star => val = Obj::op_star(&val, &right),
-						Op::Slash => val = Obj::op_slash(&val, &right),
-						Op::ToRight => {
-							match right {
-								Obj::Block(block) => {
-									let mut excx = ExCx::new();
-									excx.cx.varmap.insert("v".to_string(), val.clone());
-									self.exec_block_excx(&block, excx);
-									// TODO:
-									// reduce the indentation level here
-								},
-								obj => panic!("can't do {} for now", obj),
-							}
-						},
-					}
+					self.apply_chop(&mut val, chop)
 				}
 				val
+			},
+		}
+	}
+
+	fn apply_chop(&mut self, val: &mut Obj, chop: &ChOp) {
+		let right = self.eval_expr(&chop.expr);
+		match chop.op {
+			Op::Plus => val.plus(right),
+			Op::Minus => val.minus(right),
+			Op::Star => val.star(right),
+			Op::Slash => val.slash(right),
+			Op::ToRight => {
+				match right {
+					Obj::Block(block) => {
+						let mut excx = ExCx::new();
+						excx.cx.varmap.insert("v".to_string(), val.clone());
+						excx = self.exec_block_excx(&block, excx);
+						if let Some(v_value) = excx.cx.varmap.get("v") {
+							*val = v_value.to_owned();
+						}
+					},
+					obj => panic!("can't do {} for now", obj),
+				}
 			},
 		}
 	}

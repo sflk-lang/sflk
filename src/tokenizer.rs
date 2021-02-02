@@ -53,19 +53,19 @@ impl std::fmt::Display for TokenizingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
 			TokenizingError::EofInComment {loc} =>
-				write!(f, "end-of-file in comment started at line {}",
+				write!(f, "end-of-file in comment (started at line {})",
 					loc.line_start),
 			TokenizingError::EofInString {loc} =>
-				write!(f, "end-of-file in string literal started at line {}",
+				write!(f, "end-of-file in string literal (started at line {})",
 					loc.line_start),
 			TokenizingError::EofInEscapeSequence {loc} =>
-				write!(f, "end-of-file in escape sequence at line {}",
+				write!(f, "end-of-file in escape sequence (at line {})",
 					loc.line_start),
 			TokenizingError::UnexpectedCharacter {ch, loc} =>
-				write!(f, "unexpected character `{}` at line {}",
+				write!(f, "unexpected character `{}` (at line {})",
 					ch, loc.line_start),
 			TokenizingError::InvalidEscapeSequence {sequence, loc} =>
-				write!(f, "invalid escape sequence `{}` at line {}",
+				write!(f, "invalid escape sequence `{}` (at line {})",
 					sequence, loc.line_start),
 		}
 	}
@@ -73,13 +73,6 @@ impl std::fmt::Display for TokenizingError {
 
 
 use std::rc::Rc;
-
-#[derive(Debug)]
-pub struct TokReadingHead {
-	scu: Rc<SourceCodeUnit>,
-	raw_index: usize,
-	line: usize,
-}
 
 #[derive(Debug, Clone)]
 pub struct Loc {
@@ -112,6 +105,14 @@ impl Add for Loc {
 		self += right;
 		self
 	}
+}
+
+
+#[derive(Debug)]
+pub struct TokReadingHead {
+	scu: Rc<SourceCodeUnit>,
+	raw_index: usize,
+	line: usize,
 }
 
 impl TokReadingHead {
@@ -173,6 +174,7 @@ impl TokReadingHead {
 	}
 }
 
+
 #[derive(Debug, Clone)]
 pub enum Tok {
 	Word(String),
@@ -210,6 +212,7 @@ impl Tok {
 		}
 	}
 }
+
 
 impl TokReadingHead {
 	pub fn read_cur_tok(&mut self) -> Result<(Tok, Loc), TokenizingError> {

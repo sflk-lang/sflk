@@ -1,4 +1,12 @@
 
+mod tokenizer;
+mod parser;
+mod program;
+mod object;
+mod machine;
+mod stringtree;
+
+
 struct Settings {
 	src_filename: String,
 	debug_mode: bool,
@@ -24,14 +32,11 @@ impl Settings {
 	}
 }
 
-use std::rc::Rc;
-mod tokenizer;
-mod parser;
-mod machine;
-mod stringtree;
 
 fn main() {
 	let settings = Settings::from_args();
+
+	use std::rc::Rc;
 
 	let scu = Rc::new(tokenizer::SourceCodeUnit::from_filename(
 		&settings.src_filename));
@@ -46,9 +51,13 @@ fn main() {
 		},
 	};
 	if settings.debug_mode {
+		println!("\x1b[7mProgram tree\x1b[27m");
 		stringtree::StringTree::from(&prog).print();
 	}
 
+	if settings.debug_mode {
+		println!("\x1b[7mProgram execution\x1b[27m");
+	}
 	let mut mem = machine::Mem::new();
 	mem.exec_prog(&prog);
 }

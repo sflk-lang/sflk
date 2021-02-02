@@ -1,4 +1,8 @@
 
-pr "uwu" *3 /"uwu" nl
+prnl < {
+	pr v nl
+	v < v *2
+}
+ev "uwu" *3 /"uwu" >prnl >prnl
 
-8
+# prints 3 #

@@ -1,6 +1,35 @@
 
-use tokenizer::*;
+use std::fmt::{Display, Formatter};
+use crate::tokenizer::{TokReadingHead, Tok, Loc, TokenizingError};
+use crate::program::{Prog, Block, Stmt, Expr, ChOp, Op};
+use crate::object::Obj;
 
+
+#[derive(Debug)]
+pub enum ParsingError {
+	TokenizingError(TokenizingError),
+	UnexpectedToken {tok: Tok, loc: Loc, for_what: UnexpectedForWhat},
+}
+
+impl From<TokenizingError> for ParsingError {
+	fn from(tokenizer_error: TokenizingError) -> ParsingError {
+		ParsingError::TokenizingError(tokenizer_error)
+	}
+}
+
+impl Display for ParsingError {
+	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+		match self {
+			ParsingError::TokenizingError(parsing_error) => write!(f, "{}", parsing_error),
+			ParsingError::UnexpectedToken {tok, loc, for_what} =>
+				write!(f, "unexpected token `{}` {} (at line {})",
+					tok, for_what, loc.line()),
+		}
+	}
+}
+
+// TODO:
+// Find better names
 #[derive(Debug)]
 pub enum UnexpectedForWhat {
 	ToStartAStatement,
@@ -27,28 +56,6 @@ impl Display for UnexpectedForWhat {
 	}
 }
 
-#[derive(Debug)]
-pub enum ParsingError {
-	TokenizingError(TokenizingError),
-	UnexpectedToken {tok: Tok, loc: Loc, for_what: UnexpectedForWhat},
-}
-
-impl From<TokenizingError> for ParsingError {
-	fn from(tokenizer_error: TokenizingError) -> ParsingError {
-		ParsingError::TokenizingError(tokenizer_error)
-	}
-}
-
-impl Display for ParsingError {
-	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-		match self {
-			ParsingError::TokenizingError(parsing_error) => write!(f, "{}", parsing_error),
-			ParsingError::UnexpectedToken {tok, loc, for_what} =>
-				write!(f, "unexpected token `{}` {} (at line {})",
-					tok, for_what, loc.line()),
-		}
-	}
-}
 
 pub struct ProgReadingHead {
 	trh: TokReadingHead,
@@ -69,7 +76,7 @@ impl ProgReadingHead {
 		self.trh.read_cur_tok()
 	}
 
-	pub fn peek_tok(&mut self) -> Result<&(Tok, Loc), ParsingError> {
+	fn peek_tok(&mut self) -> Result<&(Tok, Loc), ParsingError> {
 		if self.tok_buffer.is_empty() {
 			let tok_loc = self.read_tok_from_trh()?;
 			self.tok_buffer.push(tok_loc);
@@ -101,11 +108,8 @@ impl ProgReadingHead {
 	}
 }
 
-use crate::{machine::*, tokenizer};
-use std::rc::Rc;
-use std::fmt::{Display, Formatter};
 
-pub enum BlockEnd {
+enum BlockEnd {
 	Void,
 	Curly,
 	Paren,
@@ -118,6 +122,25 @@ impl Tok {
 			(BlockEnd::Curly, Tok::Right(s)) if s == "}" => true,
 			(BlockEnd::Paren, Tok::Right(s)) if s == ")" => true,
 			_ => false,
+		}
+	}
+}
+
+#[derive(Debug)]
+pub enum ExprEnd {
+	Nothing,
+	Paren,
+}
+
+impl ProgReadingHead {
+	fn assert_expr_end(&mut self, end: ExprEnd) -> Result<(), ParsingError> {
+		match end {
+			ExprEnd::Nothing => Ok(()),
+			ExprEnd::Paren => match self.pop_tok()? {
+				(Tok::Right(s), _) if s == ")" => Ok(()),
+				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok,
+					for_what: UnexpectedForWhat::ToEndAnExpression(end)}),
+			}
 		}
 	}
 }
@@ -138,12 +161,6 @@ impl From<Tok> for Op {
 	}
 }
 
-#[derive(Debug)]
-pub enum ExprEnd {
-	Nothing,
-	Paren,
-}
-
 impl ProgReadingHead {
 	pub fn parse_prog(&mut self) -> Result<(Prog, Loc), ParsingError> {
 		self.parse_block(BlockEnd::Void)
@@ -161,13 +178,13 @@ impl ProgReadingHead {
 		Ok((stmts, loc))
 	}
 
-	pub fn parse_block(&mut self, end: BlockEnd) -> Result<(Block, Loc), ParsingError> {
+	fn parse_block(&mut self, end: BlockEnd) -> Result<(Block, Loc), ParsingError> {
 		let (stmts, loc) = self.parse_stmts(end)?;
 		let block = Block::new(stmts);
 		Ok((block, loc))
 	}
 
-	pub fn parse_stmt(&mut self) -> Result<(Stmt, Loc), ParsingError> {
+	fn parse_stmt(&mut self) -> Result<(Stmt, Loc), ParsingError> {
 		let (tok, loc) = self.pop_tok()?;
 		match tok {
 			Tok::Word(s) if s == "nop" => {
@@ -245,7 +262,7 @@ impl ProgReadingHead {
 			Tok::Left(left) if left == "(" => self.parse_expr(ExprEnd::Paren),
 			Tok::Left(left) if left == "{" => {
 				let (block, block_loc) = self.parse_block(BlockEnd::Curly)?;
-				Ok((Expr::Const {val: Obj::Block(Rc::new(block))}, block_loc))
+				Ok((Expr::Const {val: Obj::Block(block)}, block_loc))
 			},
 			tok => Err(ParsingError::UnexpectedToken {tok, loc,
 				for_what: UnexpectedForWhat::ToStartAnExpression}),
@@ -259,43 +276,7 @@ impl ProgReadingHead {
 		Ok((ChOp {op: Op::from(op_tok), expr}, loc + right_loc))
 	}
 
-	pub fn parse_expr(&mut self, end: ExprEnd) -> Result<(Expr, Loc), ParsingError> {
-		// TODO:
-		// get rid of this dead code in the comment
-		// it is unreachable because it is in a comment
-		// which is ignored by the compiler
-		// poor code
-		/*
-		let (mut expr, mut loc) = self.parse_expr_left()?;
-		while self.peek_tok()?.0.is_bin_op() {
-			let (op, _) = self.pop_tok()?;
-			match op {
-				Tok::BinOp(op_string) => {
-					let (right_expr, right_loc) = self.parse_expr_left()?;
-					expr = Expr::BinOp {
-						op: match &op_string[..] {
-							"+" => Op::Plus,
-							"-" => Op::Minus,
-							"*" => Op::Star,
-							"/" => Op::Slash,
-							_ => panic!("operator bad"),
-						},
-						left: Box::new(expr),
-						right: Box::new(right_expr),
-					};
-					loc += right_loc;
-				},
-				_ => unreachable!(),
-			}
-		}
-		match end {
-			ExprEnd::Nothing => Ok((expr, loc)),
-			ExprEnd::Paren => match self.pop_tok()? {
-				(Tok::Right(s), _) if s == ")" => Ok((expr, loc)),
-				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok}),
-			}
-		}
-		*/
+	fn parse_expr(&mut self, end: ExprEnd) -> Result<(Expr, Loc), ParsingError> {
 		let (init_expr, mut loc) = self.parse_expr_left()?;
 		let mut chops: Vec<ChOp> = Vec::new();
 		while self.peek_tok()?.0.is_bin_op() {
@@ -309,13 +290,7 @@ impl ProgReadingHead {
 			init_expr: Box::new(init_expr),
 			chops,
 		}};
-		match end {
-			ExprEnd::Nothing => Ok((expr, loc)),
-			ExprEnd::Paren => match self.pop_tok()? {
-				(Tok::Right(s), _) if s == ")" => Ok((expr, loc)),
-				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok,
-					for_what: UnexpectedForWhat::ToEndAnExpression(end)}),
-			}
-		}
+		self.assert_expr_end(end)?;
+		Ok((expr, loc))
 	}
 }

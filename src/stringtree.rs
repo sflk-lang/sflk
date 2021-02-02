@@ -1,151 +1,58 @@
 
-use crate::machine::*;
-
-type StyleBegEnd = (&'static str, &'static str);
-
 pub struct StringTree {
-	main: String,
-	style: StyleBegEnd,
+	string: String,
+	style: Style,
 	sub_trees: Vec<StringTree>,
 }
 
-const STYLE_NORMAL: StyleBegEnd = ("", "");
-const STYLE_CYAN: StyleBegEnd = ("\x1b[36m", "\x1b[39m");
-const STYLE_BOLD: StyleBegEnd = ("\x1b[4m", "\x1b[24m");
-
 impl StringTree {
-	fn new_leaf(main: String, style: StyleBegEnd) -> StringTree {
+	pub fn new_leaf(string: String, style: Style) -> StringTree {
 		StringTree {
-			main,
+			string,
 			style,
 			sub_trees: Vec::new(),
 		}
 	}
 
-	fn new_node(main: String, style: StyleBegEnd, sub_trees: Vec<StringTree>) -> StringTree {
+	pub fn new_node(string: String, style: Style, sub_trees: Vec<StringTree>) -> StringTree {
 		StringTree {
-			main,
+			string,
 			style,
 			sub_trees,
 		}
 	}
 }
 
-impl From<&Expr> for StringTree {
-	fn from(expr: &Expr) -> StringTree {
-		match expr {
-			Expr::Var {varname} => StringTree::new_leaf(
-				format!("variable {}", varname), STYLE_NORMAL),
-			Expr::Const {val} => StringTree::from(val),
-			/*Expr::BinOp {op, left, right} => StringTree::new_node(
-				format!("op {}", op), STYLE_NORMAL,
-				vec![StringTree::from(&**left), StringTree::from(&**right)]),*/
-			Expr::Chain {init_expr, chops} => {
-				// TODO
-				// make this code great again
-				let mut vec = vec![StringTree::from(&**init_expr)];
-				vec.extend(chops.iter().map(|chop| StringTree::from(chop)));
-				StringTree::new_node(
-					"chain".to_string(), STYLE_NORMAL,
-					vec)
-			},
-		}
-	}
+type Style = (&'static str, &'static str);
+
+pub mod style {
+	pub const NORMAL: super::Style = ("", "");
+	pub const CYAN: super::Style = ("\x1b[36m", "\x1b[39m");
+	pub const BOLD: super::Style = ("\x1b[4m", "\x1b[24m");
 }
 
-impl From<&ChOp> for StringTree {
-	fn from(chop: &ChOp) -> StringTree {
-		StringTree::new_node(
-			format!("chop {}", chop.op), STYLE_NORMAL,
-			vec![StringTree::from(&chop.expr)])
-	}
-}
 
-fn escape(string: &str, style: &StyleBegEnd) -> String {
+pub fn escape_string(string: &str, escape_style: &Style) -> String {
 	let mut ret = String::new();
 	string.chars().for_each(|ch| match ch {
-		'\"' => ret.extend(format!("{}\\\"{}", style.0, style.1).chars()),
-		'\\' => ret.extend(format!("{}\\\\{}", style.0, style.1).chars()),
-		'\n' => ret.extend(format!("{}\\n{}", style.0, style.1).chars()),
-		'\t' => ret.extend(format!("{}\\t{}", style.0, style.1).chars()),
-		'\x1b' => ret.extend(format!("{}\\e{}", style.0, style.1).chars()),
-		'\x07' => ret.extend(format!("{}\\a{}", style.0, style.1).chars()),
-		'\x08' => ret.extend(format!("{}\\b{}", style.0, style.1).chars()),
-		'\x0b' => ret.extend(format!("{}\\v{}", style.0, style.1).chars()),
-		'\x0c' => ret.extend(format!("{}\\f{}", style.0, style.1).chars()),
-		'\r' => ret.extend(format!("{}\\r{}", style.0, style.1).chars()),
+		'\"'   => ret.extend(format!("{}\\\"{}", escape_style.0, escape_style.1).chars()),
+		'\\'   => ret.extend(format!("{}\\\\{}", escape_style.0, escape_style.1).chars()),
+		'\n'   => ret.extend(format!("{}\\n{}",  escape_style.0, escape_style.1).chars()),
+		'\t'   => ret.extend(format!("{}\\t{}",  escape_style.0, escape_style.1).chars()),
+		'\x1b' => ret.extend(format!("{}\\e{}",  escape_style.0, escape_style.1).chars()),
+		'\x07' => ret.extend(format!("{}\\a{}",  escape_style.0, escape_style.1).chars()),
+		'\x08' => ret.extend(format!("{}\\b{}",  escape_style.0, escape_style.1).chars()),
+		'\x0b' => ret.extend(format!("{}\\v{}",  escape_style.0, escape_style.1).chars()),
+		'\x0c' => ret.extend(format!("{}\\f{}",  escape_style.0, escape_style.1).chars()),
+		'\r'   => ret.extend(format!("{}\\r{}",  escape_style.0, escape_style.1).chars()),
 		ch if (ch as u32) < (' ' as u32) =>
-			ret.extend(format!("{}\\x{:02x}{}", style.0, ch as u32, style.1).chars()),
+			ret.extend(format!("{}\\x{:02x}{}",
+				escape_style.0, ch as u32, escape_style.1).chars()),
 		ch => ret.push(ch),
 	});
 	ret
 }
 
-impl From<&Obj> for StringTree {
-	fn from(obj: &Obj) -> StringTree {
-		match obj {
-			Obj::Integer(integer) => StringTree::new_leaf(
-				format!("integer {}", integer), STYLE_NORMAL),
-			Obj::String(string) => StringTree::new_leaf(
-				format!("string \"{}\"", escape(&string, &STYLE_BOLD)), STYLE_NORMAL),
-			Obj::Block(block) => StringTree::from(&**block),
-		}
-	}
-}
-
-impl From<&Block> for StringTree {
-	fn from(block: &Block) -> StringTree {
-		StringTree::new_node("block".to_owned(), STYLE_CYAN, 
-			block.stmts.iter()
-				.map(|stmt| StringTree::from(stmt))
-				.collect()
-		)
-	}
-}
-
-impl From<&Stmt> for StringTree {
-	fn from(stmt: &Stmt) -> StringTree {
-		match stmt {
-			Stmt::Nop => StringTree::new_leaf(
-				"nop".to_owned(), STYLE_NORMAL),
-			Stmt::Print {expr} => StringTree::new_node(
-				"pr".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::PrintNewline => StringTree::new_leaf(
-				"nl".to_owned(), STYLE_NORMAL),
-			Stmt::Assign {varname, expr} => StringTree::new_node(
-				format!("assign to variable {}", varname), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::AssignIfFree {varname, expr} => StringTree::new_node(
-				format!("assign if free to variable {}", varname), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::Do {expr} => StringTree::new_node(
-				"do".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::Ev {expr} => StringTree::new_node(
-				"ev".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::Imp {expr} => StringTree::new_node(
-				"imp".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::Exp {expr} => StringTree::new_node(
-				"exp".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::Redo {expr} => StringTree::new_node(
-				"redo".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::End {expr} => StringTree::new_node(
-				"end".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(expr)]),
-			Stmt::If {cond_expr, stmt} => StringTree::new_node(
-				"if".to_owned(), STYLE_NORMAL,
-				vec![StringTree::from(cond_expr), StringTree::from(&**stmt)]),
-			Stmt::Group {stmts} => StringTree::new_node(
-				"group".to_owned(), STYLE_NORMAL,
-				stmts.iter().map(|stmt| StringTree::from(stmt)).collect()),
-		}
-	}
-}
 
 const INDENT_TUBE: &str = "│ ";
 const INDENT_ITEM: &str = "├─";
@@ -189,29 +96,20 @@ impl RightTube {
 	}
 }
 
-fn print_indent(indents: &Vec<(StyleBegEnd, Tube)>, right_override: RightTube) {
-	if let Some(((indent_right_style, _), indents_left)) = indents.split_last() {
-		for ((style_beg, style_end), tube) in indents_left {
-			print!("{}{}{}", style_beg, tube.str(), style_end);
-		}
-		print!("{}{}{}", indent_right_style.0, right_override.str(), indent_right_style.1);
-	}
-}
-
 impl StringTree {
 	pub fn print(&self) {
 		self.print_aux(&mut Vec::new(), false);
 	}
 
-	fn print_aux(&self, indent_styles: &mut Vec<(StyleBegEnd, Tube)>, is_last: bool) {
-		// Print self.main with multiple lines main support
-		let mut lines = self.main.lines();
+	fn print_aux(&self, indent_styles: &mut Vec<(Style, Tube)>, is_last: bool) {
+		// Print self.string with multiple line string support
+		let mut lines = self.string.lines();
 		if let Some(line) = lines.next() {
-			print_indent(indent_styles, RightTube::from_is_last(is_last));
+			print_indents(indent_styles, RightTube::from_is_last(is_last));
 			println!("{}{}{}", self.style.0, line, self.style.1);
 		}
 		for line in lines {
-			print_indent(indent_styles, RightTube::Tube);
+			print_indents(indent_styles, RightTube::Tube);
 			println!("{}{}{}", self.style.0, line, self.style.1);
 		}
 
@@ -227,5 +125,14 @@ impl StringTree {
 			last_sub_tree.print_aux(indent_styles, true);
 		}
 		indent_styles.pop();
+	}
+}
+
+fn print_indents(indent_styles: &Vec<(Style, Tube)>, right_override: RightTube) {
+	if let Some(((indent_right_style, _), indents_left)) = indent_styles.split_last() {
+		for (style, tube) in indents_left {
+			print!("{}{}{}", style.0, tube.str(), style.1);
+		}
+		print!("{}{}{}", indent_right_style.0, right_override.str(), indent_right_style.1);
 	}
 }
