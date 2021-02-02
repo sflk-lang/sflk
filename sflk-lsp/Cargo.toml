@@ -8,3 +8,5 @@ repository = "https://github.com/anima-libera/sflk"
 description = "SFLK programming language"
 
 [dependencies]
+tower-lsp = "0.13.3"
+tokio = { version = "0.2", features=["full"] }
