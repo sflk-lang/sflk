@@ -1,0 +1,10 @@
+[package]
+name = "sflk-lsp"
+version = "0.1.0"
+authors = ["anima-libera <anim.libera@gmail.com>", "arthur correnson <arthur.correnson@ens-rennes.fr>"]
+edition = "2018"
+readme = "README.md"
+repository = "https://github.com/anima-libera/sflk"
+description = "SFLK programming language"
+
+[dependencies]
