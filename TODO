@@ -8,4 +8,6 @@
 	- read and write to variables of other contexts with more precision
 	- good loop and conditional syntaxes
 	- bock *call* syntax
+	- @ is now the current cx
+	- syntax for a block of code to actually "return" something
 - maybe merge
