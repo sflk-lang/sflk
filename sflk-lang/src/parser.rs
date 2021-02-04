@@ -201,23 +201,27 @@ impl ProgReadingHead {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Do {expr}, loc + expr_loc))
 			},
+			Tok::Word(s) if s == "dh" => {
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::DoHere {expr}, loc + expr_loc))
+			},
 			Tok::Word(s) if s == "ev" => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Ev {expr}, loc + expr_loc))
 			}
-			Tok::Word(s) if s == "imp" => {
+			Tok::Word(s) if s == "imp" => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Imp {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "exp" => {
+			Tok::Word(s) if s == "exp" => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Exp {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "redo" => {
+			Tok::Word(s) if s == "redo" => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Redo {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "end" => {
+			Tok::Word(s) if s == "end" => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::End {expr}, loc + expr_loc))
 			},

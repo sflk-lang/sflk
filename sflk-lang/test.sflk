@@ -5,4 +5,7 @@ prnl < {
 }
 ev "uwu" *3 /"uwu" >prnl >prnl
 
+v < 8
+dh prnl dh prnl
+
 # prints 3 and then 6 #

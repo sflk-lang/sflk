@@ -96,8 +96,7 @@ impl Mem {
 		self.exec_block(prog as &Block);
 	}
 
-	fn exec_block_excx(&mut self, block: &Block, excx: ExCx) -> ExCx {
-		self.excx_stack.push(excx);
+	fn exec_block_here(&mut self, block: &Block) {
 		loop {
 			if self.excx(0).i >= block.stmts.len() {
 				self.excx_mut(0).flow = Flow::End;
@@ -112,6 +111,11 @@ impl Mem {
 				Flow::End => (),
 			}
 		}
+	}
+
+	fn exec_block_excx(&mut self, block: &Block, excx: ExCx) -> ExCx {
+		self.excx_stack.push(excx);
+		self.exec_block_here(block);
 		self.excx_stack.pop().unwrap()
 	}
 
@@ -122,12 +126,10 @@ impl Mem {
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Nop => (),
-			Stmt::Print {expr} => {
-				print!("{}", self.eval_expr(expr));
-			},
-			Stmt::PrintNewline => {
-				println!("");
-			},
+			Stmt::Print {expr} => 
+				print!("{}", self.eval_expr(expr)),
+			Stmt::PrintNewline => 
+				println!(""),
 			Stmt::Assign {varname, expr} => {
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
@@ -136,63 +138,60 @@ impl Mem {
 				let val = self.eval_expr(expr);
 				self.varset_if_free(varname, val);
 			},
-			Stmt::Do {expr} => {
+			Stmt::Do {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Block(block) => self.exec_block(&block),
 					obj => panic!("can't do {} for now", obj),
-				};
-			},
+				},
+			Stmt::DoHere {expr} =>
+				match self.eval_expr(expr) {
+					Obj::Block(block) => self.exec_block_here(&block),
+					obj => panic!("can't do {} for now", obj),
+				},
 			Stmt::Ev {expr} => {
 				self.eval_expr(expr);
-			},
-			Stmt::Imp {expr} => {
-				let val = self.eval_expr(expr);
-				if let Obj::Integer(integer) = val {
-					let cx_to_import = self.excx(integer as usize).cx.clone();
-					self.excx_mut(0).cx.import(cx_to_import);
-				} else {
-					panic!("imp expected integer but found {}", val)
-				}
-			},
-			Stmt::Exp {expr} => {
-				let val = self.eval_expr(expr);
-				if let Obj::Integer(integer) = val {
-					let cx_to_export = self.excx(0).cx.clone();
-					self.excx_mut(integer as usize).cx.import(cx_to_export);
-				} else {
-					panic!("exp expected integer but found {}", val)
-				}
-			},
-			Stmt::Redo {expr} => {
-				let val = self.eval_expr(expr);
-				if let Obj::Integer(integer) = val {
-					self.excx_mut(integer as usize).flow = Flow::Restart;
-				} else {
-					panic!("redo expected integer but found {}", val)
-				}
-			},
-			Stmt::End {expr} => {
-				let val = self.eval_expr(expr);
-				if let Obj::Integer(integer) = val {
-					self.excx_mut(integer as usize).flow = Flow::End;
-				} else {
-					panic!("redo expected integer but found {}", val)
-				}
-			},
-			Stmt::If {cond_expr, stmt} => {
-				let cond_val = self.eval_expr(cond_expr);
-				if cond_val.as_cond() {
+			}
+			Stmt::Imp {expr} =>
+				match self.eval_expr(expr) {
+					Obj::Integer(integer) => {
+						let cx_to_import = self.excx(integer as usize).cx.clone();
+						self.excx_mut(0).cx.import(cx_to_import);
+					},
+					invalid_obj => panic!("imp expected integer but found {}", invalid_obj),
+				},
+			Stmt::Exp {expr} =>
+				match self.eval_expr(expr) {
+					Obj::Integer(integer) => {
+						let cx_to_export = self.excx(0).cx.clone();
+						self.excx_mut(integer as usize).cx.import(cx_to_export);
+					},
+					invalid_obj => panic!("exp expected integer but found {}", invalid_obj),
+				},
+			Stmt::Redo {expr} =>
+				match self.eval_expr(expr) {
+					Obj::Integer(integer) => {
+						self.excx_mut(integer as usize).flow = Flow::Restart;
+					},
+					invalid_obj => panic!("redo expected integer but found {}", invalid_obj),
+				},
+			Stmt::End {expr} =>
+				match self.eval_expr(expr) {
+					Obj::Integer(integer) => {
+						self.excx_mut(integer as usize).flow = Flow::End;
+					},
+					invalid_obj => panic!("end expected integer but found {}", invalid_obj),
+				},
+			Stmt::If {cond_expr, stmt} =>
+				if self.eval_expr(cond_expr).as_cond() {
 					self.exec_stmt(stmt)
-				}
-			},
-			Stmt::Group {stmts} => {
+				},
+			Stmt::Group {stmts} =>
 				for stmt in stmts {
 					self.exec_stmt(stmt);
 					if self.excx(0).flow != Flow::Next {
 						break;
 					}
-				}
-			},
+				},
 		}
 	}
 
@@ -227,7 +226,7 @@ impl Mem {
 							*val = v_value.to_owned();
 						}
 					},
-					obj => panic!("can't do {} for now", obj),
+					invalid_obj => panic!("can't do {} for now", invalid_obj),
 				}
 			},
 		}

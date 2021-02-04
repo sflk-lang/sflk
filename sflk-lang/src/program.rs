@@ -49,6 +49,7 @@ pub enum Stmt {
 	Assign {varname: String, expr: Expr},
 	AssignIfFree {varname: String, expr: Expr},
 	Do {expr: Expr},
+	DoHere {expr: Expr},
 	Ev {expr: Expr},
 	Imp {expr: Expr},
 	Exp {expr: Expr},
@@ -76,6 +77,9 @@ impl From<&Stmt> for StringTree {
 				vec![StringTree::from(expr)]),
 			Stmt::Do {expr} => StringTree::new_node(
 				String::from("do"), style::NORMAL,
+				vec![StringTree::from(expr)]),
+			Stmt::DoHere {expr} => StringTree::new_node(
+				String::from("dh"), style::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Ev {expr} => StringTree::new_node(
 				String::from("ev"), style::NORMAL,
