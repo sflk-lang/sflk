@@ -1,6 +1,4 @@
 
-pr "a" nl
-do {
-	fh "sflk-lang/test2.sflk"
-	pr uwu nl
-}
+fh "sflk-lang/std.sflk"
+
+ev 8 >prnl

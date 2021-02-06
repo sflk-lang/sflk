@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::program::{Prog, Block, Stmt, Expr, ChOp, Op};
 use crate::object::Obj;
 use crate::stringrtlog::StringRtlog;
-use crate::utils::{Style, styles, escape_string};
+use crate::utils::{Style, styles};
 
 
 #[derive(Debug, Clone)]
