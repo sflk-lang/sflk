@@ -276,13 +276,17 @@ impl Mem {
 					},
 					invalid_obj => panic!("end expected integer but found {}", invalid_obj),
 				},
-			Stmt::If {cond_expr, stmt} => {
+			Stmt::If {cond_expr, if_stmt, el_stmt} => {
 				self.rtlog_indent(String::from("if"), false, styles::NORMAL);
 				if self.eval_expr(cond_expr).as_cond() {
 					self.rtlog_log(String::from("condition is true"), styles::NORMAL);
-					self.exec_stmt(stmt)
+					self.exec_stmt(if_stmt)
 				} else {
 					self.rtlog_log(String::from("condition is false"), styles::NORMAL);
+					match el_stmt {
+						Some(stmt) => self.exec_stmt(stmt),
+						None => (),
+					}
 				}
 				self.rtlog_deindent();
 			},

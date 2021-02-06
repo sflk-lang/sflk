@@ -1,10 +1,7 @@
-x < 0
-f < {
-	if x *(x-1) *(x-2) *(x-3) (
-		nl end 0
-	)
-	pr x pr " "
-	x < x +1
-	dh f
+
+if 0 dh {
+	pr "if" nl
+} el dh {
+	pr "else" nl
 }
-dh f # prints 0 1 2 3 #
+

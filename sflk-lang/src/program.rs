@@ -56,7 +56,7 @@ pub enum Stmt {
 	Exp {expr: Expr},
 	Redo {expr: Expr},
 	End {expr: Expr},
-	If {cond_expr: Expr, stmt: Box<Stmt>},
+	If {cond_expr: Expr, if_stmt: Box<Stmt>, el_stmt: Option<Box<Stmt>>},
 }
 
 impl From<&Stmt> for StringTree {
@@ -96,9 +96,21 @@ impl From<&Stmt> for StringTree {
 			Stmt::End {expr} => StringTree::new_node(
 				String::from("end"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
-			Stmt::If {cond_expr, stmt} => StringTree::new_node(
+			Stmt::If {cond_expr, if_stmt, el_stmt} => StringTree::new_node(
 				String::from("if"), styles::NORMAL,
-				vec![StringTree::from(cond_expr), StringTree::from(&**stmt)]),
+				{
+					// TODO:
+					// Rerwrite this with iterators but without cloning any StringTree
+					// if it is even possible
+					let mut vec: Vec<StringTree> = Vec::new();
+					vec.push(StringTree::from(cond_expr));
+					vec.push(StringTree::from(&**if_stmt));
+					match el_stmt {
+						Some(stmt) => vec.push(StringTree::from(&**stmt)),
+						None => (),
+					}
+					vec
+				}),
 		}
 	}
 }

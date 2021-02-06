@@ -178,7 +178,7 @@ impl TokReadingHead {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tok {
 	Word(String),
 	Keyword(Keyword),
@@ -199,7 +199,7 @@ impl std::fmt::Display for Tok {
 			Tok::Integer(s) => write!(f, "{}", s),
 			Tok::String(s) => write!(f, "\"{}\"", escape_string(s, &styles::UNDERLINE)),
 			Tok::BinOp(op) => write!(f, "{}", op),
-			Tok::Left(s) => write!(f, "{}", s),
+			Tok::Left(s) => write!(f, "{:#}", s),
 			Tok::Right(s) => write!(f, "{}", s),
 			Tok::StmtBinOp(op) => write!(f, "{}", op),
 			Tok::Void => write!(f, ""),
@@ -207,9 +207,9 @@ impl std::fmt::Display for Tok {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keyword {
-	Np, Pr, Nl, Do, Dh, Ev, Redo, End, Imp, Exp, If,
+	Np, Pr, Nl, Do, Dh, Ev, Redo, End, Imp, Exp, If, El,
 }
 
 impl std::fmt::Display for Keyword {
@@ -226,6 +226,7 @@ impl std::fmt::Display for Keyword {
 			Keyword::Imp => write!(f, "{}", "imp"),
 			Keyword::Exp => write!(f, "{}", "exp"),
 			Keyword::If => write!(f, "{}", "if"),
+			Keyword::El => write!(f, "{}", "el"),
 		}
 	}
 }
@@ -245,6 +246,7 @@ impl Tok {
 			keywords.insert("imp", Keyword::Imp);
 			keywords.insert("exp", Keyword::Exp);
 			keywords.insert("if", Keyword::If);
+			keywords.insert("el", Keyword::El);
 			keywords
 		};
 		match &self {
@@ -260,7 +262,7 @@ impl Tok {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinOp {
 	Plus, Minus, Star, Slash, ToRight,
 }
@@ -277,7 +279,7 @@ impl std::fmt::Display for BinOp {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Matched {
 	Paren,
 	Bracket,
@@ -294,7 +296,7 @@ impl std::fmt::Display for Matched {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StmtBinOp {
 	ToLeft,
 	ToLeftTilde,

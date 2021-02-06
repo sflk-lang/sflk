@@ -39,7 +39,7 @@ contexts:
         2: variable.function.sflk
     - match: '>'
       scope: keyword.operator.sflk
-    - match: '\b(if)\b'
+    - match: '\b(if|el)\b'
       scope: keyword.control.conditional.if.sflk
     - match: '\b(np|pr|nl|do|dh|ev|redo|end|imp|exp)\b'
       scope: keyword.other.sflk

@@ -53,8 +53,7 @@ impl Display for UnexpectedForWhat {
 				write!(f, "to start an expression"),
 			UnexpectedForWhat::ToEndAnExpression(expr_end) => match expr_end {
 				ExprEnd::Nothing => unreachable!(),
-				ExprEnd::Paren =>
-					write!(f, "to end an expression while `)` was expected"),
+				ExprEnd::Paren => write!(f, "to end an expression while `)` was expected"),
 			},
 		}
 	}
@@ -228,8 +227,26 @@ impl ProgReadingHead {
 			},
 			Tok::Keyword(Keyword::If) => {
 				let (cond_expr, cond_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				let (stmt, stmt_loc) = self.parse_stmt()?;
-				Ok((Stmt::If {cond_expr, stmt: Box::new(stmt)}, loc + cond_loc + stmt_loc))
+				let (if_stmt, if_stmt_loc) = self.parse_stmt()?;
+				if self.peek_tok()?.0 == Tok::Keyword(Keyword::El) {
+					self.disc_tok()?;
+					let (el_stmt, el_stmt_loc) = self.parse_stmt()?;
+					Ok((
+						Stmt::If {
+							cond_expr,
+							if_stmt: Box::new(if_stmt),
+							el_stmt: Some(Box::new(el_stmt))
+						},
+						loc + cond_loc + if_stmt_loc + el_stmt_loc))
+				} else {
+					Ok((
+						Stmt::If {
+							cond_expr,
+							if_stmt: Box::new(if_stmt),
+							el_stmt: None
+						},
+						loc + cond_loc + if_stmt_loc))
+				}
 			},
 			Tok::Word(word) => match self.peek_tok()? {
 				(Tok::StmtBinOp(StmtBinOp::ToLeft), _) => {
