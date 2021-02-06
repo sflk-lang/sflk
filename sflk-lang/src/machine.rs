@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::program::{Prog, Block, Stmt, Expr, ChOp, Op};
 use crate::object::Obj;
 use crate::stringrtlog::StringRtlog;
-use crate::utils::{Style, styles};
+use crate::utils::{Style, styles, escape_string};
 
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,7 @@ impl ExCx {
 }
 
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Flow {
 	Next,
 	Restart,
@@ -134,7 +134,7 @@ impl Mem {
 		self.excx_mut(0).i.push(0);
 		loop {
 			if *self.excx(0).i.last().unwrap() >= stmts.len() {
-				self.excx_mut(0).flow = Flow::End;
+				break;
 			}
 			match self.excx_mut(0).flow {
 				Flow::Next => (),
@@ -144,8 +144,11 @@ impl Mem {
 			self.exec_stmt(&stmts[*self.excx(0).i.last().unwrap()]);
 			match self.excx_mut(0).flow {
 				Flow::Next => *self.excx_mut(0).i.last_mut().unwrap() += 1,
-				Flow::Restart => *self.excx_mut(0).i.last_mut().unwrap() = 0,
-				Flow::End => (),
+				Flow::Restart => {
+					*self.excx_mut(0).i.last_mut().unwrap() = 0;
+					self.rtlog_log(String::from("restart"), styles::NORMAL);
+				},
+				Flow::End => self.rtlog_log(String::from("end"), styles::NORMAL),
 			}
 		}
 		self.excx_mut(0).i.pop().expect("bug");
@@ -163,18 +166,22 @@ impl Mem {
 
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
-			Stmt::Np => 
-				if let Some(string_rtlog) = &mut self.debug_mode {
-					string_rtlog.indent(String::from("np"), false, styles::NORMAL);
-					string_rtlog.deindent();
-				},
+			Stmt::Np => {
+				self.rtlog_indent(String::from("np"), false, styles::NORMAL);
+				self.rtlog_deindent();
+			},
 			Stmt::Print {expr} => {
 				self.rtlog_indent(String::from("pr"), false, styles::NORMAL);
-				let string = format!("{}", self.eval_expr(expr));
+				let val = self.eval_expr(expr);
 				if let Some(_) = self.debug_mode {
-					self.rtlog_log(format!("output: {}", string), styles::NORMAL);
+					self.rtlog_log(format!("output {}", val),
+						styles::NORMAL);
 				} else {
-					print!("{}", string);
+					match val {
+						Obj::Integer(integer) => print!("{}", integer),
+						Obj::String(string) => print!("{}", string),
+						invalid_object => panic!("can't print {} for now", invalid_object),
+					}
 				}
 				self.rtlog_deindent();
 			},
@@ -212,24 +219,68 @@ impl Mem {
 				}
 				self.rtlog_deindent();
 			},
-			Stmt::Do {expr} =>
+			Stmt::Do {expr} => {
+				self.rtlog_indent(String::from("do"), true, styles::BOLD_LIGHT_RED);
 				match self.eval_expr(expr) {
 					Obj::Block(block) => {
-						self.rtlog_indent(String::from("do"), true, styles::BOLD_LIGHT_RED);
 						self.exec_block(&block);
-						self.rtlog_deindent();
 					},
 					obj => panic!("can't do {} for now", obj),
-				},
-			Stmt::DoHere {expr} =>
+				}
+				self.rtlog_deindent();
+			},
+			Stmt::DoHere {expr} => {
+				self.rtlog_indent(String::from("dh"), false, styles::YELLOW);
 				match self.eval_expr(expr) {
 					Obj::Block(block) => {
-						self.rtlog_indent(String::from("dh"), false, styles::YELLOW);
 						self.exec_stmts_here(&block.stmts);
-						self.rtlog_deindent();
 					},
-					obj => panic!("can't do {} for now", obj),
-				},
+					obj => panic!("can't dh {} for now", obj),
+				}
+				self.rtlog_deindent();
+			},
+			Stmt::FileDoHere {expr} => {
+				self.rtlog_indent(String::from("fh"), false, styles::YELLOW);
+				match self.eval_expr(expr) {
+					Obj::String(filename) => {
+						// TODO:
+						// Rewrite this temporary code, divide it into cool functions, etc.
+						// Try to reduce code duplication beteen here and in main
+
+						use std::rc::Rc;
+						use crate::tokenizer::{SourceCodeUnit, TokReadingHead};
+						use crate::parser::ProgReadingHead;
+						use crate::stringtree::StringTree;
+
+						let scu = Rc::new(SourceCodeUnit::from_filename(&filename));
+
+						let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
+						let prog = match prh.parse_prog() {
+							Ok((prog, _)) => prog,
+							Err(parsing_error) => {
+								self.rtlog_log(
+									format!("\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}",
+										parsing_error), 
+									styles::NORMAL);
+								return;
+							},
+						};
+						self.rtlog_log(String::from("\x1b[7mProgram tree\x1b[27m"),
+							styles::NORMAL);
+						if let Some(_) = self.debug_mode {
+							StringTree::from(&prog).print(self.debug_mode.as_mut().unwrap());
+						}
+
+						self.rtlog_log(String::from("\x1b[7mProgram execution\x1b[27m"),
+							styles::NORMAL);
+						self.exec_stmts_here(&prog.stmts);
+						self.rtlog_log(String::from("\x1b[7mProgram end\x1b[27m"),
+							styles::NORMAL);
+					},
+					obj => panic!("can't fh {} for now", obj),
+				}
+				self.rtlog_deindent();
+			},
 			Stmt::Ev {expr} => {
 				self.rtlog_indent(String::from("ev"), false, styles::NORMAL);
 				self.eval_expr(expr);
@@ -296,8 +347,21 @@ impl Mem {
 
 	fn eval_expr(&mut self, expr: &Expr) -> Obj {
 		match expr {
-			Expr::Var {varname} => self.varget(varname).clone(),
-			Expr::Const {val} => val.clone(),
+			Expr::Var {varname} => {
+				self.rtlog_indent(String::from("read"), false, styles::NORMAL);
+				self.rtlog_log(format!("variable {}", varname), styles::NORMAL);
+				let val = self.varget(varname).clone();
+				self.rtlog_log(format!("value is {}", val), styles::NORMAL);
+				self.rtlog_deindent();
+				val
+			},
+			Expr::Const {val} => {
+				self.rtlog_indent(String::from("constant"), false, styles::NORMAL);
+				let val = val.clone();
+				self.rtlog_log(format!("value is {}", val), styles::NORMAL);
+				self.rtlog_deindent();
+				val
+			},
 			Expr::Chain {init_expr, chops} => {
 				self.rtlog_indent(String::from("chain"), false, styles::BLUE);
 				let mut val = self.eval_expr(init_expr);

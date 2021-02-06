@@ -1,3 +1,6 @@
 
-ev 0 +1 +1 +(8 /2 /2 /2) +1 >{pr v nl}
-
+pr "a" nl
+do {
+	fh "sflk-lang/test2.sflk"
+	pr uwu nl
+}

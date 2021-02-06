@@ -209,7 +209,7 @@ impl std::fmt::Display for Tok {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keyword {
-	Np, Pr, Nl, Do, Dh, Ev, Redo, End, Imp, Exp, If, El,
+	Np, Pr, Nl, Do, Dh, Fh, Ev, Redo, End, Imp, Exp, If, El,
 }
 
 impl std::fmt::Display for Keyword {
@@ -220,6 +220,7 @@ impl std::fmt::Display for Keyword {
 			Keyword::Nl => write!(f, "{}", "nl"),
 			Keyword::Do => write!(f, "{}", "do"),
 			Keyword::Dh => write!(f, "{}", "dh"),
+			Keyword::Fh => write!(f, "{}", "fh"),
 			Keyword::Ev => write!(f, "{}", "ev"),
 			Keyword::Redo => write!(f, "{}", "redo"),
 			Keyword::End => write!(f, "{}", "end"),
@@ -240,6 +241,7 @@ impl Tok {
 			keywords.insert("nl", Keyword::Nl);
 			keywords.insert("do", Keyword::Do);
 			keywords.insert("dh", Keyword::Dh);
+			keywords.insert("fh", Keyword::Fh);
 			keywords.insert("ev", Keyword::Ev);
 			keywords.insert("redo", Keyword::Redo);
 			keywords.insert("end", Keyword::End);

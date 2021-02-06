@@ -70,20 +70,22 @@ impl RightTube {
 }
 
 impl StringTree {
-	pub fn print(&self) {
-		self.print_aux(&mut Vec::new(), false);
+	pub fn print<W: std::fmt::Write>(&self, writer: &mut W) {
+		self.print_aux(writer, &mut Vec::new(), false);
 	}
 
-	fn print_aux(&self, indent_styles: &mut Vec<(Style, Tube)>, is_last: bool) {
+	fn print_aux<W: std::fmt::Write>(&self, writer: &mut W,
+		indent_styles: &mut Vec<(Style, Tube)>, is_last: bool
+	) {
 		// Print self.string with multiple line string support
 		let mut lines = self.string.lines();
 		if let Some(line) = lines.next() {
-			print_indents(indent_styles, RightTube::from_is_last(is_last));
-			println!("{}{}{}", self.style.0, line, self.style.1);
+			print_indents(writer, indent_styles, RightTube::from_is_last(is_last));
+			writeln!(writer, "{}{}{}", self.style.0, line, self.style.1).expect("error");
 		}
 		for line in lines {
-			print_indents(indent_styles, RightTube::Tube);
-			println!("{}{}{}", self.style.0, line, self.style.1);
+			print_indents(writer, indent_styles, RightTube::Tube);
+			writeln!(writer, "{}{}{}", self.style.0, line, self.style.1).expect("error");
 		}
 
 		// Manage the indentation changes and recusive printing
@@ -93,19 +95,22 @@ impl StringTree {
 		indent_styles.push((self.style, Tube::Tube));
 		if let Some((last_sub_tree, sub_trees)) = self.sub_trees.split_last() {
 			for sub_tree in sub_trees {
-				sub_tree.print_aux(indent_styles, false);
+				sub_tree.print_aux(writer, indent_styles, false);
 			}
-			last_sub_tree.print_aux(indent_styles, true);
+			last_sub_tree.print_aux(writer, indent_styles, true);
 		}
 		indent_styles.pop();
 	}
 }
 
-fn print_indents(indent_styles: &Vec<(Style, Tube)>, right_override: RightTube) {
-	if let Some(((indent_right_style, _), indents_left)) = indent_styles.split_last() {
+fn print_indents<W: std::fmt::Write>(writer: &mut W,
+	indent_styles: &Vec<(Style, Tube)>, right_override: RightTube
+) {
+	if let Some(((right_style, _), indents_left)) = indent_styles.split_last() {
 		for (style, tube) in indents_left {
-			print!("{}{}{}", style.0, tube.str(), style.1);
+			write!(writer, "{}{}{}", style.0, tube.str(), style.1).expect("error");
 		}
-		print!("{}{}{}", indent_right_style.0, right_override.str(), indent_right_style.1);
+		write!(writer, "{}{}{}",
+			right_style.0, right_override.str(), right_style.1).expect("error");
 	}
 }

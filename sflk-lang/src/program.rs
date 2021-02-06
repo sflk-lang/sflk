@@ -51,6 +51,7 @@ pub enum Stmt {
 	AssignIfFree {varname: String, expr: Expr},
 	Do {expr: Expr},
 	DoHere {expr: Expr},
+	FileDoHere {expr: Expr},
 	Ev {expr: Expr},
 	Imp {expr: Expr},
 	Exp {expr: Expr},
@@ -63,7 +64,7 @@ impl From<&Stmt> for StringTree {
 	fn from(stmt: &Stmt) -> StringTree {
 		match stmt {
 			Stmt::Np => StringTree::new_leaf(
-				String::from("nop"), styles::NORMAL),
+				String::from("np"), styles::NORMAL),
 			Stmt::Print {expr} => StringTree::new_node(
 				String::from("pr"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
@@ -81,6 +82,9 @@ impl From<&Stmt> for StringTree {
 			Stmt::DoHere {expr} => StringTree::new_node(
 				String::from("dh"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
+			Stmt::FileDoHere {expr} => StringTree::new_node(
+				String::from("fh"), styles::NORMAL,
+				vec![StringTree::from(expr)]),
 			Stmt::Ev {expr} => StringTree::new_node(
 				String::from("ev"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
@@ -97,12 +101,8 @@ impl From<&Stmt> for StringTree {
 				String::from("end"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::If {cond_expr, if_stmt, el_stmt} => StringTree::new_node(
-				String::from("if"), styles::NORMAL,
-				{
-					// TODO:
-					// Rerwrite this with iterators but without cloning any StringTree
-					// if it is even possible
-					let mut vec: Vec<StringTree> = Vec::new();
+				String::from("if"), styles::NORMAL, {
+					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
 					vec.push(StringTree::from(cond_expr));
 					vec.push(StringTree::from(&**if_stmt));
 					match el_stmt {

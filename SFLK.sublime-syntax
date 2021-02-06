@@ -41,6 +41,8 @@ contexts:
       scope: keyword.operator.sflk
     - match: '\b(if|el)\b'
       scope: keyword.control.conditional.if.sflk
+    - match: '\b(fh)\b'
+      scope: keyword.import.sflk
     - match: '\b(np|pr|nl|do|dh|ev|redo|end|imp|exp)\b'
       scope: keyword.other.sflk
     - match: '\b(v)\b'

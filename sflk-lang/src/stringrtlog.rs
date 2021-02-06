@@ -30,11 +30,19 @@ impl StringRtlog {
 	}
 }
 
+impl std::fmt::Write for StringRtlog {
+	fn write_str(&mut self, string: &str) -> Result<(), std::fmt::Error> {
+		self.push(Item::RawString(string.to_string()));
+		Ok(())
+	}
+}
+
 
 enum Item {
 	IndentAdd {string: String, indent: Indent},
 	IndentRemove,
 	String(String, Style),
+	RawString(String),
 }
 
 #[derive(Clone)]
@@ -52,19 +60,34 @@ const INDENT_WEAK: &str = "╎";
 impl StringRtlog {
 	pub fn print(&self) {
 		let mut indents: Vec<Indent> = Vec::new();
+		let mut is_newline: bool = true;
 		for item in &self.items {
 			match item {
 				Item::IndentAdd {string, indent} => {
-					print_indents(&indents, Some(indent));
+					if is_newline {
+						print_indents(&indents, Some(indent));
+					}
 					println!("{}{}{}", indent.style.0, string, indent.style.1);
+					is_newline = true;
 					indents.push(indent.clone());
 				},
 				Item::IndentRemove => {
 					indents.pop().expect("bug");
 				},
 				Item::String(string, style) => {
-					print_indents(&indents, None);
+					if is_newline {
+						print_indents(&indents, None);
+					}
 					println!("{}{}{}", style.0, string, style.1);
+					is_newline = true;
+				}
+				Item::RawString(string) => {
+					if is_newline {
+						print_indents(&indents, None);
+					}
+					let formatted_string = format!("{}", string);
+					is_newline = formatted_string.chars().last().map_or(false, |ch| ch == '\n');
+					print!("{}", formatted_string);
 				}
 			}
 		}

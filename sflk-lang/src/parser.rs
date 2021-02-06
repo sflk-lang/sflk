@@ -205,6 +205,10 @@ impl ProgReadingHead {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::DoHere {expr}, loc + expr_loc))
 			},
+			Tok::Keyword(Keyword::Fh) => {
+				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
+				Ok((Stmt::FileDoHere {expr}, loc + expr_loc))
+			},
 			Tok::Keyword(Keyword::Ev) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Ev {expr}, loc + expr_loc))

@@ -1,6 +1,5 @@
 
 - display runtime errors nicely (embbed optionnal statement loc ?)
-- forbid varnames that are keywords
 - BRANCH from this point ( dev branch )
 	- debug expression using $ like this:
 		x < y + $(z - a / $b) # dbg b, then dbg (z - a / $b) #

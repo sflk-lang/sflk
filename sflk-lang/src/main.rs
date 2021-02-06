@@ -21,8 +21,14 @@ impl Settings {
 		let src_filename = args.next().expect("no source file provided");
 		let mut debug_mode = false;
 		for arg in args {
-			if arg == "-d" {
+			if arg == "-d" || arg == "--debug" {
 				debug_mode = true;
+			} else if arg == "-v" || arg == "--version" {
+				println!("SFLK reference interpreter, version {}.{}.{} ({})",
+					0, 1, 0, "indev");
+				println!("Please note that there is NO warranty, \
+					not even for MERCHANTABILITY or \
+					FITNESS FOR A PARTICULAR PURPOSE.");
 			} else {
 				panic!("unknown command line argument `{}`", arg);
 			}
@@ -54,7 +60,7 @@ fn main() {
 	};
 	if settings.debug_mode {
 		println!("\x1b[7mProgram tree\x1b[27m");
-		stringtree::StringTree::from(&prog).print();
+		stringtree::StringTree::from(&prog).print(&mut crate::utils::StdoutWriter::new());
 	}
 
 	if settings.debug_mode {
@@ -64,5 +70,8 @@ fn main() {
 	mem.exec_prog(&prog);
 	if let Some(string_rtlog) =  mem.debug_mode {
 		string_rtlog.print();
+	}
+	if settings.debug_mode {
+		println!("\x1b[7mProgram end\x1b[27m");
 	}
 }

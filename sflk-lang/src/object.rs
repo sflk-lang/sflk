@@ -29,7 +29,7 @@ impl std::fmt::Display for Obj {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
 			Obj::Integer(integer) => write!(f, "{}", integer),
-			Obj::String(string) => write!(f, "{}", string),
+			Obj::String(string) => write!(f, "\"{}\"", escape_string(&string, &styles::UNDERLINE)),
 			Obj::Block(_) => write!(f, "{}", "block"), // TODO: Change this
 			//Obj::Cx(cx) => write!(f, "{:?}", cx), // Coming soon!
 		}

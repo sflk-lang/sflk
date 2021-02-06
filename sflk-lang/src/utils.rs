@@ -31,3 +31,19 @@ pub fn escape_string(string: &str, escape_style: &Style) -> String {
 	});
 	ret
 }
+
+
+pub struct StdoutWriter;
+
+impl std::fmt::Write for StdoutWriter {
+	fn write_str(&mut self, string: &str) -> Result<(), std::fmt::Error> {
+		print!("{}", string);
+		Ok(())
+	}
+}
+
+impl StdoutWriter {
+	pub fn new() -> StdoutWriter {
+		StdoutWriter {}
+	}
+}
