@@ -130,7 +130,7 @@ impl From<&Expr> for StringTree {
 				format!("variable {}", varname), styles::NORMAL),
 			Expr::Const {val} => StringTree::from(val),
 			Expr::Chain {init_expr, chops} => StringTree::new_node(
-				"chain".to_string(), styles::NORMAL,
+				"chain".to_string(), styles::BLUE,
 				std::iter::once(StringTree::from(&**init_expr)).chain(
 					chops.iter().map(|chop| StringTree::from(chop))).collect()),
 		}

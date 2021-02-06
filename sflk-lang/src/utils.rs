@@ -4,7 +4,8 @@ pub type Style = (&'static str, &'static str);
 pub mod styles {
 	pub const NORMAL: super::Style = ("", "");
 	pub const CYAN: super::Style = ("\x1b[36m", "\x1b[39m");
-	pub const LIGHT_YELLOW: super::Style = ("\x1b[93m", "\x1b[39m");
+	pub const YELLOW: super::Style = ("\x1b[33m", "\x1b[39m");
+	pub const BLUE: super::Style = ("\x1b[34m", "\x1b[39m");
 	pub const UNDERLINE: super::Style = ("\x1b[4m", "\x1b[24m");
 	pub const BOLD_LIGHT_RED: super::Style = ("\x1b[91m\x1b[1m", "\x1b[22m\x1b[39m");
 }

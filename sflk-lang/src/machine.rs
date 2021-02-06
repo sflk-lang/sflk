@@ -188,7 +188,8 @@ impl Mem {
 				self.rtlog_deindent();
 			},
 			Stmt::Assign {varname, expr} => {
-				self.rtlog_indent(format!("assign to variable {}", varname), false, styles::NORMAL);
+				self.rtlog_indent(String::from("assign"), false, styles::NORMAL);
+				self.rtlog_log(format!("to variable {}", varname), styles::NORMAL);
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
 				self.rtlog_log(format!("now variable {} is {}", varname, self.varget(varname)),
@@ -196,8 +197,8 @@ impl Mem {
 				self.rtlog_deindent();
 			},
 			Stmt::AssignIfFree {varname, expr} => {
-				self.rtlog_indent(format!("assign if free to variable {}", varname), false,
-					styles::NORMAL);
+				self.rtlog_indent(String::from("assign if free"), false, styles::NORMAL);
+				self.rtlog_log(format!("to variable {}", varname), styles::NORMAL);
 				let val = self.eval_expr(expr);
 				let was_free = self.varset_if_free(varname, val);
 				if was_free {
@@ -223,7 +224,7 @@ impl Mem {
 			Stmt::DoHere {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Block(block) => {
-						self.rtlog_indent(String::from("dh"), false, styles::LIGHT_YELLOW);
+						self.rtlog_indent(String::from("dh"), false, styles::YELLOW);
 						self.exec_stmts_here(&block.stmts);
 						self.rtlog_deindent();
 					},
@@ -298,10 +299,14 @@ impl Mem {
 			Expr::Var {varname} => self.varget(varname).clone(),
 			Expr::Const {val} => val.clone(),
 			Expr::Chain {init_expr, chops} => {
+				self.rtlog_indent(String::from("chain"), false, styles::BLUE);
 				let mut val = self.eval_expr(init_expr);
+				self.rtlog_log(format!("initial value is {}", val), styles::NORMAL);
 				for chop in chops {
-					self.apply_chop(&mut val, chop)
+					self.apply_chop(&mut val, chop);
+					self.rtlog_log(format!("value now is {}", val), styles::NORMAL);
 				}
+				self.rtlog_deindent();
 				val
 			},
 		}
@@ -309,6 +314,9 @@ impl Mem {
 
 	fn apply_chop(&mut self, val: &mut Obj, chop: &ChOp) {
 		let right = self.eval_expr(&chop.expr);
+		self.rtlog_indent(String::from("chop"), false, styles::NORMAL);
+		self.rtlog_log(format!("op {}", chop.op), styles::NORMAL);
+		self.rtlog_log(format!("value {}", right), styles::NORMAL);
 		match chop.op {
 			Op::Plus => val.plus(right),
 			Op::Minus => val.minus(right),
@@ -328,5 +336,6 @@ impl Mem {
 				}
 			},
 		}
+		self.rtlog_deindent();
 	}
 }
