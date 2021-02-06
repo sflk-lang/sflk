@@ -187,8 +187,8 @@ impl ProgReadingHead {
 	fn parse_stmt(&mut self) -> Result<(Stmt, Loc), ParsingError> {
 		let (tok, loc) = self.pop_tok()?;
 		match tok {
-			Tok::Word(s) if s == "nop" => {
-				Ok((Stmt::Nop, loc))
+			Tok::Word(s) if s == "np" => {
+				Ok((Stmt::Np, loc))
 			},
 			Tok::Word(s) if s == "pr" => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;

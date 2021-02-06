@@ -43,7 +43,7 @@ impl Block {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-	Nop,
+	Np,
 	Print {expr: Expr},
 	PrintNewline,
 	Assign {varname: String, expr: Expr},
@@ -62,7 +62,7 @@ pub enum Stmt {
 impl From<&Stmt> for StringTree {
 	fn from(stmt: &Stmt) -> StringTree {
 		match stmt {
-			Stmt::Nop => StringTree::new_leaf(
+			Stmt::Np => StringTree::new_leaf(
 				String::from("nop"), style::NORMAL),
 			Stmt::Print {expr} => StringTree::new_node(
 				String::from("pr"), style::NORMAL,

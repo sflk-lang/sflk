@@ -5,6 +5,7 @@ mod program;
 mod object;
 mod machine;
 mod stringtree;
+mod stringrtlog;
 
 
 struct Settings {
@@ -58,6 +59,9 @@ fn main() {
 	if settings.debug_mode {
 		println!("\x1b[7mProgram execution\x1b[27m");
 	}
-	let mut mem = machine::Mem::new();
+	let mut mem = machine::Mem::new(settings.debug_mode);
 	mem.exec_prog(&prog);
+	if let Some(string_rtlog) =  mem.debug_mode {
+		string_rtlog.print();
+	}
 }

@@ -1,13 +1,19 @@
 
 - debug messages at runtime (indented execution log)
 - display runtime errors nicely (embbed optionnal statement loc ?)
+- keyword tokens, forbid varnames that are keywords
 - BRANCH from this point ( dev branch )
-	- statements as expression ( x < pr y < 4 + do ({pr 1} + {pr "uwu"}) )
 	- debug expression using $ like this:
 		x < y + $(z - a / $b) # dbg b, then dbg (z - a / $b) #
+	- breakpoints that open a debug repl
+	- debug repl commands can be used in the code with prefix $$
+	- normal repl
 	- read and write to variables of other contexts with more precision
 	- good loop and conditional syntaxes
-	- bock *call* syntax
-	- @ is now the current cx
-	- syntax for a block of code to actually "return" something
+	- bock *call* syntax (or not ?)
+	- @ is now the current cx (or not ?)
 - maybe merge
+- globals
+- types, conersions
+- lazy expressions
+- signals (print is a signal going down the stack, input goes up, etc.)

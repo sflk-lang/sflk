@@ -1,5 +1,5 @@
 
-use crate::stringtree::{StringTree, style};
+use crate::stringtree::{StringTree, style, escape_string};
 use crate::program::Block;
 
 
@@ -17,8 +17,8 @@ impl From<&Obj> for StringTree {
 			Obj::Integer(integer) => StringTree::new_leaf(
 				format!("integer {}", integer), style::NORMAL),
 			Obj::String(string) => StringTree::new_leaf(
-				format!("string \"{}\"", crate::stringtree::escape_string(&string, &style::BOLD)),
-					style::NORMAL),
+				format!("string \"{}\"", escape_string(&string, &style::UNDERLINE)),
+				style::NORMAL),
 			Obj::Block(block) => StringTree::from(block),
 		}
 	}

@@ -1,11 +1,9 @@
 
-prnl < {
-	pr v nl
-	v < v *2
+if 8 dh {
+	pr "uwu" nl
+	do {
+		pr "owo" nl
+	}
+	end 0
 }
-ev "uwu" *3 /"uwu" >prnl >prnl
-
-v < 8
-dh prnl dh prnl
-
-# prints 3 and then 6 #
+pr "ono" nl

@@ -28,7 +28,7 @@ type Style = (&'static str, &'static str);
 pub mod style {
 	pub const NORMAL: super::Style = ("", "");
 	pub const CYAN: super::Style = ("\x1b[36m", "\x1b[39m");
-	pub const BOLD: super::Style = ("\x1b[4m", "\x1b[24m");
+	pub const UNDERLINE: super::Style = ("\x1b[4m", "\x1b[24m");
 }
 
 
