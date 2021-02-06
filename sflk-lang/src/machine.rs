@@ -286,11 +286,6 @@ impl Mem {
 				}
 				self.rtlog_deindent();
 			},
-			Stmt::Group {stmts} => {
-				self.rtlog_indent(String::from("group"), false, styles::LIGHT_YELLOW);
-				self.exec_stmts_here(stmts);
-				self.rtlog_deindent();
-			},
 		}
 	}
 

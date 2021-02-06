@@ -57,7 +57,6 @@ pub enum Stmt {
 	Redo {expr: Expr},
 	End {expr: Expr},
 	If {cond_expr: Expr, stmt: Box<Stmt>},
-	Group {stmts: Vec<Stmt>},
 }
 
 impl From<&Stmt> for StringTree {
@@ -100,9 +99,6 @@ impl From<&Stmt> for StringTree {
 			Stmt::If {cond_expr, stmt} => StringTree::new_node(
 				String::from("if"), styles::NORMAL,
 				vec![StringTree::from(cond_expr), StringTree::from(&**stmt)]),
-			Stmt::Group {stmts} => StringTree::new_node(
-				String::from("group"), styles::NORMAL,
-				stmts.iter().map(|stmt| StringTree::from(stmt)).collect()),
 		}
 	}
 }

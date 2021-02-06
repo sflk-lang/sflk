@@ -116,7 +116,6 @@ impl ProgReadingHead {
 enum BlockEnd {
 	Void,
 	Curly,
-	Paren,
 }
 
 impl Tok {
@@ -124,7 +123,6 @@ impl Tok {
 		match (end, self) {
 			(BlockEnd::Void, Tok::Void) => true,
 			(BlockEnd::Curly, Tok::Right(Matched::Curly)) => true,
-			(BlockEnd::Paren, Tok::Right(Matched::Paren)) => true,
 			_ => false,
 		}
 	}
@@ -248,10 +246,6 @@ impl ProgReadingHead {
 					tok: tok.clone(), loc: loc.clone(),
 					for_what: UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement
 				}),
-			},
-			Tok::Left(Matched::Paren) => {
-				let (stmts, loc) = self.parse_stmts(BlockEnd::Paren)?;
-				Ok((Stmt::Group {stmts}, loc))
 			},
 			tok => Err(ParsingError::UnexpectedToken {tok, loc,
 				for_what: UnexpectedForWhat::ToStartAStatement}),
