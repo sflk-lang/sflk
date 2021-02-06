@@ -2,7 +2,8 @@
 use std::collections::HashMap;
 use crate::program::{Prog, Block, Stmt, Expr, ChOp, Op};
 use crate::object::Obj;
-use crate::stringrtlog::{StringRtlog, Style, style};
+use crate::stringrtlog::StringRtlog;
+use crate::utils::{Style, styles};
 
 
 #[derive(Debug, Clone)]
@@ -164,56 +165,56 @@ impl Mem {
 		match stmt {
 			Stmt::Np => 
 				if let Some(string_rtlog) = &mut self.debug_mode {
-					string_rtlog.indent(String::from("np"), false, style::NORMAL);
+					string_rtlog.indent(String::from("np"), false, styles::NORMAL);
 					string_rtlog.deindent();
 				},
 			Stmt::Print {expr} => {
-				self.rtlog_indent(String::from("pr"), false, style::NORMAL);
+				self.rtlog_indent(String::from("pr"), false, styles::NORMAL);
 				let string = format!("{}", self.eval_expr(expr));
 				if let Some(_) = self.debug_mode {
-					self.rtlog_log(format!("output: {}", string), style::NORMAL);
+					self.rtlog_log(format!("output: {}", string), styles::NORMAL);
 				} else {
 					print!("{}", string);
 				}
 				self.rtlog_deindent();
 			},
 			Stmt::PrintNewline => {
-				self.rtlog_indent(String::from("nl"), false, style::NORMAL);
+				self.rtlog_indent(String::from("nl"), false, styles::NORMAL);
 				if let Some(_) = self.debug_mode {
-					self.rtlog_log(String::from("output newline"), style::NORMAL);
+					self.rtlog_log(String::from("output newline"), styles::NORMAL);
 				} else {
 					println!("");
 				}
 				self.rtlog_deindent();
 			},
 			Stmt::Assign {varname, expr} => {
-				self.rtlog_indent(format!("assign to variable {}", varname), false, style::NORMAL);
+				self.rtlog_indent(format!("assign to variable {}", varname), false, styles::NORMAL);
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
 				self.rtlog_log(format!("now variable {} is {}", varname, self.varget(varname)),
-					style::NORMAL);
+					styles::NORMAL);
 				self.rtlog_deindent();
 			},
 			Stmt::AssignIfFree {varname, expr} => {
 				self.rtlog_indent(format!("assign if free to variable {}", varname), false,
-					style::NORMAL);
+					styles::NORMAL);
 				let val = self.eval_expr(expr);
 				let was_free = self.varset_if_free(varname, val);
 				if was_free {
 					self.rtlog_log(format!("now variable {} is {}",
 						varname, self.varget(varname)),
-						style::NORMAL);
+						styles::NORMAL);
 				} else {
 					self.rtlog_log(format!("variable {} was already {}",
 						varname, self.varget(varname)),
-						style::NORMAL);
+						styles::NORMAL);
 				}
 				self.rtlog_deindent();
 			},
 			Stmt::Do {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Block(block) => {
-						self.rtlog_indent(String::from("do"), true, style::BOLD_LIGHT_RED);
+						self.rtlog_indent(String::from("do"), true, styles::BOLD_LIGHT_RED);
 						self.exec_block(&block);
 						self.rtlog_deindent();
 					},
@@ -222,23 +223,23 @@ impl Mem {
 			Stmt::DoHere {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Block(block) => {
-						self.rtlog_indent(String::from("dh"), false, style::NORMAL);
+						self.rtlog_indent(String::from("dh"), false, styles::NORMAL);
 						self.exec_stmts_here(&block.stmts);
 						self.rtlog_deindent();
 					},
 					obj => panic!("can't do {} for now", obj),
 				},
 			Stmt::Ev {expr} => {
-				self.rtlog_indent(String::from("ev"), false, style::NORMAL);
+				self.rtlog_indent(String::from("ev"), false, styles::NORMAL);
 				self.eval_expr(expr);
 				self.rtlog_deindent();
 			},
 			Stmt::Imp {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Integer(integer) => {
-						self.rtlog_indent(String::from("imp"), false, style::NORMAL);
+						self.rtlog_indent(String::from("imp"), false, styles::NORMAL);
 						let cx_to_import = self.excx(integer as usize).cx.clone();
-						self.rtlog_log(format!("import from excx {}", integer), style::NORMAL);
+						self.rtlog_log(format!("import from excx {}", integer), styles::NORMAL);
 						self.excx_mut(0).cx.import(cx_to_import);
 						self.rtlog_deindent();
 					},
@@ -247,9 +248,9 @@ impl Mem {
 			Stmt::Exp {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Integer(integer) => {
-						self.rtlog_indent(String::from("exp"), false, style::NORMAL);
+						self.rtlog_indent(String::from("exp"), false, styles::NORMAL);
 						let cx_to_export = self.excx(0).cx.clone();
-						self.rtlog_log(format!("export to excx {}", integer), style::NORMAL);
+						self.rtlog_log(format!("export to excx {}", integer), styles::NORMAL);
 						self.excx_mut(integer as usize).cx.import(cx_to_export);
 						self.rtlog_deindent();
 					},
@@ -258,8 +259,8 @@ impl Mem {
 			Stmt::Redo {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Integer(integer) => {
-						self.rtlog_indent(String::from("redo"), false, style::NORMAL);
-						self.rtlog_log(format!("redo excx {}", integer), style::NORMAL);
+						self.rtlog_indent(String::from("redo"), false, styles::NORMAL);
+						self.rtlog_log(format!("redo excx {}", integer), styles::NORMAL);
 						self.excx_mut(integer as usize).flow = Flow::Restart;
 						self.rtlog_deindent();
 					},
@@ -268,25 +269,25 @@ impl Mem {
 			Stmt::End {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Integer(integer) => {
-						self.rtlog_indent(String::from("end"), false, style::NORMAL);
-						self.rtlog_log(format!("end excx {}", integer), style::NORMAL);
+						self.rtlog_indent(String::from("end"), false, styles::NORMAL);
+						self.rtlog_log(format!("end excx {}", integer), styles::NORMAL);
 						self.excx_mut(integer as usize).flow = Flow::End;
 						self.rtlog_deindent();
 					},
 					invalid_obj => panic!("end expected integer but found {}", invalid_obj),
 				},
 			Stmt::If {cond_expr, stmt} => {
-				self.rtlog_indent(String::from("if"), false, style::NORMAL);
+				self.rtlog_indent(String::from("if"), false, styles::NORMAL);
 				if self.eval_expr(cond_expr).as_cond() {
-					self.rtlog_log(String::from("condition is true"), style::NORMAL);
+					self.rtlog_log(String::from("condition is true"), styles::NORMAL);
 					self.exec_stmt(stmt)
 				} else {
-					self.rtlog_log(String::from("condition is false"), style::NORMAL);
+					self.rtlog_log(String::from("condition is false"), styles::NORMAL);
 				}
 				self.rtlog_deindent();
 			},
 			Stmt::Group {stmts} => {
-				self.rtlog_indent(String::from("group"), false, style::NORMAL);
+				self.rtlog_indent(String::from("group"), false, styles::NORMAL);
 				/*
 				for stmt in stmts {
 					self.exec_stmt(stmt);

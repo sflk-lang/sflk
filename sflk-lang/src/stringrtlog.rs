@@ -1,4 +1,7 @@
 
+use crate::utils::Style;
+
+
 pub struct StringRtlog {
 	items: Vec<Item>,
 }
@@ -38,14 +41,6 @@ enum Item {
 struct Indent {
 	is_context: bool,
 	style: Style,
-}
-
-
-pub type Style = (&'static str, &'static str);
-
-pub mod style {
-	pub const NORMAL: super::Style = ("", "");
-	pub const BOLD_LIGHT_RED: super::Style = ("\x1b[91m\x1b[1m", "\x1b[22m\x1b[39m");
 }
 
 

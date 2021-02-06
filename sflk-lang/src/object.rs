@@ -1,6 +1,7 @@
 
-use crate::stringtree::{StringTree, style, escape_string};
+use crate::stringtree::StringTree;
 use crate::program::Block;
+use crate::utils::{escape_string, styles};
 
 
 #[derive(Debug, Clone)]
@@ -15,10 +16,10 @@ impl From<&Obj> for StringTree {
 	fn from(obj: &Obj) -> StringTree {
 		match obj {
 			Obj::Integer(integer) => StringTree::new_leaf(
-				format!("integer {}", integer), style::NORMAL),
+				format!("integer {}", integer), styles::NORMAL),
 			Obj::String(string) => StringTree::new_leaf(
-				format!("string \"{}\"", escape_string(&string, &style::UNDERLINE)),
-				style::NORMAL),
+				format!("string \"{}\"", escape_string(&string, &styles::UNDERLINE)),
+				styles::NORMAL),
 			Obj::Block(block) => StringTree::from(block),
 		}
 	}

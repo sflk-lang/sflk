@@ -1,6 +1,7 @@
 
-use crate::stringtree::{StringTree, style};
+use crate::stringtree::{StringTree};
 use crate::object::Obj;
+use crate::utils::styles;
 
 
 pub type Prog = Block;
@@ -12,7 +13,7 @@ pub struct Block {
 
 impl From<&Block> for StringTree {
 	fn from(block: &Block) -> StringTree {
-		StringTree::new_node("block".to_owned(), style::CYAN, 
+		StringTree::new_node("block".to_owned(), styles::CYAN, 
 			block.stmts.iter()
 				.map(|stmt| StringTree::from(stmt))
 				.collect()
@@ -63,44 +64,44 @@ impl From<&Stmt> for StringTree {
 	fn from(stmt: &Stmt) -> StringTree {
 		match stmt {
 			Stmt::Np => StringTree::new_leaf(
-				String::from("nop"), style::NORMAL),
+				String::from("nop"), styles::NORMAL),
 			Stmt::Print {expr} => StringTree::new_node(
-				String::from("pr"), style::NORMAL,
+				String::from("pr"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::PrintNewline => StringTree::new_leaf(
-				String::from("nl"), style::NORMAL),
+				String::from("nl"), styles::NORMAL),
 			Stmt::Assign {varname, expr} => StringTree::new_node(
-				format!("assign to variable {}", varname), style::NORMAL,
+				format!("assign to variable {}", varname), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::AssignIfFree {varname, expr} => StringTree::new_node(
-				format!("assign if free to variable {}", varname), style::NORMAL,
+				format!("assign if free to variable {}", varname), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Do {expr} => StringTree::new_node(
-				String::from("do"), style::NORMAL,
+				String::from("do"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::DoHere {expr} => StringTree::new_node(
-				String::from("dh"), style::NORMAL,
+				String::from("dh"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Ev {expr} => StringTree::new_node(
-				String::from("ev"), style::NORMAL,
+				String::from("ev"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Imp {expr} => StringTree::new_node(
-				String::from("imp"), style::NORMAL,
+				String::from("imp"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Exp {expr} => StringTree::new_node(
-				String::from("exp"), style::NORMAL,
+				String::from("exp"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::Redo {expr} => StringTree::new_node(
-				String::from("redo"), style::NORMAL,
+				String::from("redo"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::End {expr} => StringTree::new_node(
-				String::from("end"), style::NORMAL,
+				String::from("end"), styles::NORMAL,
 				vec![StringTree::from(expr)]),
 			Stmt::If {cond_expr, stmt} => StringTree::new_node(
-				String::from("if"), style::NORMAL,
+				String::from("if"), styles::NORMAL,
 				vec![StringTree::from(cond_expr), StringTree::from(&**stmt)]),
 			Stmt::Group {stmts} => StringTree::new_node(
-				String::from("group"), style::NORMAL,
+				String::from("group"), styles::NORMAL,
 				stmts.iter().map(|stmt| StringTree::from(stmt)).collect()),
 		}
 	}
@@ -118,10 +119,10 @@ impl From<&Expr> for StringTree {
 	fn from(expr: &Expr) -> StringTree {
 		match expr {
 			Expr::Var {varname} => StringTree::new_leaf(
-				format!("variable {}", varname), style::NORMAL),
+				format!("variable {}", varname), styles::NORMAL),
 			Expr::Const {val} => StringTree::from(val),
 			Expr::Chain {init_expr, chops} => StringTree::new_node(
-				"chain".to_string(), style::NORMAL,
+				"chain".to_string(), styles::NORMAL,
 				std::iter::once(StringTree::from(&**init_expr)).chain(
 					chops.iter().map(|chop| StringTree::from(chop))).collect()),
 		}
@@ -138,7 +139,7 @@ pub struct ChOp {
 impl From<&ChOp> for StringTree {
 	fn from(chop: &ChOp) -> StringTree {
 		StringTree::new_node(
-			format!("chop {}", chop.op), style::NORMAL,
+			format!("chop {}", chop.op), styles::NORMAL,
 			vec![StringTree::from(&chop.expr)])
 	}
 }

@@ -6,6 +6,7 @@ mod object;
 mod machine;
 mod stringtree;
 mod stringrtlog;
+mod utils;
 
 
 struct Settings {

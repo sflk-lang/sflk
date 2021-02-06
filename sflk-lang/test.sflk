@@ -1,9 +1,11 @@
 
-if 8 dh {
-	pr "uwu" nl
-	do {
-		pr "owo" nl
-	}
-	end 0
+x < 0
+f < {
+	if x *(x-1) *(x-2) *(x-3) (
+		nl end 0
+	)
+	pr x pr " "
+	x < x +1
+	dh f
 }
-pr "ono" nl
+dh f # prints 0 1 2 3 #
