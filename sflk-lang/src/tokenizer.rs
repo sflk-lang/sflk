@@ -1,4 +1,9 @@
 
+use std::rc::Rc;
+use std::collections::HashMap;
+use crate::utils::{styles, escape_string};
+
+
 #[derive(Debug)]
 pub struct SourceCodeUnit {
 	name: String,
@@ -71,8 +76,6 @@ impl std::fmt::Display for TokenizingError {
 	}
 }
 
-
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct Loc {
@@ -178,13 +181,13 @@ impl TokReadingHead {
 #[derive(Debug, Clone)]
 pub enum Tok {
 	Word(String),
+	Keyword(Keyword),
 	Integer(String),
 	String(String),
-	BinOp(String),
-	Left(String),
-	Right(String),
-	ToLeft,
-	ToLeftTilde,
+	BinOp(BinOp),
+	Left(Matched),
+	Right(Matched),
+	StmtBinOp(StmtBinOp),
 	Void,
 }
 
@@ -192,14 +195,116 @@ impl std::fmt::Display for Tok {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
 			Tok::Word(s) => write!(f, "{}", s),
+			Tok::Keyword(kw) => write!(f, "{}", kw),
 			Tok::Integer(s) => write!(f, "{}", s),
-			Tok::String(s) => write!(f, "\"{}\"", s),
-			Tok::BinOp(s) => write!(f, "{}", s),
+			Tok::String(s) => write!(f, "\"{}\"", escape_string(s, &styles::UNDERLINE)),
+			Tok::BinOp(op) => write!(f, "{}", op),
 			Tok::Left(s) => write!(f, "{}", s),
 			Tok::Right(s) => write!(f, "{}", s),
-			Tok::ToLeft => write!(f, "<"),
-			Tok::ToLeftTilde => write!(f, "<~"),
+			Tok::StmtBinOp(op) => write!(f, "{}", op),
 			Tok::Void => write!(f, ""),
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub enum Keyword {
+	Np, Pr, Nl, Do, Dh, Ev, Redo, End, Imp, Exp, If,
+}
+
+impl std::fmt::Display for Keyword {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			Keyword::Np => write!(f, "{}", "np"),
+			Keyword::Pr => write!(f, "{}", "pr"),
+			Keyword::Nl => write!(f, "{}", "nl"),
+			Keyword::Do => write!(f, "{}", "do"),
+			Keyword::Dh => write!(f, "{}", "dh"),
+			Keyword::Ev => write!(f, "{}", "ev"),
+			Keyword::Redo => write!(f, "{}", "redo"),
+			Keyword::End => write!(f, "{}", "end"),
+			Keyword::Imp => write!(f, "{}", "imp"),
+			Keyword::Exp => write!(f, "{}", "exp"),
+			Keyword::If => write!(f, "{}", "if"),
+		}
+	}
+}
+
+impl Tok {
+	fn maybe_to_keyword(self) -> Tok {
+		let keywords = {
+			let mut keywords: HashMap<&str, Keyword> = HashMap::new();
+			keywords.insert("np", Keyword::Np);
+			keywords.insert("pr", Keyword::Pr);
+			keywords.insert("nl", Keyword::Nl);
+			keywords.insert("do", Keyword::Do);
+			keywords.insert("dh", Keyword::Dh);
+			keywords.insert("ev", Keyword::Ev);
+			keywords.insert("redo", Keyword::Redo);
+			keywords.insert("end", Keyword::End);
+			keywords.insert("imp", Keyword::Imp);
+			keywords.insert("exp", Keyword::Exp);
+			keywords.insert("if", Keyword::If);
+			keywords
+		};
+		match &self {
+			Tok::Word(s) => {
+				if let Some(keyword) = keywords.get(s.as_str()) {
+					Tok::Keyword(keyword.clone())
+				} else {
+					self
+				}
+			},
+			_ => self,
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub enum BinOp {
+	Plus, Minus, Star, Slash, ToRight,
+}
+
+impl std::fmt::Display for BinOp {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			BinOp::Plus => write!(f, "{}", "+"),
+			BinOp::Minus => write!(f, "{}", "-"),
+			BinOp::Star => write!(f, "{}", "*"),
+			BinOp::Slash => write!(f, "{}", "/"),
+			BinOp::ToRight => write!(f, "{}", ">"),
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub enum Matched {
+	Paren,
+	Bracket,
+	Curly,
+}
+
+impl std::fmt::Display for Matched {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			Matched::Paren => write!(f, "{}", if f.alternate() {"("} else {")"}),
+			Matched::Bracket => write!(f, "{}", if f.alternate() {"["} else {"]"}),
+			Matched::Curly => write!(f, "{}", if f.alternate() {"{"} else {"}"}),
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub enum StmtBinOp {
+	ToLeft,
+	ToLeftTilde,
+}
+
+impl std::fmt::Display for StmtBinOp {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			StmtBinOp::ToLeft => write!(f, "{}", "<"),
+			StmtBinOp::ToLeftTilde => write!(f, "{}", "<~"),
 		}
 	}
 }
@@ -220,7 +325,7 @@ impl TokReadingHead {
 		match self.peek_cur_char() {
 			Some(ch) if ch.is_ascii_alphabetic() => {
 				let (word, loc) = self.read_cur_word();
-				Ok((Tok::Word(word), loc))
+				Ok((Tok::Word(word).maybe_to_keyword(), loc))
 			},
 			Some(ch) if ch.is_ascii_digit() => {
 				let (integer, loc) = self.read_cur_integer();
@@ -230,26 +335,58 @@ impl TokReadingHead {
 				let (string, loc) = self.read_cur_string()?;
 				Ok((Tok::String(string), loc))
 			},
-			Some(ch) if ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '>' => {
+			Some(ch) if ch == '+' => {
 				self.goto_next_char();
-				Ok((Tok::BinOp(ch.to_string()), self.cur_char_loc()))
+				Ok((Tok::BinOp(BinOp::Plus), self.cur_char_loc()))
 			},
-			Some(ch) if ch == '(' || ch == '[' || ch == '{' => {
+			Some(ch) if ch == '-' => {
 				self.goto_next_char();
-				Ok((Tok::Left(ch.to_string()), self.cur_char_loc()))
+				Ok((Tok::BinOp(BinOp::Minus), self.cur_char_loc()))
 			},
-			Some(ch) if ch == ')' || ch == ']' || ch == '}' => {
+			Some(ch) if ch == '*' => {
 				self.goto_next_char();
-				Ok((Tok::Right(ch.to_string()), self.cur_char_loc()))
+				Ok((Tok::BinOp(BinOp::Star), self.cur_char_loc()))
+			},
+			Some(ch) if ch == '/' => {
+				self.goto_next_char();
+				Ok((Tok::BinOp(BinOp::Slash), self.cur_char_loc()))
+			},
+			Some(ch) if ch == '>' => {
+				self.goto_next_char();
+				Ok((Tok::BinOp(BinOp::ToRight), self.cur_char_loc()))
+			},
+			Some(ch) if ch == '(' => {
+				self.goto_next_char();
+				Ok((Tok::Left(Matched::Paren), self.cur_char_loc()))
+			},
+			Some(ch) if ch == ')' => {
+				self.goto_next_char();
+				Ok((Tok::Right(Matched::Paren), self.cur_char_loc()))
+			},
+			Some(ch) if ch == '[' => {
+				self.goto_next_char();
+				Ok((Tok::Left(Matched::Bracket), self.cur_char_loc()))
+			},
+			Some(ch) if ch == ']' => {
+				self.goto_next_char();
+				Ok((Tok::Right(Matched::Bracket), self.cur_char_loc()))
+			},
+			Some(ch) if ch == '{' => {
+				self.goto_next_char();
+				Ok((Tok::Left(Matched::Curly), self.cur_char_loc()))
+			},
+			Some(ch) if ch == '}' => {
+				self.goto_next_char();
+				Ok((Tok::Right(Matched::Curly), self.cur_char_loc()))
 			},
 			Some(ch) if ch == '<' => {
 				self.goto_next_char();
 				match self.peek_cur_char() {
 					Some('~') => {
 						self.goto_next_char();
-						Ok((Tok::ToLeftTilde, self.cur_char_loc()))
+						Ok((Tok::StmtBinOp(StmtBinOp::ToLeftTilde), self.cur_char_loc()))
 					},
-					_ => Ok((Tok::ToLeft, self.cur_char_loc())),
+					_ => Ok((Tok::StmtBinOp(StmtBinOp::ToLeft), self.cur_char_loc())),
 				}
 			},
 			Some(ch) => Err(TokenizingError::UnexpectedCharacter {

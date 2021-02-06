@@ -1,2 +1,2 @@
 #!/bin/sh
-cat src/* | wc -l
+cat sflk-lang/src/* sflk-lsp/src/* | wc -l

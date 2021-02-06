@@ -223,7 +223,7 @@ impl Mem {
 			Stmt::DoHere {expr} =>
 				match self.eval_expr(expr) {
 					Obj::Block(block) => {
-						self.rtlog_indent(String::from("dh"), false, styles::NORMAL);
+						self.rtlog_indent(String::from("dh"), false, styles::LIGHT_YELLOW);
 						self.exec_stmts_here(&block.stmts);
 						self.rtlog_deindent();
 					},
@@ -287,15 +287,7 @@ impl Mem {
 				self.rtlog_deindent();
 			},
 			Stmt::Group {stmts} => {
-				self.rtlog_indent(String::from("group"), false, styles::NORMAL);
-				/*
-				for stmt in stmts {
-					self.exec_stmt(stmt);
-					if self.excx(0).flow != Flow::Next {
-						break;
-					}
-				}
-				*/
+				self.rtlog_indent(String::from("group"), false, styles::LIGHT_YELLOW);
 				self.exec_stmts_here(stmts);
 				self.rtlog_deindent();
 			},

@@ -1,6 +1,10 @@
 
 use std::fmt::{Display, Formatter};
-use crate::tokenizer::{TokReadingHead, Tok, Loc, TokenizingError};
+use crate::tokenizer::{
+	TokReadingHead,
+	Tok, Keyword, BinOp, Matched, StmtBinOp,
+	Loc, TokenizingError
+};
 use crate::program::{Prog, Block, Stmt, Expr, ChOp, Op};
 use crate::object::Obj;
 
@@ -119,8 +123,8 @@ impl Tok {
 	fn is_block_end(&self, end: &BlockEnd) -> bool {
 		match (end, self) {
 			(BlockEnd::Void, Tok::Void) => true,
-			(BlockEnd::Curly, Tok::Right(s)) if s == "}" => true,
-			(BlockEnd::Paren, Tok::Right(s)) if s == ")" => true,
+			(BlockEnd::Curly, Tok::Right(Matched::Curly)) => true,
+			(BlockEnd::Paren, Tok::Right(Matched::Paren)) => true,
 			_ => false,
 		}
 	}
@@ -137,7 +141,7 @@ impl ProgReadingHead {
 		match end {
 			ExprEnd::Nothing => Ok(()),
 			ExprEnd::Paren => match self.pop_tok()? {
-				(Tok::Right(s), _) if s == ")" => Ok(()),
+				(Tok::Right(Matched::Paren), _) => Ok(()),
 				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok,
 					for_what: UnexpectedForWhat::ToEndAnExpression(end)}),
 			}
@@ -148,13 +152,12 @@ impl ProgReadingHead {
 impl From<Tok> for Op {
 	fn from(tok: Tok) -> Op {
 		match tok {
-			Tok::BinOp(op_string) => match &op_string[..] {
-				"+" => Op::Plus,
-				"-" => Op::Minus,
-				"*" => Op::Star,
-				"/" => Op::Slash,
-				">" => Op::ToRight,
-				_ => panic!("operator bad"),
+			Tok::BinOp(binop) => match binop {
+				BinOp::Plus => Op::Plus,
+				BinOp::Minus => Op::Minus,
+				BinOp::Star => Op::Star,
+				BinOp::Slash => Op::Slash,
+				BinOp::ToRight => Op::ToRight,
 			},
 			_ => panic!("not even operator"),
 		}
@@ -187,66 +190,66 @@ impl ProgReadingHead {
 	fn parse_stmt(&mut self) -> Result<(Stmt, Loc), ParsingError> {
 		let (tok, loc) = self.pop_tok()?;
 		match tok {
-			Tok::Word(s) if s == "np" => {
+			Tok::Keyword(Keyword::Np) => {
 				Ok((Stmt::Np, loc))
 			},
-			Tok::Word(s) if s == "pr" => {
+			Tok::Keyword(Keyword::Pr) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Print {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "nl" => {
+			Tok::Keyword(Keyword::Nl) => {
 				Ok((Stmt::PrintNewline, loc))
 			},
-			Tok::Word(s) if s == "do" => {
+			Tok::Keyword(Keyword::Do) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Do {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "dh" => {
+			Tok::Keyword(Keyword::Dh) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::DoHere {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "ev" => {
+			Tok::Keyword(Keyword::Ev) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Ev {expr}, loc + expr_loc))
 			}
-			Tok::Word(s) if s == "imp" => { // will likely disapear or change
+			Tok::Keyword(Keyword::Imp) => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Imp {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "exp" => { // will likely disapear or change
+			Tok::Keyword(Keyword::Exp) => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Exp {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "redo" => { // will likely disapear or change
+			Tok::Keyword(Keyword::Redo) => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::Redo {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "end" => { // will likely disapear or change
+			Tok::Keyword(Keyword::End) => { // will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				Ok((Stmt::End {expr}, loc + expr_loc))
 			},
-			Tok::Word(s) if s == "if" => {
+			Tok::Keyword(Keyword::If) => {
 				let (cond_expr, cond_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				let (stmt, stmt_loc) = self.parse_stmt()?;
 				Ok((Stmt::If {cond_expr, stmt: Box::new(stmt)}, loc + cond_loc + stmt_loc))
 			},
-			Tok::Word(left_word) => match self.peek_tok()? {
-				(Tok::ToLeft, _) => {
+			Tok::Word(word) => match self.peek_tok()? {
+				(Tok::StmtBinOp(StmtBinOp::ToLeft), _) => {
 					self.disc_tok()?;
 					let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-					Ok((Stmt::Assign {varname: left_word, expr}, loc + expr_loc))
+					Ok((Stmt::Assign {varname: word, expr}, loc + expr_loc))
 				},
-				(Tok::ToLeftTilde, _) => {
+				(Tok::StmtBinOp(StmtBinOp::ToLeftTilde), _) => {
 					self.disc_tok()?;
 					let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-					Ok((Stmt::AssignIfFree {varname: left_word, expr}, loc + expr_loc))
+					Ok((Stmt::AssignIfFree {varname: word, expr}, loc + expr_loc))
 				},
 				(tok, loc) => Err(ParsingError::UnexpectedToken {
 					tok: tok.clone(), loc: loc.clone(),
 					for_what: UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement
 				}),
 			},
-			Tok::Left(s) if s == "(" => {
+			Tok::Left(Matched::Paren) => {
 				let (stmts, loc) = self.parse_stmts(BlockEnd::Paren)?;
 				Ok((Stmt::Group {stmts}, loc))
 			},
@@ -263,8 +266,8 @@ impl ProgReadingHead {
 				Obj::Integer(str::parse(&integer).expect("integer parsing error"))}, loc)),
 			Tok::String(string) => Ok((Expr::Const {val:
 				Obj::String(string.clone())}, loc)),
-			Tok::Left(left) if left == "(" => self.parse_expr(ExprEnd::Paren),
-			Tok::Left(left) if left == "{" => {
+			Tok::Left(Matched::Paren) => self.parse_expr(ExprEnd::Paren),
+			Tok::Left(Matched::Curly) => {
 				let (block, block_loc) = self.parse_block(BlockEnd::Curly)?;
 				Ok((Expr::Const {val: Obj::Block(block)}, block_loc))
 			},
