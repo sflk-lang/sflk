@@ -34,7 +34,7 @@ impl Settings {
 	fn from_args() -> Settings {
 		let mut args = std::env::args();
 		args.next();
-		let root_filename = None;//args.next().expect("no source file provided");
+		let mut root_filename = None;
 		let mut debug_mode = false;
 		for arg in args {
 			if arg == "-d" || arg == "--debug" {
@@ -46,7 +46,11 @@ impl Settings {
 					0, 1, 0, "indev");
 				println!("{}", NO_WARRANTY_NOTE);
 			} else {
-				panic!("unknown command line argument `{}`", arg);
+				if root_filename.is_none() {
+					root_filename = Some(arg);
+				} else {
+					panic!("unknown command line argument `{}`", arg);
+				}
 			}
 		}
 		Settings {

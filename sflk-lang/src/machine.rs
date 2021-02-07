@@ -382,15 +382,9 @@ impl Mem {
 
 	fn apply_chop(&mut self, val: &mut Obj, chop: &ChOp) {
 		let right = self.eval_expr(&chop.expr);
-		self.log_indent(String::from("chop"), false, styles::NORMAL);
-		self.log_line(format!("op {}", chop.op), styles::NORMAL);
-		self.log_line(format!("value {}", right), styles::NORMAL);
-		match chop.op {
-			Op::Plus => val.plus(right),
-			Op::Minus => val.minus(right),
-			Op::Star => val.star(right),
-			Op::Slash => val.slash(right),
+		match &chop.op {
 			Op::ToRight => {
+				self.log_indent(String::from("chop to right"), true, styles::BOLD_LIGHT_RED);
 				match right {
 					Obj::Block(block) => {
 						let mut excx = ExCx::new();
@@ -402,8 +396,21 @@ impl Mem {
 					},
 					invalid_obj => panic!("can't do {} for now", invalid_obj),
 				}
+				self.log_deindent();
+			},
+			op => {
+				self.log_indent(String::from("chop"), false, styles::NORMAL);
+				self.log_line(format!("op {}", chop.op), styles::NORMAL);
+				self.log_line(format!("value {}", right), styles::NORMAL);
+				match op {
+					Op::Plus => val.plus(right),
+					Op::Minus => val.minus(right),
+					Op::Star => val.star(right),
+					Op::Slash => val.slash(right),
+					_ => unreachable!(),
+				}
+				self.log_deindent();
 			},
 		}
-		self.log_deindent();
 	}
 }

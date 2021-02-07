@@ -1,5 +1,5 @@
 
 fh "sflk-lang/std.sflk"
 
-ev 8 >prnl
+ev 8 >prnl >{pr v nl}
 np
