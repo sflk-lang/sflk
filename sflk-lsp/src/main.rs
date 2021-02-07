@@ -14,6 +14,13 @@ impl LanguageServer for Backend {
 	async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
 		Ok(InitializeResult {
 			capabilities: ServerCapabilities {
+				// We always sync documents
+				text_document_sync: Some(TextDocumentSyncCapability::Kind(
+					TextDocumentSyncKind::Full,
+				)),
+				// We know how to react on hover
+				hover_provider: Some(HoverProviderCapability::Simple(true)),
+				// We know how to provide completion
 				completion_provider: Some(CompletionOptions {
 					trigger_characters: Some(vec![
 						" ".to_string(),
@@ -34,6 +41,20 @@ impl LanguageServer for Backend {
 			.await;
 	}
 
+	async fn did_open(&self, params: DidOpenTextDocumentParams) {
+		let uri = params.text_document.uri;
+		self.client
+			.log_message(MessageType::Info, format!("Opening file {}", uri))
+			.await;
+	}
+
+	async fn did_change(&self, params: DidChangeTextDocumentParams) {
+		let uri = params.text_document.uri;
+		self.client
+			.log_message(MessageType::Info, format!("Changing file {}", uri))
+			.await;
+	}
+
 	async fn shutdown(&self) -> Result<()> {
 		Ok(())
 	}
@@ -46,6 +67,23 @@ impl LanguageServer for Backend {
 			completion::symb("if"),
 			completion::symb("redo"),
 		])))
+	}
+
+	async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+		let position = params.text_document_position_params;
+		self.client
+			.log_message(
+				MessageType::Info,
+				format!("hover at line {}", position.position.line),
+			)
+			.await;
+		Ok(Some(Hover {
+			contents: HoverContents::Scalar(MarkedString::String(format!(
+				"{}",
+				position.position.line
+			))),
+			range: None,
+		}))
 	}
 }
 
