@@ -1,7 +1,7 @@
-use crate::log::IndentedLog;
 use crate::object::Obj;
 use crate::program::{Block, ChOp, Expr, Op, Prog, Stmt};
 use crate::utils::{styles, Style};
+use crate::{log::IndentedLog, program::Located};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -146,7 +146,10 @@ impl Mem {
 
 		let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
 		let prog = match prh.parse_prog() {
-			Ok((prog, _)) => prog,
+			Ok(Located {
+				content: prog,
+				loc: _,
+			}) => prog,
 			Err(parsing_error) => {
 				self.log_line(
 					format!(

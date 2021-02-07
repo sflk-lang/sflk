@@ -1,6 +1,6 @@
-use crate::object::Obj;
 use crate::stringtree::StringTree;
 use crate::utils::styles;
+use crate::{object::Obj, tokenizer::Loc};
 
 pub type Prog = Block;
 
@@ -85,6 +85,11 @@ pub enum Stmt {
 		if_stmt: Box<Stmt>,
 		el_stmt: Option<Box<Stmt>>,
 	},
+}
+
+pub struct Located<T> {
+	pub content: T,
+	pub loc: Loc,
 }
 
 impl From<&Stmt> for StringTree {
