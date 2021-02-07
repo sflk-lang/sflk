@@ -1,16 +1,13 @@
-
-mod tokenizer;
+mod log;
+mod machine;
+mod object;
 mod parser;
 mod program;
-mod object;
-mod machine;
 mod stringtree;
-mod log;
+mod tokenizer;
 mod utils;
 
-
-const HELP_MESSAGE: &str = 
-	"Usage:\n\
+const HELP_MESSAGE: &str = "Usage:\n\
 	\tsflk <filename.sflk> [options]\n\
 	\n\
 	Options:\n\
@@ -19,11 +16,9 @@ const HELP_MESSAGE: &str =
 	\t-v --version  Prints the interpreter version\n\
 	";
 
-const NO_WARRANTY_NOTE: &str =
-	"Please note that there is NO warranty, \
+const NO_WARRANTY_NOTE: &str = "Please note that there is NO warranty, \
 	not even for MERCHANTABILITY or \
 	FITNESS FOR A PARTICULAR PURPOSE.";
-
 
 struct Settings {
 	root_filename: Option<String>,
@@ -42,8 +37,10 @@ impl Settings {
 			} else if arg == "-h" || arg == "--help" {
 				print!("{}", HELP_MESSAGE);
 			} else if arg == "-v" || arg == "--version" {
-				println!("SFLK reference interpreter, version {}.{}.{} ({})",
-					0, 1, 0, "indev");
+				println!(
+					"SFLK reference interpreter, version {}.{}.{} ({})",
+					0, 1, 0, "indev"
+				);
 				println!("{}", NO_WARRANTY_NOTE);
 			} else {
 				if root_filename.is_none() {
@@ -59,7 +56,6 @@ impl Settings {
 		}
 	}
 }
-
 
 fn main() {
 	let settings = Settings::from_args();

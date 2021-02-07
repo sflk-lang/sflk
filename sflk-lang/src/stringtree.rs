@@ -1,6 +1,4 @@
-
 use crate::utils::Style;
-
 
 pub struct StringTree {
 	string: String,
@@ -25,7 +23,6 @@ impl StringTree {
 		}
 	}
 }
-
 
 const INDENT_TUBE: &str = "│ ";
 const INDENT_ITEM: &str = "├─";
@@ -74,8 +71,11 @@ impl StringTree {
 		self.print_aux(writer, &mut Vec::new(), false);
 	}
 
-	fn print_aux(&self, writer: &mut impl std::fmt::Write,
-		indent_styles: &mut Vec<(Style, Tube)>, is_last: bool
+	fn print_aux(
+		&self,
+		writer: &mut impl std::fmt::Write,
+		indent_styles: &mut Vec<(Style, Tube)>,
+		is_last: bool,
 	) {
 		// Print self.string with multiple line string support
 		let mut lines = self.string.lines();
@@ -103,14 +103,22 @@ impl StringTree {
 	}
 }
 
-fn print_indents(writer: &mut impl std::fmt::Write,
-	indent_styles: &Vec<(Style, Tube)>, right_override: RightTube
+fn print_indents(
+	writer: &mut impl std::fmt::Write,
+	indent_styles: &Vec<(Style, Tube)>,
+	right_override: RightTube,
 ) {
 	if let Some(((right_style, _), indents_left)) = indent_styles.split_last() {
 		for (style, tube) in indents_left {
 			write!(writer, "{}{}{}", style.0, tube.str(), style.1).expect("error");
 		}
-		write!(writer, "{}{}{}",
-			right_style.0, right_override.str(), right_style.1).expect("error");
+		write!(
+			writer,
+			"{}{}{}",
+			right_style.0,
+			right_override.str(),
+			right_style.1
+		)
+		.expect("error");
 	}
 }

@@ -1,18 +1,18 @@
-
-use std::fmt::{Display, Formatter};
-use crate::tokenizer::{
-	TokReadingHead,
-	Tok, Keyword, BinOp, Matched, StmtBinOp,
-	Loc, TokenizingError
-};
-use crate::program::{Prog, Block, Stmt, Expr, ChOp, Op};
 use crate::object::Obj;
-
+use crate::program::{Block, ChOp, Expr, Op, Prog, Stmt};
+use crate::tokenizer::{
+	BinOp, Keyword, Loc, Matched, StmtBinOp, Tok, TokReadingHead, TokenizingError,
+};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub enum ParsingError {
 	TokenizingError(TokenizingError),
-	UnexpectedToken {tok: Tok, loc: Loc, for_what: UnexpectedForWhat},
+	UnexpectedToken {
+		tok: Tok,
+		loc: Loc,
+		for_what: UnexpectedForWhat,
+	},
 }
 
 impl From<TokenizingError> for ParsingError {
@@ -25,9 +25,13 @@ impl Display for ParsingError {
 	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
 		match self {
 			ParsingError::TokenizingError(parsing_error) => write!(f, "{}", parsing_error),
-			ParsingError::UnexpectedToken {tok, loc, for_what} =>
-				write!(f, "unexpected token `{}` {} (at line {})",
-					tok, for_what, loc.line()),
+			ParsingError::UnexpectedToken { tok, loc, for_what } => write!(
+				f,
+				"unexpected token `{}` {} (at line {})",
+				tok,
+				for_what,
+				loc.line()
+			),
 		}
 	}
 }
@@ -45,12 +49,11 @@ pub enum UnexpectedForWhat {
 impl Display for UnexpectedForWhat {
 	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
 		match self {
-			UnexpectedForWhat::ToStartAStatement =>
-				write!(f, "to start a statement"),
-			UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement =>
-				write!(f, "to follow a variable name at the start of a statement"),
-			UnexpectedForWhat::ToStartAnExpression =>
-				write!(f, "to start an expression"),
+			UnexpectedForWhat::ToStartAStatement => write!(f, "to start a statement"),
+			UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement => {
+				write!(f, "to follow a variable name at the start of a statement")
+			}
+			UnexpectedForWhat::ToStartAnExpression => write!(f, "to start an expression"),
 			UnexpectedForWhat::ToEndAnExpression(expr_end) => match expr_end {
 				ExprEnd::Nothing => unreachable!(),
 				ExprEnd::Paren => write!(f, "to end an expression while `)` was expected"),
@@ -58,7 +61,6 @@ impl Display for UnexpectedForWhat {
 		}
 	}
 }
-
 
 pub struct ProgReadingHead {
 	trh: TokReadingHead,
@@ -93,11 +95,13 @@ impl ProgReadingHead {
 			None => {
 				let tok = self.read_tok_from_trh()?;
 				if cfg!(debug_assertions) {
-					println!("debug warning: \
+					println!(
+						"debug warning: \
 						token {:?} discaded without having been peeked",
-						tok);
+						tok
+					);
 				}
-			},
+			}
 		}
 		Ok(())
 	}
@@ -110,7 +114,6 @@ impl ProgReadingHead {
 		}
 	}
 }
-
 
 enum BlockEnd {
 	Void,
@@ -139,9 +142,12 @@ impl ProgReadingHead {
 			ExprEnd::Nothing => Ok(()),
 			ExprEnd::Paren => match self.pop_tok()? {
 				(Tok::Right(Matched::Paren), _) => Ok(()),
-				(tok, loc) => Err(ParsingError::UnexpectedToken {loc, tok,
-					for_what: UnexpectedForWhat::ToEndAnExpression(end)}),
-			}
+				(tok, loc) => Err(ParsingError::UnexpectedToken {
+					loc,
+					tok,
+					for_what: UnexpectedForWhat::ToEndAnExpression(end),
+				}),
+			},
 		}
 	}
 }
@@ -187,48 +193,48 @@ impl ProgReadingHead {
 	fn parse_stmt(&mut self) -> Result<(Stmt, Loc), ParsingError> {
 		let (tok, loc) = self.pop_tok()?;
 		match tok {
-			Tok::Keyword(Keyword::Np) => {
-				Ok((Stmt::Np, loc))
-			},
+			Tok::Keyword(Keyword::Np) => Ok((Stmt::Np, loc)),
 			Tok::Keyword(Keyword::Pr) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::Print {expr}, loc + expr_loc))
-			},
-			Tok::Keyword(Keyword::Nl) => {
-				Ok((Stmt::PrintNewline, loc))
-			},
+				Ok((Stmt::Print { expr }, loc + expr_loc))
+			}
+			Tok::Keyword(Keyword::Nl) => Ok((Stmt::PrintNewline, loc)),
 			Tok::Keyword(Keyword::Do) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::Do {expr}, loc + expr_loc))
-			},
+				Ok((Stmt::Do { expr }, loc + expr_loc))
+			}
 			Tok::Keyword(Keyword::Dh) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::DoHere {expr}, loc + expr_loc))
-			},
+				Ok((Stmt::DoHere { expr }, loc + expr_loc))
+			}
 			Tok::Keyword(Keyword::Fh) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::FileDoHere {expr}, loc + expr_loc))
-			},
+				Ok((Stmt::FileDoHere { expr }, loc + expr_loc))
+			}
 			Tok::Keyword(Keyword::Ev) => {
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::Ev {expr}, loc + expr_loc))
+				Ok((Stmt::Ev { expr }, loc + expr_loc))
 			}
-			Tok::Keyword(Keyword::Imp) => { // will likely disapear or change
+			Tok::Keyword(Keyword::Imp) => {
+				// will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::Imp {expr}, loc + expr_loc))
-			},
-			Tok::Keyword(Keyword::Exp) => { // will likely disapear or change
+				Ok((Stmt::Imp { expr }, loc + expr_loc))
+			}
+			Tok::Keyword(Keyword::Exp) => {
+				// will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::Exp {expr}, loc + expr_loc))
-			},
-			Tok::Keyword(Keyword::Redo) => { // will likely disapear or change
+				Ok((Stmt::Exp { expr }, loc + expr_loc))
+			}
+			Tok::Keyword(Keyword::Redo) => {
+				// will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::Redo {expr}, loc + expr_loc))
-			},
-			Tok::Keyword(Keyword::End) => { // will likely disapear or change
+				Ok((Stmt::Redo { expr }, loc + expr_loc))
+			}
+			Tok::Keyword(Keyword::End) => {
+				// will likely disapear or change
 				let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-				Ok((Stmt::End {expr}, loc + expr_loc))
-			},
+				Ok((Stmt::End { expr }, loc + expr_loc))
+			}
 			Tok::Keyword(Keyword::If) => {
 				let (cond_expr, cond_loc) = self.parse_expr(ExprEnd::Nothing)?;
 				let (if_stmt, if_stmt_loc) = self.parse_stmt()?;
@@ -239,55 +245,89 @@ impl ProgReadingHead {
 						Stmt::If {
 							cond_expr,
 							if_stmt: Box::new(if_stmt),
-							el_stmt: Some(Box::new(el_stmt))
+							el_stmt: Some(Box::new(el_stmt)),
 						},
-						loc + cond_loc + if_stmt_loc + el_stmt_loc))
+						loc + cond_loc + if_stmt_loc + el_stmt_loc,
+					))
 				} else {
 					Ok((
 						Stmt::If {
 							cond_expr,
 							if_stmt: Box::new(if_stmt),
-							el_stmt: None
+							el_stmt: None,
 						},
-						loc + cond_loc + if_stmt_loc))
+						loc + cond_loc + if_stmt_loc,
+					))
 				}
-			},
+			}
 			Tok::Word(word) => match self.peek_tok()? {
 				(Tok::StmtBinOp(StmtBinOp::ToLeft), _) => {
 					self.disc_tok()?;
 					let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-					Ok((Stmt::Assign {varname: word, expr}, loc + expr_loc))
-				},
+					Ok((
+						Stmt::Assign {
+							varname: word,
+							expr,
+						},
+						loc + expr_loc,
+					))
+				}
 				(Tok::StmtBinOp(StmtBinOp::ToLeftTilde), _) => {
 					self.disc_tok()?;
 					let (expr, expr_loc) = self.parse_expr(ExprEnd::Nothing)?;
-					Ok((Stmt::AssignIfFree {varname: word, expr}, loc + expr_loc))
-				},
+					Ok((
+						Stmt::AssignIfFree {
+							varname: word,
+							expr,
+						},
+						loc + expr_loc,
+					))
+				}
 				(tok, loc) => Err(ParsingError::UnexpectedToken {
-					tok: tok.clone(), loc: loc.clone(),
-					for_what: UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement
+					tok: tok.clone(),
+					loc: loc.clone(),
+					for_what: UnexpectedForWhat::ToFollowAVariableNameAtTheStartOfAStatement,
 				}),
 			},
-			tok => Err(ParsingError::UnexpectedToken {tok, loc,
-				for_what: UnexpectedForWhat::ToStartAStatement}),
+			tok => Err(ParsingError::UnexpectedToken {
+				tok,
+				loc,
+				for_what: UnexpectedForWhat::ToStartAStatement,
+			}),
 		}
 	}
 
 	fn parse_expr_left(&mut self) -> Result<(Expr, Loc), ParsingError> {
 		let (tok, loc) = self.pop_tok()?;
 		match tok {
-			Tok::Word(word) => Ok((Expr::Var {varname: word}, loc)),
-			Tok::Integer(integer) => Ok((Expr::Const {val:
-				Obj::Integer(str::parse(&integer).expect("integer parsing error"))}, loc)),
-			Tok::String(string) => Ok((Expr::Const {val:
-				Obj::String(string.clone())}, loc)),
+			Tok::Word(word) => Ok((Expr::Var { varname: word }, loc)),
+			Tok::Integer(integer) => Ok((
+				Expr::Const {
+					val: Obj::Integer(str::parse(&integer).expect("integer parsing error")),
+				},
+				loc,
+			)),
+			Tok::String(string) => Ok((
+				Expr::Const {
+					val: Obj::String(string.clone()),
+				},
+				loc,
+			)),
 			Tok::Left(Matched::Paren) => self.parse_expr(ExprEnd::Paren),
 			Tok::Left(Matched::Curly) => {
 				let (block, block_loc) = self.parse_block(BlockEnd::Curly)?;
-				Ok((Expr::Const {val: Obj::Block(block)}, block_loc))
-			},
-			tok => Err(ParsingError::UnexpectedToken {tok, loc,
-				for_what: UnexpectedForWhat::ToStartAnExpression}),
+				Ok((
+					Expr::Const {
+						val: Obj::Block(block),
+					},
+					block_loc,
+				))
+			}
+			tok => Err(ParsingError::UnexpectedToken {
+				tok,
+				loc,
+				for_what: UnexpectedForWhat::ToStartAnExpression,
+			}),
 		}
 	}
 
@@ -295,7 +335,13 @@ impl ProgReadingHead {
 		std::assert!(self.peek_tok()?.0.is_bin_op());
 		let (op_tok, loc) = self.pop_tok()?;
 		let (expr, right_loc) = self.parse_expr_left()?;
-		Ok((ChOp {op: Op::from(op_tok), expr}, loc + right_loc))
+		Ok((
+			ChOp {
+				op: Op::from(op_tok),
+				expr,
+			},
+			loc + right_loc,
+		))
 	}
 
 	fn parse_expr(&mut self, end: ExprEnd) -> Result<(Expr, Loc), ParsingError> {
@@ -308,10 +354,12 @@ impl ProgReadingHead {
 		}
 		let expr = if chops.is_empty() {
 			init_expr
-		} else {Expr::Chain {
-			init_expr: Box::new(init_expr),
-			chops,
-		}};
+		} else {
+			Expr::Chain {
+				init_expr: Box::new(init_expr),
+				chops,
+			}
+		};
 		self.assert_expr_end(end)?;
 		Ok((expr, loc))
 	}

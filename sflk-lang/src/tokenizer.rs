@@ -1,8 +1,6 @@
-
-use std::rc::Rc;
+use crate::utils::{escape_string, styles};
 use std::collections::HashMap;
-use crate::utils::{styles, escape_string};
-
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct SourceCodeUnit {
@@ -19,17 +17,15 @@ impl SourceCodeUnit {
 	}
 
 	pub fn from_str(s: &str, name: String) -> SourceCodeUnit {
-		let line_offsets_iter = s.bytes()
-			.enumerate()
-			.filter_map(|(i, ch)|
-				if ch as char == '\n' {
-					Some(i+1)
-				} else {
-					None 
-				});
-		let mut line_offsets: Vec<usize> = Some(0usize).into_iter()
-			.chain(line_offsets_iter)
-			.collect();
+		let line_offsets_iter = s.bytes().enumerate().filter_map(|(i, ch)| {
+			if ch as char == '\n' {
+				Some(i + 1)
+			} else {
+				None
+			}
+		});
+		let mut line_offsets: Vec<usize> =
+			Some(0usize).into_iter().chain(line_offsets_iter).collect();
 		let mut content = s.to_string();
 		if *line_offsets.last().unwrap() != content.len() {
 			content += "\n";
@@ -44,38 +40,46 @@ impl SourceCodeUnit {
 	}
 }
 
-
 #[derive(Debug)]
 pub enum TokenizingError {
-	EofInComment {loc: Loc},
-	EofInString {loc: Loc},
-	EofInEscapeSequence {loc: Loc},
-	UnexpectedCharacter {ch: char, loc: Loc},
-	InvalidEscapeSequence {sequence: String, loc: Loc},
+	EofInComment { loc: Loc },
+	EofInString { loc: Loc },
+	EofInEscapeSequence { loc: Loc },
+	UnexpectedCharacter { ch: char, loc: Loc },
+	InvalidEscapeSequence { sequence: String, loc: Loc },
 }
 
 impl std::fmt::Display for TokenizingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			TokenizingError::EofInComment {loc} =>
-				write!(f, "end-of-file in comment (started at line {})",
-					loc.line_start),
-			TokenizingError::EofInString {loc} =>
-				write!(f, "end-of-file in string literal (started at line {})",
-					loc.line_start),
-			TokenizingError::EofInEscapeSequence {loc} =>
-				write!(f, "end-of-file in escape sequence (at line {})",
-					loc.line_start),
-			TokenizingError::UnexpectedCharacter {ch, loc} =>
-				write!(f, "unexpected character `{}` (at line {})",
-					ch, loc.line_start),
-			TokenizingError::InvalidEscapeSequence {sequence, loc} =>
-				write!(f, "invalid escape sequence `{}` (at line {})",
-					sequence, loc.line_start),
+			TokenizingError::EofInComment { loc } => write!(
+				f,
+				"end-of-file in comment (started at line {})",
+				loc.line_start
+			),
+			TokenizingError::EofInString { loc } => write!(
+				f,
+				"end-of-file in string literal (started at line {})",
+				loc.line_start
+			),
+			TokenizingError::EofInEscapeSequence { loc } => write!(
+				f,
+				"end-of-file in escape sequence (at line {})",
+				loc.line_start
+			),
+			TokenizingError::UnexpectedCharacter { ch, loc } => write!(
+				f,
+				"unexpected character `{}` (at line {})",
+				ch, loc.line_start
+			),
+			TokenizingError::InvalidEscapeSequence { sequence, loc } => write!(
+				f,
+				"invalid escape sequence `{}` (at line {})",
+				sequence, loc.line_start
+			),
 		}
 	}
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Loc {
@@ -109,7 +113,6 @@ impl Add for Loc {
 		self
 	}
 }
-
 
 #[derive(Debug)]
 pub struct TokReadingHead {
@@ -157,18 +160,15 @@ impl TokReadingHead {
 		let mut comment: Option<Loc> = None;
 		loop {
 			match (self.peek_cur_char(), &comment) {
-				(Some('#'), None) =>
-					comment = Some(self.cur_char_loc()),
-				(Some(ch), None) if !ch.is_ascii_whitespace() =>
-					break,
-				(Some('#'), Some(_)) =>
-					comment = None,
-				(None, Some(comment_loc)) =>
+				(Some('#'), None) => comment = Some(self.cur_char_loc()),
+				(Some(ch), None) if !ch.is_ascii_whitespace() => break,
+				(Some('#'), Some(_)) => comment = None,
+				(None, Some(comment_loc)) => {
 					return Err(TokenizingError::EofInComment {
-						loc: comment_loc.clone()
-					}),
-				(None, None) =>
-					break,
+						loc: comment_loc.clone(),
+					})
+				}
+				(None, None) => break,
 				_ => (),
 			}
 			self.goto_next_char();
@@ -176,7 +176,6 @@ impl TokReadingHead {
 		Ok(())
 	}
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tok {
@@ -209,7 +208,19 @@ impl std::fmt::Display for Tok {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keyword {
-	Np, Pr, Nl, Do, Dh, Fh, Ev, Redo, End, Imp, Exp, If, El,
+	Np,
+	Pr,
+	Nl,
+	Do,
+	Dh,
+	Fh,
+	Ev,
+	Redo,
+	End,
+	Imp,
+	Exp,
+	If,
+	El,
 }
 
 impl std::fmt::Display for Keyword {
@@ -258,7 +269,7 @@ impl Tok {
 				} else {
 					self
 				}
-			},
+			}
 			_ => self,
 		}
 	}
@@ -266,7 +277,11 @@ impl Tok {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinOp {
-	Plus, Minus, Star, Slash, ToRight,
+	Plus,
+	Minus,
+	Star,
+	Slash,
+	ToRight,
 }
 
 impl std::fmt::Display for BinOp {
@@ -291,9 +306,9 @@ pub enum Matched {
 impl std::fmt::Display for Matched {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			Matched::Paren => write!(f, "{}", if f.alternate() {"("} else {")"}),
-			Matched::Bracket => write!(f, "{}", if f.alternate() {"["} else {"]"}),
-			Matched::Curly => write!(f, "{}", if f.alternate() {"{"} else {"}"}),
+			Matched::Paren => write!(f, "{}", if f.alternate() { "(" } else { ")" }),
+			Matched::Bracket => write!(f, "{}", if f.alternate() { "[" } else { "]" }),
+			Matched::Curly => write!(f, "{}", if f.alternate() { "{" } else { "}" }),
 		}
 	}
 }
@@ -322,7 +337,6 @@ impl Tok {
 	}
 }
 
-
 impl TokReadingHead {
 	pub fn read_cur_tok(&mut self) -> Result<(Tok, Loc), TokenizingError> {
 		self.skip_ws()?;
@@ -330,71 +344,72 @@ impl TokReadingHead {
 			Some(ch) if ch.is_ascii_alphabetic() => {
 				let (word, loc) = self.read_cur_word();
 				Ok((Tok::Word(word).maybe_to_keyword(), loc))
-			},
+			}
 			Some(ch) if ch.is_ascii_digit() => {
 				let (integer, loc) = self.read_cur_integer();
 				Ok((Tok::Integer(integer), loc))
-			},
+			}
 			Some(ch) if ch == '\"' => {
 				let (string, loc) = self.read_cur_string()?;
 				Ok((Tok::String(string), loc))
-			},
+			}
 			Some(ch) if ch == '+' => {
 				self.goto_next_char();
 				Ok((Tok::BinOp(BinOp::Plus), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '-' => {
 				self.goto_next_char();
 				Ok((Tok::BinOp(BinOp::Minus), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '*' => {
 				self.goto_next_char();
 				Ok((Tok::BinOp(BinOp::Star), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '/' => {
 				self.goto_next_char();
 				Ok((Tok::BinOp(BinOp::Slash), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '>' => {
 				self.goto_next_char();
 				Ok((Tok::BinOp(BinOp::ToRight), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '(' => {
 				self.goto_next_char();
 				Ok((Tok::Left(Matched::Paren), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == ')' => {
 				self.goto_next_char();
 				Ok((Tok::Right(Matched::Paren), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '[' => {
 				self.goto_next_char();
 				Ok((Tok::Left(Matched::Bracket), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == ']' => {
 				self.goto_next_char();
 				Ok((Tok::Right(Matched::Bracket), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '{' => {
 				self.goto_next_char();
 				Ok((Tok::Left(Matched::Curly), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '}' => {
 				self.goto_next_char();
 				Ok((Tok::Right(Matched::Curly), self.cur_char_loc()))
-			},
+			}
 			Some(ch) if ch == '<' => {
 				self.goto_next_char();
 				match self.peek_cur_char() {
 					Some('~') => {
 						self.goto_next_char();
 						Ok((Tok::StmtBinOp(StmtBinOp::ToLeftTilde), self.cur_char_loc()))
-					},
+					}
 					_ => Ok((Tok::StmtBinOp(StmtBinOp::ToLeft), self.cur_char_loc())),
 				}
-			},
+			}
 			Some(ch) => Err(TokenizingError::UnexpectedCharacter {
-				ch, loc: self.cur_char_loc(),
+				ch,
+				loc: self.cur_char_loc(),
 			}),
 			None => Ok((Tok::Void, self.cur_char_loc())),
 		}
@@ -438,23 +453,23 @@ impl TokReadingHead {
 		loop {
 			match self.peek_cur_char() {
 				None => {
-					loc.raw_length = string_string.bytes().len()+1;
-					return Err(TokenizingError::EofInString {loc});
-				},
+					loc.raw_length = string_string.bytes().len() + 1;
+					return Err(TokenizingError::EofInString { loc });
+				}
 				Some('\"') => {
 					self.goto_next_char();
 					break;
-				},
+				}
 				Some('\\') => {
 					string_string += &self.read_cur_escape_sequence()?.0;
-				},
+				}
 				Some(ch) => {
 					self.goto_next_char();
 					string_string.push(ch);
-				},
+				}
 			}
 		}
-		loc.raw_length = string_string.bytes().len()+2;
+		loc.raw_length = string_string.bytes().len() + 2;
 		Ok((string_string, loc))
 	}
 
@@ -463,25 +478,60 @@ impl TokReadingHead {
 		std::assert_eq!(self.peek_cur_char(), Some('\\'));
 		self.goto_next_char();
 		match self.peek_cur_char() {
-			Some('\n') => {self.goto_next_char(); Ok(("".to_string(), loc_beg))},
-			Some('\\') => {self.goto_next_char(); Ok(("\\".to_string(), loc_beg))},
-			Some('\"') => {self.goto_next_char(); Ok(("\"".to_string(), loc_beg))},
-			Some('n') => {self.goto_next_char(); Ok(("\n".to_string(), loc_beg))},
-			Some('t') => {self.goto_next_char(); Ok(("\t".to_string(), loc_beg))},
-			Some('e') => {self.goto_next_char(); Ok(("\x1b".to_string(), loc_beg))},
-			Some('a') => {self.goto_next_char(); Ok(("\x07".to_string(), loc_beg))},
-			Some('b') => {self.goto_next_char(); Ok(("\x08".to_string(), loc_beg))},
-			Some('v') => {self.goto_next_char(); Ok(("\x0b".to_string(), loc_beg))},
-			Some('f') => {self.goto_next_char(); Ok(("\x0c".to_string(), loc_beg))},
-			Some('r') => {self.goto_next_char(); Ok(("\r".to_string(), loc_beg))},
+			Some('\n') => {
+				self.goto_next_char();
+				Ok(("".to_string(), loc_beg))
+			}
+			Some('\\') => {
+				self.goto_next_char();
+				Ok(("\\".to_string(), loc_beg))
+			}
+			Some('\"') => {
+				self.goto_next_char();
+				Ok(("\"".to_string(), loc_beg))
+			}
+			Some('n') => {
+				self.goto_next_char();
+				Ok(("\n".to_string(), loc_beg))
+			}
+			Some('t') => {
+				self.goto_next_char();
+				Ok(("\t".to_string(), loc_beg))
+			}
+			Some('e') => {
+				self.goto_next_char();
+				Ok(("\x1b".to_string(), loc_beg))
+			}
+			Some('a') => {
+				self.goto_next_char();
+				Ok(("\x07".to_string(), loc_beg))
+			}
+			Some('b') => {
+				self.goto_next_char();
+				Ok(("\x08".to_string(), loc_beg))
+			}
+			Some('v') => {
+				self.goto_next_char();
+				Ok(("\x0b".to_string(), loc_beg))
+			}
+			Some('f') => {
+				self.goto_next_char();
+				Ok(("\x0c".to_string(), loc_beg))
+			}
+			Some('r') => {
+				self.goto_next_char();
+				Ok(("\r".to_string(), loc_beg))
+			}
 			Some('x') => {
 				self.goto_next_char();
 				let (ch, loc) = self.read_cur_hex_escape_sequence()?;
 				Ok((ch.to_string(), loc))
-			},
+			}
 			Some(ch) => Err(TokenizingError::InvalidEscapeSequence {
-				sequence: ch.to_string(), loc: loc_beg}),
-			None => Err(TokenizingError::EofInEscapeSequence {loc: loc_beg}),
+				sequence: ch.to_string(),
+				loc: loc_beg,
+			}),
+			None => Err(TokenizingError::EofInEscapeSequence { loc: loc_beg }),
 		}
 	}
 
@@ -498,13 +548,15 @@ impl TokReadingHead {
 				let digit2 = ch2.to_digit(16);
 				if digit1.is_none() || digit2.is_none() {
 					return Err(TokenizingError::InvalidEscapeSequence {
-						sequence: format!("x{}{}", ch1, ch2), loc})
+						sequence: format!("x{}{}", ch1, ch2),
+						loc,
+					});
 				} else {
 					let value = digit1.unwrap() * 16 + digit2.unwrap();
 					Ok((value as u8 as char, loc))
 				}
-			},
-			(None, _) | (_, None) => Err(TokenizingError::EofInEscapeSequence {loc}),
+			}
+			(None, _) | (_, None) => Err(TokenizingError::EofInEscapeSequence { loc }),
 		}
 	}
 }
