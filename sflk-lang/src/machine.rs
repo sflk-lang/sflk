@@ -126,13 +126,13 @@ impl Mem {
 }
 
 impl Mem {
-	pub fn exec_root_file(&mut self, filename: String) {
+	pub fn exec_file(&mut self, filename: String) {
 		self.push_excx(ExCx::new());
-		self.exec_file(filename);
+		self.exec_file_here(filename);
 		self.pop_excx();
 	}
 
-	pub fn exec_file(&mut self, filename: String) {
+	fn exec_file_here(&mut self, filename: String) {
 		use std::rc::Rc;
 		use crate::tokenizer::{SourceCodeUnit, TokReadingHead};
 		use crate::parser::ProgReadingHead;
@@ -159,13 +159,13 @@ impl Mem {
 
 		self.log_line(String::from("\x1b[7mProgram execution\x1b[27m"),
 			styles::NORMAL);
-		self.exec_stmts_here(&prog.stmts);
+		self.exec_prog_here(&prog);
 		self.log_line(String::from("\x1b[7mProgram end\x1b[27m"),
 			styles::NORMAL);
 	}
 
-	pub fn exec_prog(&mut self, prog: &Prog) {
-		self.exec_block(prog as &Block);
+	fn exec_prog_here(&mut self, prog: &Prog) {
+		self.exec_block_here(prog as &Block);
 	}
 
 	fn exec_stmts_here(&mut self, stmts: &Vec<Stmt>) {
@@ -194,12 +194,16 @@ impl Mem {
 
 	fn exec_block_excx(&mut self, block: &Block, excx: ExCx) -> ExCx {
 		self.push_excx(excx);
-		self.exec_stmts_here(&block.stmts);
+		self.exec_block_here(block);
 		self.pop_excx()
 	}
 
 	fn exec_block(&mut self, block: &Block) {
 		self.exec_block_excx(block, ExCx::new());
+	}
+
+	fn exec_block_here(&mut self, block: &Block) {
+		self.exec_stmts_here(&block.stmts);
 	}
 
 	fn exec_stmt(&mut self, stmt: &Stmt) {
@@ -260,9 +264,7 @@ impl Mem {
 			Stmt::Do {expr} => {
 				self.log_indent(String::from("do"), true, styles::BOLD_LIGHT_RED);
 				match self.eval_expr(expr) {
-					Obj::Block(block) => {
-						self.exec_block(&block);
-					},
+					Obj::Block(block) => self.exec_block(&block),
 					obj => panic!("can't do {} for now", obj),
 				}
 				self.log_deindent();
@@ -270,9 +272,7 @@ impl Mem {
 			Stmt::DoHere {expr} => {
 				self.log_indent(String::from("dh"), false, styles::YELLOW);
 				match self.eval_expr(expr) {
-					Obj::Block(block) => {
-						self.exec_stmts_here(&block.stmts);
-					},
+					Obj::Block(block) => self.exec_block_here(&block),
 					obj => panic!("can't dh {} for now", obj),
 				}
 				self.log_deindent();
@@ -280,7 +280,7 @@ impl Mem {
 			Stmt::FileDoHere {expr} => {
 				self.log_indent(String::from("fh"), false, styles::YELLOW);
 				match self.eval_expr(expr) {
-					Obj::String(filename) => self.exec_file(filename),
+					Obj::String(filename) => self.exec_file_here(filename),
 					obj => panic!("can't fh {} for now", obj),
 				}
 				self.log_deindent();

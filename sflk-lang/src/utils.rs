@@ -33,6 +33,9 @@ pub fn escape_string(string: &str, escape_style: &Style) -> String {
 }
 
 
+// TODO:
+// delete this ?
+/*
 pub struct StdoutWriter;
 
 impl std::fmt::Write for StdoutWriter {
@@ -47,3 +50,4 @@ impl StdoutWriter {
 		StdoutWriter {}
 	}
 }
+*/

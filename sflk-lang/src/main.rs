@@ -45,8 +45,8 @@ fn main() {
 	let settings = Settings::from_args();
 
 	let mut mem = machine::Mem::new(settings.debug_mode);
-	mem.exec_root_file(settings.src_filename);
-	if let Some(string_rtlog) =  mem.debug_mode {
-		string_rtlog.print();
+	mem.exec_file(settings.src_filename);
+	if let Some(indented_log) =  mem.debug_mode {
+		indented_log.print();
 	}
 }
