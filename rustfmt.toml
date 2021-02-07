@@ -43,11 +43,11 @@ tab_spaces = 4
 
 # Maximum width in the body of a struct lit before falling back to vertical formatting.
 # Default: 16
-#   struct_lit_width = 
+struct_lit_width = 50
 
 # Maximum width in the body of a struct variant before falling back to vertical formatting.
 # Default: 35
-#   struct_variant_width = 
+struct_variant_width = 50
 
 # Always print the abi for extern items.
 # Default: true
@@ -156,12 +156,12 @@ tab_spaces = 4
 # Style of struct definition.
 # Values: Visual | Block
 # Default: Block
-#   struct_lit_style = 
+struct_lit_style = "Visual"
 
 # Multiline style on literal structs.
 # Values: PreferSingle | ForceMulti
 # Default: PreferSingle
-#   struct_lit_multiline_style = 
+struct_lit_multiline_style = "PreferSingle"
 
 # Put a trailing comma on enum declarations.
 # Default: true
