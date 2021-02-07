@@ -1,14 +1,14 @@
 
-use crate::utils::Style;
+use crate::utils::{Style, styles};
 
 
-pub struct StringRtlog {
+pub struct IndentedLog {
 	items: Vec<Item>,
 }
 
-impl StringRtlog {
-	pub fn new() -> StringRtlog {
-		StringRtlog {
+impl IndentedLog {
+	pub fn new() -> IndentedLog {
+		IndentedLog {
 			items: Vec::new(),
 		}
 	}
@@ -18,6 +18,7 @@ impl StringRtlog {
 	}
 
 	pub fn indent(&mut self, string: String, is_context: bool, style: Style) {
+		assert!(!string.contains("\n"));
 		self.push(Item::IndentAdd {string, indent: Indent {is_context, style}});
 	}
 
@@ -25,27 +26,32 @@ impl StringRtlog {
 		self.push(Item::IndentRemove);
 	}
 
-	pub fn log(&mut self, string: String, style: Style) {
-		self.push(Item::String(string, style));
+	pub fn log_line(&mut self, string: String, style: Style) {
+		assert!(!string.contains("\n"));
+		self.push(Item::String {string, is_line: true, style});
+	}
+
+	pub fn log_string(&mut self, string: String, style: Style) {
+		self.push(Item::String {string, is_line: false, style});
 	}
 }
 
-impl std::fmt::Write for StringRtlog {
+impl std::fmt::Write for IndentedLog {
 	fn write_str(&mut self, string: &str) -> Result<(), std::fmt::Error> {
-		self.push(Item::RawString(string.to_string()));
+		self.log_string(string.to_string(), styles::NORMAL);
 		Ok(())
 	}
 }
 
 
+#[derive(Debug)]
 enum Item {
 	IndentAdd {string: String, indent: Indent},
 	IndentRemove,
-	String(String, Style),
-	RawString(String),
+	String {string: String, is_line: bool, style: Style},
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Indent {
 	is_context: bool,
 	style: Style,
@@ -57,16 +63,14 @@ const INDENT_NORMAL: &str = "│";
 const INDENT_WEAK: &str = "╎";
 
 
-impl StringRtlog {
+impl IndentedLog {
 	pub fn print(&self) {
 		let mut indents: Vec<Indent> = Vec::new();
 		let mut is_newline: bool = true;
 		for item in &self.items {
 			match item {
 				Item::IndentAdd {string, indent} => {
-					if is_newline {
-						print_indents(&indents, Some(indent));
-					}
+					print_indents(&indents, Some(indent));
 					println!("{}{}{}", indent.style.0, string, indent.style.1);
 					is_newline = true;
 					indents.push(indent.clone());
@@ -74,21 +78,33 @@ impl StringRtlog {
 				Item::IndentRemove => {
 					indents.pop().expect("bug");
 				},
-				Item::String(string, style) => {
+				Item::String {string, is_line: true, style} => {
 					if is_newline {
 						print_indents(&indents, None);
 					}
 					println!("{}{}{}", style.0, string, style.1);
 					is_newline = true;
-				}
-				Item::RawString(string) => {
-					if is_newline {
-						print_indents(&indents, None);
-					}
+				},
+				Item::String {string, is_line: false, style} => {
 					let formatted_string = format!("{}", string);
-					is_newline = formatted_string.chars().last().map_or(false, |ch| ch == '\n');
-					print!("{}", formatted_string);
-				}
+					let fragments: Vec<&str> = formatted_string.split("\n").collect();
+					if let Some((end, lines)) = fragments.split_last() {
+						for line in lines {
+							if is_newline {
+								print_indents(&indents, None);
+							}
+							println!("{}{}{}", style.0, line, style.1);
+							is_newline = true;
+						}
+						if *end != "" {
+							if is_newline {
+								print_indents(&indents, None);
+							}
+							print!("{}{}{}", style.0, end, style.1);
+							is_newline = false;
+						}
+					}
+				},
 			}
 		}
 	}
@@ -98,8 +114,8 @@ fn print_indents(indents: &Vec<Indent>, add_start: Option<&Indent>) {
 	let last_cx_index = match add_start {
 		Some(indent) if indent.is_context => indents.len(),
 		_ => indents.iter()
-				.rposition(|indent| indent.is_context)
-				.unwrap_or(0),
+			.rposition(|indent| indent.is_context)
+			.unwrap_or(0),
 	};
 	for indent in indents[..last_cx_index].iter() {
 		print!("{}{}{}",

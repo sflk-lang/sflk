@@ -5,7 +5,7 @@ mod program;
 mod object;
 mod machine;
 mod stringtree;
-mod stringrtlog;
+mod log;
 mod utils;
 
 
@@ -44,34 +44,9 @@ impl Settings {
 fn main() {
 	let settings = Settings::from_args();
 
-	use std::rc::Rc;
-
-	let scu = Rc::new(tokenizer::SourceCodeUnit::from_filename(
-		&settings.src_filename));
-
-	let mut prh = parser::ProgReadingHead::from(
-		tokenizer::TokReadingHead::from_scu(scu));
-	let prog = match prh.parse_prog() {
-		Ok((prog, _)) => prog,
-		Err(parsing_error) => {
-			println!("\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}", parsing_error);
-			return;
-		},
-	};
-	if settings.debug_mode {
-		println!("\x1b[7mProgram tree\x1b[27m");
-		stringtree::StringTree::from(&prog).print(&mut crate::utils::StdoutWriter::new());
-	}
-
-	if settings.debug_mode {
-		println!("\x1b[7mProgram execution\x1b[27m");
-	}
 	let mut mem = machine::Mem::new(settings.debug_mode);
-	mem.exec_prog(&prog);
+	mem.exec_root_file(settings.src_filename);
 	if let Some(string_rtlog) =  mem.debug_mode {
 		string_rtlog.print();
-	}
-	if settings.debug_mode {
-		println!("\x1b[7mProgram end\x1b[27m");
 	}
 }

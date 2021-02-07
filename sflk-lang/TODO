@@ -1,5 +1,8 @@
 
 - display runtime errors nicely (embbed optionnal statement loc ?)
+- display parsed tree even in case of a parsing error
+- display rtlog even in case of a runtime error
+- be able to display warning
 - BRANCH from this point ( dev branch )
 	- debug expression using $ like this:
 		x < y + $(z - a / $b) # dbg b, then dbg (z - a / $b) #

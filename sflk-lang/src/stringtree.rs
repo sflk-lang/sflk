@@ -70,11 +70,11 @@ impl RightTube {
 }
 
 impl StringTree {
-	pub fn print<W: std::fmt::Write>(&self, writer: &mut W) {
+	pub fn print(&self, writer: &mut impl std::fmt::Write) {
 		self.print_aux(writer, &mut Vec::new(), false);
 	}
 
-	fn print_aux<W: std::fmt::Write>(&self, writer: &mut W,
+	fn print_aux(&self, writer: &mut impl std::fmt::Write,
 		indent_styles: &mut Vec<(Style, Tube)>, is_last: bool
 	) {
 		// Print self.string with multiple line string support
@@ -103,7 +103,7 @@ impl StringTree {
 	}
 }
 
-fn print_indents<W: std::fmt::Write>(writer: &mut W,
+fn print_indents(writer: &mut impl std::fmt::Write,
 	indent_styles: &Vec<(Style, Tube)>, right_override: RightTube
 ) {
 	if let Some(((right_style, _), indents_left)) = indent_styles.split_last() {
