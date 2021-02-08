@@ -136,11 +136,11 @@ pub enum ExprEnd {
 }
 
 impl ProgReadingHead {
-	fn assert_expr_end(&mut self, end: ExprEnd) -> Result<(), ParsingError> {
+	fn assert_expr_end(&mut self, end: ExprEnd) -> Result<Option<Loc>, ParsingError> {
 		match end {
-			ExprEnd::Nothing => Ok(()),
+			ExprEnd::Nothing => Ok(None),
 			ExprEnd::Paren => match self.pop_tok()? {
-				(Tok::Right(Matched::Paren), _) => Ok(()),
+				(Tok::Right(Matched::Paren), loc) => Ok(Some(loc)),
 				(tok, loc) => Err(ParsingError::UnexpectedToken {
 					loc,
 					tok,
@@ -182,15 +182,14 @@ impl ProgReadingHead {
 			stmts.push(stmt);
 			loc += stmt_loc;
 		}
-		self.disc_tok()?; // Discard the end tok already peeked in the loop condition
-		Ok((stmts, loc))
+		let (_, rightmost_loc) = self.pop_tok()?; // Peeked in the loop condition
+		Ok((stmts, loc + rightmost_loc))
 	}
 
 	fn parse_block(&mut self, end: BlockEnd) -> Result<Located<Block>, ParsingError> {
 		let (stmts, loc) = self.parse_stmts(end)?;
-		let block = Block::new(stmts);
 		Ok(Located {
-			content: block,
+			content: Block::new(stmts),
 			loc,
 		})
 	}
@@ -276,7 +275,7 @@ impl ProgReadingHead {
 					})
 				}
 			}
-			Tok::Word(word) => match self.peek_tok()? {
+			Tok::Name(name) => match self.peek_tok()? {
 				(Tok::StmtBinOp(StmtBinOp::ToLeft), _) => {
 					self.disc_tok()?;
 					let Located {
@@ -285,7 +284,7 @@ impl ProgReadingHead {
 					} = self.parse_expr(ExprEnd::Nothing)?;
 					Ok(Located {
 						content: Stmt::Assign {
-							varname: word,
+							varname: name,
 							expr,
 						},
 						loc: leftmost_loc + expr_loc,
@@ -299,7 +298,7 @@ impl ProgReadingHead {
 					} = self.parse_expr(ExprEnd::Nothing)?;
 					Ok(Located {
 						content: Stmt::AssignIfFree {
-							varname: word,
+							varname: name,
 							expr,
 						},
 						loc: leftmost_loc + expr_loc,
@@ -320,40 +319,36 @@ impl ProgReadingHead {
 	}
 
 	fn parse_expr_left(&mut self) -> Result<Located<Expr>, ParsingError> {
-		let (tok, loc) = self.pop_tok()?;
+		let (tok, leftmost_loc) = self.pop_tok()?;
 		match tok {
-			Tok::Word(word) => Ok(Located {
-				content: Expr::Var { varname: word },
-				loc,
+			Tok::Name(name) => Ok(Located {
+				content: Expr::Var { varname: name },
+				loc: leftmost_loc,
 			}),
 			Tok::Integer(integer) => Ok(Located {
 				content: Expr::Const {
 					val: Obj::Integer(str::parse(&integer).expect("integer parsing error")),
 				},
-				loc,
+				loc: leftmost_loc,
 			}),
 			Tok::String(string) => Ok(Located {
 				content: Expr::Const {
 					val: Obj::String(string.clone()),
 				},
-				loc,
+				loc: leftmost_loc,
 			}),
-			Tok::Left(Matched::Paren) => self.parse_expr(ExprEnd::Paren),
-			Tok::Left(Matched::Curly) => {
-				let Located {
-					content: block,
-					loc: block_loc,
-				} = self.parse_block(BlockEnd::Curly)?;
-				Ok(Located {
-					content: Expr::Const {
-						val: Obj::Block(block),
-					},
-					loc: block_loc,
-				})
+			Tok::Left(Matched::Paren) => {
+				Ok(self.parse_expr(ExprEnd::Paren)?.leftmost_loc(leftmost_loc))
 			}
+			Tok::Left(Matched::Curly) => Ok(self
+				.parse_block(BlockEnd::Curly)?
+				.map(|block| Expr::Const {
+					val: Obj::Block(block),
+				})
+				.leftmost_loc(leftmost_loc)),
 			tok => Err(ParsingError::UnexpectedToken {
 				tok,
-				loc,
+				loc: leftmost_loc,
 				for_what: UnexpectedForWhat::ToStartAnExpression,
 			}),
 		}
@@ -361,18 +356,12 @@ impl ProgReadingHead {
 
 	fn parse_chop(&mut self) -> Result<Located<ChOp>, ParsingError> {
 		std::assert!(self.peek_tok()?.0.is_bin_op());
-		let (op_tok, loc) = self.pop_tok()?;
-		let Located {
-			content: expr,
-			loc: right_loc,
-		} = self.parse_expr_left()?;
-		Ok(Located {
-			content: ChOp {
-				op: Op::from(op_tok),
-				expr,
-			},
-			loc: loc + right_loc,
-		})
+		let (op_tok, op_loc) = self.pop_tok()?;
+		let op = Op::from(op_tok);
+		Ok(self
+			.parse_expr_left()?
+			.map(|expr| ChOp { op, expr })
+			.leftmost_loc(op_loc))
 	}
 
 	fn parse_expr(&mut self, end: ExprEnd) -> Result<Located<Expr>, ParsingError> {
@@ -397,7 +386,10 @@ impl ProgReadingHead {
 				chops,
 			}
 		};
-		self.assert_expr_end(end)?;
+		match self.assert_expr_end(end)? {
+			Some(rightmost_loc) => loc += rightmost_loc,
+			None => (),
+		}
 		Ok(Located { content: expr, loc })
 	}
 }

@@ -109,7 +109,7 @@ impl TokReadingHead {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tok {
-	Word(String),
+	Name(String),
 	Keyword(Keyword),
 	Integer(String),
 	String(String),
@@ -123,7 +123,7 @@ pub enum Tok {
 impl std::fmt::Display for Tok {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			Tok::Word(s) => write!(f, "{}", s),
+			Tok::Name(s) => write!(f, "{}", s),
 			Tok::Keyword(kw) => write!(f, "{}", kw),
 			Tok::Integer(s) => write!(f, "{}", s),
 			Tok::String(s) => write!(f, "\"{}\"", escape_string(s, &styles::UNDERLINE)),
@@ -193,7 +193,7 @@ impl Tok {
 			keywords
 		};
 		match &self {
-			Tok::Word(s) => {
+			Tok::Name(s) => {
 				if let Some(keyword) = keywords.get(s.as_str()) {
 					Tok::Keyword(keyword.clone())
 				} else {
@@ -273,7 +273,7 @@ impl TokReadingHead {
 		match self.peek_cur_char() {
 			Some(ch) if ch.is_ascii_alphabetic() => {
 				let (word, loc) = self.read_cur_word();
-				Ok((Tok::Word(word).maybe_to_keyword(), loc))
+				Ok((Tok::Name(word).maybe_to_keyword(), loc))
 			}
 			Some(ch) if ch.is_ascii_digit() => {
 				let (integer, loc) = self.read_cur_integer();
