@@ -1,7 +1,8 @@
+use crate::log::IndentedLog;
 use crate::object::Obj;
 use crate::program::{Block, ChOp, Expr, Op, Prog, Stmt};
+use crate::scu::Located;
 use crate::utils::{styles, Style};
-use crate::{log::IndentedLog, program::Located};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -138,8 +139,9 @@ impl Mem {
 
 	fn exec_file_here(&mut self, filename: String) {
 		use crate::parser::ProgReadingHead;
+		use crate::scu::SourceCodeUnit;
 		use crate::stringtree::StringTree;
-		use crate::tokenizer::{SourceCodeUnit, TokReadingHead};
+		use crate::tokenizer::TokReadingHead;
 		use std::rc::Rc;
 
 		let scu = Rc::new(SourceCodeUnit::from_filename(&filename));
@@ -218,7 +220,7 @@ impl Mem {
 
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
-			Stmt::Np => {
+			Stmt::Nop => {
 				self.log_indent(String::from("np"), false, styles::NORMAL);
 				self.log_deindent();
 			}
@@ -298,7 +300,7 @@ impl Mem {
 				}
 				self.log_deindent();
 			}
-			Stmt::Ev { expr } => {
+			Stmt::Evaluate { expr } => {
 				self.log_indent(String::from("ev"), false, styles::NORMAL);
 				self.eval_expr(expr);
 				self.log_deindent();

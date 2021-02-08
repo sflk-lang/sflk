@@ -3,6 +3,7 @@ mod machine;
 mod object;
 mod parser;
 mod program;
+mod scu;
 mod stringtree;
 mod tokenizer;
 mod utils;

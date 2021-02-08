@@ -1,8 +1,7 @@
+use crate::object::Obj;
 use crate::program::{Block, ChOp, Expr, Op, Prog, Stmt};
-use crate::tokenizer::{
-	BinOp, Keyword, Loc, Matched, StmtBinOp, Tok, TokReadingHead, TokenizingError,
-};
-use crate::{object::Obj, program::Located};
+use crate::scu::{Loc, Located};
+use crate::tokenizer::{BinOp, Keyword, Matched, StmtBinOp, Tok, TokReadingHead, TokenizingError};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
@@ -197,110 +196,52 @@ impl ProgReadingHead {
 	}
 
 	fn parse_stmt(&mut self) -> Result<Located<Stmt>, ParsingError> {
-		let (tok, loc) = self.pop_tok()?;
+		let (tok, leftmost_loc) = self.pop_tok()?;
 		match tok {
 			Tok::Keyword(Keyword::Np) => Ok(Located {
-				content: Stmt::Np,
-				loc,
+				content: Stmt::Nop,
+				loc: leftmost_loc,
 			}),
-			Tok::Keyword(Keyword::Pr) => {
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::Print { expr },
-					loc: loc + expr_loc,
-				})
-			}
+			Tok::Keyword(Keyword::Pr) => Ok(self
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::Print { expr })
+				.leftmost_loc(leftmost_loc)),
 			Tok::Keyword(Keyword::Nl) => Ok(Located {
 				content: Stmt::PrintNewline,
-				loc,
+				loc: leftmost_loc,
 			}),
-			Tok::Keyword(Keyword::Do) => {
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::Do { expr },
-					loc: loc + expr_loc,
-				})
-			}
-			Tok::Keyword(Keyword::Dh) => {
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::DoHere { expr },
-					loc: loc + expr_loc,
-				})
-			}
-			Tok::Keyword(Keyword::Fh) => {
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::FileDoHere { expr },
-					loc: loc + expr_loc,
-				})
-			}
-			Tok::Keyword(Keyword::Ev) => {
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::Ev { expr },
-					loc: loc + expr_loc,
-				})
-			}
-			Tok::Keyword(Keyword::Imp) => {
-				// will likely disapear or change
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::Imp { expr },
-					loc: loc + expr_loc,
-				})
-			}
-			Tok::Keyword(Keyword::Exp) => {
-				// will likely disapear or change
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::Exp { expr },
-					loc: loc + expr_loc,
-				})
-			}
-			Tok::Keyword(Keyword::Redo) => {
-				// will likely disapear or change
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::Redo { expr },
-					loc: loc + expr_loc,
-				})
-			}
-			Tok::Keyword(Keyword::End) => {
-				// will likely disapear or change
-				let Located {
-					content: expr,
-					loc: expr_loc,
-				} = self.parse_expr(ExprEnd::Nothing)?;
-				Ok(Located {
-					content: Stmt::End { expr },
-					loc: loc + expr_loc,
-				})
-			}
+			Tok::Keyword(Keyword::Do) => Ok(self
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::Do { expr })
+				.leftmost_loc(leftmost_loc)),
+			Tok::Keyword(Keyword::Dh) => Ok(self
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::DoHere { expr })
+				.leftmost_loc(leftmost_loc)),
+			Tok::Keyword(Keyword::Fh) => Ok(self
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::FileDoHere { expr })
+				.leftmost_loc(leftmost_loc)),
+			Tok::Keyword(Keyword::Ev) => Ok(self
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::Evaluate { expr })
+				.leftmost_loc(leftmost_loc)),
+			Tok::Keyword(Keyword::Imp) => Ok(self // Will likely disapear or change
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::Imp { expr })
+				.leftmost_loc(leftmost_loc)),
+			Tok::Keyword(Keyword::Exp) => Ok(self // Will likely disapear or change
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::Exp { expr })
+				.leftmost_loc(leftmost_loc)),
+			Tok::Keyword(Keyword::Redo) => Ok(self // Will likely disapear or change
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::Redo { expr })
+				.leftmost_loc(leftmost_loc)),
+			Tok::Keyword(Keyword::End) => Ok(self // Will likely disapear or change
+				.parse_expr(ExprEnd::Nothing)?
+				.map(|expr| Stmt::End { expr })
+				.leftmost_loc(leftmost_loc)),
 			Tok::Keyword(Keyword::If) => {
 				let Located {
 					content: cond_expr,
@@ -322,7 +263,7 @@ impl ProgReadingHead {
 							if_stmt: Box::new(if_stmt),
 							el_stmt: Some(Box::new(el_stmt)),
 						},
-						loc: loc + cond_loc + if_stmt_loc + el_stmt_loc,
+						loc: leftmost_loc + cond_loc + if_stmt_loc + el_stmt_loc,
 					})
 				} else {
 					Ok(Located {
@@ -331,7 +272,7 @@ impl ProgReadingHead {
 							if_stmt: Box::new(if_stmt),
 							el_stmt: None,
 						},
-						loc: loc + cond_loc + if_stmt_loc,
+						loc: leftmost_loc + cond_loc + if_stmt_loc,
 					})
 				}
 			}
@@ -347,7 +288,7 @@ impl ProgReadingHead {
 							varname: word,
 							expr,
 						},
-						loc: loc + expr_loc,
+						loc: leftmost_loc + expr_loc,
 					})
 				}
 				(Tok::StmtBinOp(StmtBinOp::ToLeftTilde), _) => {
@@ -361,7 +302,7 @@ impl ProgReadingHead {
 							varname: word,
 							expr,
 						},
-						loc: loc + expr_loc,
+						loc: leftmost_loc + expr_loc,
 					})
 				}
 				(tok, loc) => Err(ParsingError::UnexpectedToken {
@@ -372,7 +313,7 @@ impl ProgReadingHead {
 			},
 			tok => Err(ParsingError::UnexpectedToken {
 				tok,
-				loc,
+				loc: leftmost_loc,
 				for_what: UnexpectedForWhat::ToStartAStatement,
 			}),
 		}

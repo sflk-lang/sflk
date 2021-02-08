@@ -3,7 +3,7 @@
 - display parsed tree even in case of a parsing error
 - display indented_log even in case of a runtime error
 - be able to display warning
-- modular parser, generate ast that is different from the program
+- modular parser ?
 - lib build target for integration in the language server
 - debug expression using $ like this:
 	x < y + $(z - a / $b) # dbg b, then dbg (z - a / $b) #

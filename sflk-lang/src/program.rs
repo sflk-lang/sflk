@@ -1,6 +1,6 @@
+use crate::object::Obj;
 use crate::stringtree::StringTree;
 use crate::utils::styles;
-use crate::{object::Obj, tokenizer::Loc};
 
 pub type Prog = Block;
 
@@ -43,7 +43,7 @@ impl Block {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-	Np,
+	Nop,
 	Print {
 		expr: Expr,
 	},
@@ -65,7 +65,7 @@ pub enum Stmt {
 	FileDoHere {
 		expr: Expr,
 	},
-	Ev {
+	Evaluate {
 		expr: Expr,
 	},
 	Imp {
@@ -87,15 +87,10 @@ pub enum Stmt {
 	},
 }
 
-pub struct Located<T> {
-	pub content: T,
-	pub loc: Loc,
-}
-
 impl From<&Stmt> for StringTree {
 	fn from(stmt: &Stmt) -> StringTree {
 		match stmt {
-			Stmt::Np => StringTree::new_leaf(String::from("np"), styles::NORMAL),
+			Stmt::Nop => StringTree::new_leaf(String::from("np"), styles::NORMAL),
 			Stmt::Print { expr } => StringTree::new_node(
 				String::from("pr"),
 				styles::NORMAL,
@@ -127,7 +122,7 @@ impl From<&Stmt> for StringTree {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::Ev { expr } => StringTree::new_node(
+			Stmt::Evaluate { expr } => StringTree::new_node(
 				String::from("ev"),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
