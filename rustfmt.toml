@@ -11,12 +11,15 @@ match_block_trailing_comma = true
 hard_tabs = true
 tab_spaces = 4
 
+blank_lines_upper_bound = 1
+
 use_field_init_shorthand = true
 
 # TODO: fix this (it doesn't work)
 # Try to mess with width_heuristics
 # https://github.com/rust-lang/rustfmt/blob/master/Configurations.md#width_heuristics
 struct_lit_width = 50
+struct_lit_single_line = true
 struct_variant_width = 50
 
 wrap_comments = true

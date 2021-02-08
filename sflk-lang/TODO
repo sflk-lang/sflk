@@ -1,18 +1,20 @@
 
 - display runtime errors nicely (embbed optionnal statement loc ?)
 - display parsed tree even in case of a parsing error
-- display rtlog even in case of a runtime error
+- display indented_log even in case of a runtime error
 - be able to display warning
-- BRANCH from this point ( dev branch )
-	- debug expression using $ like this:
-		x < y + $(z - a / $b) # dbg b, then dbg (z - a / $b) #
-	- breakpoints that open a debug repl
-	- debug repl commands can be used in the code with prefix $$
-	- normal repl
-	- read and write to variables of other contexts with more precision
-	- good loop and conditional syntaxes
-	- bock *call* syntax (or not ?)
-	- @ is now the current cx (or not ?)
+- modular parser, generate ast that is different from the program
+- lib build target for integration in the language server
+- debug expression using $ like this:
+	x < y + $(z - a / $b) # dbg b, then dbg (z - a / $b) #
+	(or not ?)
+- breakpoints that open a debug repl
+- debug repl commands can be used in the code with prefix $$
+- normal repl
+- read and write to variables of other contexts with more precision
+- good loop and conditional syntaxes
+- bock *call* syntax (or not ?)
+- @ is now the current cx (or not ?)
 - maybe merge
 - globals
 - types, conersions
