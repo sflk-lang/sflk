@@ -148,10 +148,7 @@ impl Mem {
 
 		let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
 		let prog = match prh.parse_prog() {
-			Ok(Located {
-				content: prog,
-				loc: _,
-			}) => prog,
+			Ok(located_porg) => located_porg.unwrap(),
 			Err(parsing_error) => {
 				self.log_line(
 					format!(

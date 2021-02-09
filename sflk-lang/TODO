@@ -20,3 +20,4 @@
 - types, conersions
 - lazy expressions
 - signals (print is a signal going down the stack, input goes up, etc.)
+- make runtime objects embed their trace

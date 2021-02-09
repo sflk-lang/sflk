@@ -70,12 +70,24 @@ impl Add for Loc {
 	}
 }
 
+#[derive(Debug, Clone)]
 pub struct Located<T> {
 	pub content: T,
 	pub loc: Loc,
 }
 
 impl<T> Located<T> {
+	pub fn new(content: T, loc: Loc) -> Located<T> {
+		Located { content, loc }
+	}
+
+	pub fn unwrap(self) -> T {
+		self.content
+	}
+}
+
+impl<T> Located<T> {
+	#[allow(dead_code)] // TODO: remoe this attribute one way or another
 	pub fn rightmost_loc(mut self, loc: Loc) -> Located<T> {
 		self.loc += loc;
 		self
@@ -95,3 +107,11 @@ impl<T> Located<T> {
 		}
 	}
 }
+
+// This doesn't work ><
+//
+//impl<T> From<Located<T>> for T {
+//	fn from(located: Located<T>) -> T {
+//		located.content
+//	}
+//}
