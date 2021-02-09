@@ -1,3 +1,4 @@
+mod ast;
 mod log;
 mod machine;
 mod object;
