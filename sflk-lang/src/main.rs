@@ -3,6 +3,7 @@ mod log;
 mod machine;
 mod object;
 mod parser;
+mod parser2;
 mod program;
 mod scu;
 mod stringtree;
