@@ -43,7 +43,10 @@ impl TokForwardRh {
 		Ok(&self.toks_ahead[n])
 	}
 
-	fn pop(&mut self) -> Result<(Tok, Loc), ParsingError> {}
+	fn pop(&mut self) -> Result<(Tok, Loc), ParsingError> {
+		self.peek(0);
+		self.toks_ahead.pop()
+	}
 }
 
 struct Parser {}
