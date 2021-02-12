@@ -1,4 +1,4 @@
-<img src="/logo/sflk-logo-color.svg" align="right" width="400" alt="SFLK logo" />
+<img src="/logo/sflk-logo-color.svg" align="right" width="200" alt="SFLK logo" />
 
 # SFLK programming language
 
