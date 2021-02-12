@@ -1,7 +1,7 @@
 
 # SFLK programming language
 
-![(logo)](https://github.com/sflk-lang/sflk/logo/sflk-logo-color.svg "SFLK logo")
+![(logo)](https://raw.githubusercontent.com/sflk-lang/sflk/main/logo/sflk-logo-color.svg "SFLK logo")
 
 The language is very unstable as it is still in very early development. The examples provided here may not be accurate.
 
