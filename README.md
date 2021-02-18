@@ -1,8 +1,9 @@
-<img src="/logo/sflk-logo-color.svg" align="right" width="200" alt="SFLK logo" />
+<img src="/logo/sflk-logo-color.svg" align="right" width="300" alt="SFLK logo" />
 
 # SFLK programming language
 
-The language is very unstable as it is still in very early development. The examples provided here may not be accurate.
+The language is very unstable as it is still in very early development.
+The examples provided here may not be accurate.
 
 ```sflk
 uwu < "o"
@@ -72,5 +73,6 @@ f < {pr v *10 nl}
 ev 8 >{pr v nl} -4 >f # print 8 and then 40 #
 ```
 
-It has assignments, `+`, `-`, strings, integers, prints, parenthesis, comments, first class code blocks, `*`, `/`, assignments if free, loops, nops.
+It has assignments, `+`, `-`, strings, integers, prints, parenthesis, comments,
+first class code blocks, `*`, `/`, assignments if free, loops, nops.
 And more is comming soon!

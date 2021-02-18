@@ -39,6 +39,17 @@ impl SourceCodeUnit {
 	}
 }
 
+impl Loc {
+	pub fn total_of(scu: Rc<SourceCodeUnit>) -> Loc {
+		Loc {
+			scu: Rc::clone(&scu),
+			line_start: 1,
+			raw_index_start: 0,
+			raw_length: scu.content.len(),
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct Loc {
 	pub scu: Rc<SourceCodeUnit>,
@@ -53,12 +64,24 @@ impl Loc {
 	}
 }
 
-impl AddAssign for Loc {
-	fn add_assign(&mut self, right: Loc) {
+impl AddAssign<&Loc> for Loc {
+	fn add_assign(&mut self, right: &Loc) {
 		std::assert_eq!(Rc::as_ptr(&self.scu), Rc::as_ptr(&right.scu));
 		std::assert!(self.line_start <= right.line_start);
 		std::assert!(self.raw_index_start <= right.raw_index_start);
 		self.raw_length += (right.raw_index_start - self.raw_index_start) + right.raw_length;
+	}
+}
+
+impl AddAssign for Loc {
+	fn add_assign(&mut self, right: Loc) {
+		*self += &right;
+	}
+}
+
+impl AddAssign<&Loc> for &mut Loc {
+	fn add_assign(&mut self, right: &Loc) {
+		**self += right;
 	}
 }
 
@@ -67,6 +90,15 @@ impl Add for Loc {
 	fn add(mut self, right: Loc) -> Loc {
 		self += right;
 		self
+	}
+}
+
+impl Add for &Loc {
+	type Output = Loc;
+	fn add(self, right: &Loc) -> Loc {
+		let mut loc = self.clone();
+		loc += right;
+		loc
 	}
 }
 

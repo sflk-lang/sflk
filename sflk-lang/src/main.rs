@@ -86,10 +86,93 @@ fn main() {
 	}
 
 	let mut mem = machine::Mem::new(settings.debug_mode);
+	/*
 	if let Some(root_filename) = settings.root_filename {
 		mem.exec_file(root_filename);
 		if let Some(indented_log) = mem.debug_mode {
 			indented_log.print();
 		}
 	}
+	*/
+
+	/*
+	use crate::parser::ProgReadingHead;
+	use crate::scu::SourceCodeUnit;
+	use crate::stringtree::StringTree;
+	use crate::tokenizer::TokReadingHead;
+	use std::rc::Rc;
+
+	let scu = Rc::new(SourceCodeUnit::from_filename(&filename));
+
+	let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
+	let prog = match prh.parse_prog() {
+		Ok(located_porg) => located_porg.unwrap(),
+		Err(parsing_error) => {
+			self.log_line(
+				format!(
+					"\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}",
+					parsing_error
+				),
+				styles::NORMAL,
+			);
+			return;
+		}
+	};
+	self.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
+	if let Some(_) = self.debug_mode {
+		StringTree::from(&prog).print(self.debug_mode.as_mut().unwrap());
+	}
+
+	self.log_line(
+		String::from("\x1b[7mProgram execution\x1b[27m"),
+		styles::NORMAL,
+	);
+	self.exec_prog_here(&prog);
+	self.log_line(String::from("\x1b[7mProgram end\x1b[27m"), styles::NORMAL); */
+
+	let mut log = crate::log::IndentedLog::new();
+	use crate::utils::styles;
+
+	use crate::parser::ProgReadingHead;
+	use crate::scu::SourceCodeUnit;
+	use crate::stringtree::StringTree;
+	use crate::tokenizer::TokReadingHead;
+	use std::rc::Rc;
+
+	let scu = Rc::new(SourceCodeUnit::from_filename(
+		&settings.root_filename.as_ref().unwrap(),
+	));
+
+	let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
+	let prog = match prh.parse_prog() {
+		Ok(located_porg) => located_porg.unwrap(),
+		Err(parsing_error) => {
+			log.log_line(
+				format!(
+					"\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}",
+					parsing_error
+				),
+				styles::NORMAL,
+			);
+			return;
+		}
+	};
+	log.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
+	if settings.debug_mode {
+		StringTree::from(&prog).print(&mut log);
+	}
+
+	let scu = Rc::new(SourceCodeUnit::from_filename(
+		&settings.root_filename.unwrap().clone(),
+	));
+	let ast = match parser2::Parser::new().parse_program(&mut parser2::TokForwardRh::from(
+		TokReadingHead::from_scu(scu),
+	)) {
+		Ok(ast) => ast,
+		Err(err) => panic!("{}", err),
+	};
+	let mut log = crate::log::IndentedLog::new();
+	let tree = StringTree::from(&ast);
+	tree.print(&mut log);
+	log.print();
 }

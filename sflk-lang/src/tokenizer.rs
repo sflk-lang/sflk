@@ -107,6 +107,12 @@ impl TokReadingHead {
 	}
 }
 
+impl TokReadingHead {
+	pub fn scu(&self) -> Rc<SourceCodeUnit> {
+		Rc::clone(&self.scu)
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tok {
 	Name(String),

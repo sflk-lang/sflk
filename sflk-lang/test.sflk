@@ -1,5 +1,3 @@
 
-fh "sflk-lang/std.sflk"
-
-ev 8 >prnl >{pr v nl}
-np
+pr "uwu" nl
+do {ev h+1}*2+f
