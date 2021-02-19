@@ -126,6 +126,40 @@ impl Parser {
 					tfr.discard_peeked();
 					Ok(Some(Node::from(Stmt::Newline, kw_loc)))
 				}
+				Keyword::Ev => {
+					let kw_loc = first_loc.clone();
+					tfr.discard_peeked();
+					let expr_node = self.parse_expr(tfr)?;
+					let full_loc = &kw_loc + expr_node.loc();
+					Ok(Some(Node::from(
+						Stmt::Evaluate { expr: expr_node },
+						full_loc,
+					)))
+				}
+				Keyword::Do => {
+					let kw_loc = first_loc.clone();
+					tfr.discard_peeked();
+					let expr_node = self.parse_expr(tfr)?;
+					let full_loc = &kw_loc + expr_node.loc();
+					Ok(Some(Node::from(Stmt::Do { expr: expr_node }, full_loc)))
+				}
+				Keyword::Dh => {
+					let kw_loc = first_loc.clone();
+					tfr.discard_peeked();
+					let expr_node = self.parse_expr(tfr)?;
+					let full_loc = &kw_loc + expr_node.loc();
+					Ok(Some(Node::from(Stmt::DoHere { expr: expr_node }, full_loc)))
+				}
+				Keyword::Fh => {
+					let kw_loc = first_loc.clone();
+					tfr.discard_peeked();
+					let expr_node = self.parse_expr(tfr)?;
+					let full_loc = &kw_loc + expr_node.loc();
+					Ok(Some(Node::from(
+						Stmt::DoFileHere { expr: expr_node },
+						full_loc,
+					)))
+				}
 				_ => todo!(),
 			}
 		} else if let Some(stmt) = self.maybe_parse_assign_stmt(tfr)? {
@@ -219,7 +253,7 @@ impl Parser {
 		let (op_tok, op_loc) = tfr.peek(0)?.clone();
 		if let Tok::BinOp(op) = op_tok {
 			tfr.discard_peeked();
-			let expr_node = self.parse_expr(tfr)?;
+			let expr_node = self.parse_expr_beg(tfr)?;
 			let full_loc = &op_loc + expr_node.loc();
 			match op {
 				BinOp::Plus => Ok(Some(Node::from(Chop::Plus(expr_node), full_loc))),

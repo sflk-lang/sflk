@@ -86,6 +86,9 @@ pub enum Stmt {
 		target: Node<AssignTarget>,
 		expr: Node<Expr>,
 	},
+	Evaluate {
+		expr: Node<Expr>,
+	},
 	Do {
 		expr: Node<Expr>,
 	},
@@ -233,6 +236,11 @@ impl Treeable for Stmt {
 				format!("assign"),
 				styles::NORMAL,
 				vec![StringTree::from(target), StringTree::from(expr)],
+			),
+			Stmt::Evaluate { expr } => StringTree::new_node(
+				format!("evaluate"),
+				styles::NORMAL,
+				vec![StringTree::from(expr)],
 			),
 			Stmt::Do { expr } => {
 				StringTree::new_node(format!("do"), styles::NORMAL, vec![StringTree::from(expr)])
