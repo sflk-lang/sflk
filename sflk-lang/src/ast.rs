@@ -188,7 +188,7 @@ impl Treeable for Expr {
 				StringTree::new_leaf(format!("integer {}", integer), styles::NORMAL)
 			}
 			Expr::StringLiteral(string) => StringTree::new_leaf(
-				format!("string {}", escape_string(string, &styles::UNDERLINE)),
+				format!("string \"{}\"", escape_string(string, &styles::UNDERLINE)),
 				styles::NORMAL,
 			),
 			Expr::BlockLiteral(stmts) => StringTree::new_node(

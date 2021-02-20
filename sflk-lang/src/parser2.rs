@@ -169,12 +169,14 @@ impl Parser {
 					tfr.discard_peeked();
 					let cond_expr_node = self.parse_expr(tfr)?;
 					let if_stmt_node = self.parse_stmt(tfr)?;
+					let el_opt_stmt_node =
+						self.maybe_parse_stmt_extension_stmt(tfr, Keyword::El)?;
 					let full_loc = &kw_loc + if_stmt_node.loc();
 					Ok(Some(Node::from(
 						Stmt::If {
 							cond_expr: cond_expr_node,
 							if_stmt: Box::new(if_stmt_node),
-							el_opt_stmt: None,
+							el_opt_stmt: el_opt_stmt_node.map(Box::new),
 						},
 						full_loc,
 					)))
@@ -183,6 +185,20 @@ impl Parser {
 			}
 		} else if let Some(stmt) = self.maybe_parse_assign_stmt(tfr)? {
 			Ok(Some(stmt))
+		} else {
+			Ok(None)
+		}
+	}
+
+	fn maybe_parse_stmt_extension_stmt(
+		&mut self,
+		tfr: &mut TokForwardRh,
+		kw: Keyword,
+	) -> Result<Option<Node<Stmt>>, ParsingError> {
+		let (tok, _) = tfr.peek(0)?;
+		if *tok == Tok::Keyword(kw) {
+			tfr.discard_peeked();
+			Ok(Some(self.parse_stmt(tfr)?))
 		} else {
 			Ok(None)
 		}
