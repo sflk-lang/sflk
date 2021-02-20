@@ -83,7 +83,7 @@ pub enum Stmt {
 	},
 	Newline,
 	Assign {
-		target: Node<AssignTarget>,
+		target: Node<TargetExpr>,
 		expr: Node<Expr>,
 	},
 	Evaluate {
@@ -106,7 +106,7 @@ pub enum Stmt {
 	Invalid, // TODO: Add error details
 }
 
-pub enum AssignTarget {
+pub enum TargetExpr {
 	VariableName(String),
 	Invalid, // TODO: Add error details
 }
@@ -211,13 +211,13 @@ impl Treeable for Expr {
 	}
 }
 
-impl Treeable for AssignTarget {
+impl Treeable for TargetExpr {
 	fn tree(&self, loc: &Loc) -> StringTree {
 		match self {
-			AssignTarget::VariableName(name) => {
+			TargetExpr::VariableName(name) => {
 				StringTree::new_leaf(format!("target variable {}", name), styles::NORMAL)
 			}
-			AssignTarget::Invalid => todo!("TODO"),
+			TargetExpr::Invalid => todo!("TODO"),
 		}
 	}
 }

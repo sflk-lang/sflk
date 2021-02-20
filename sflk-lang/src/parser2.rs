@@ -102,6 +102,10 @@ impl Parser {
 		Ok(stmts)
 	}
 
+	fn parse_stmt(&mut self, tfr: &mut TokForwardRh) -> Result<Node<Stmt>, ParsingError> {
+		Ok(self.maybe_parse_stmt(tfr)?.unwrap())
+	}
+
 	fn maybe_parse_stmt(
 		&mut self,
 		tfr: &mut TokForwardRh,
@@ -160,6 +164,21 @@ impl Parser {
 						full_loc,
 					)))
 				}
+				Keyword::If => {
+					let kw_loc = first_loc.clone();
+					tfr.discard_peeked();
+					let cond_expr_node = self.parse_expr(tfr)?;
+					let if_stmt_node = self.parse_stmt(tfr)?;
+					let full_loc = &kw_loc + if_stmt_node.loc();
+					Ok(Some(Node::from(
+						Stmt::If {
+							cond_expr: cond_expr_node,
+							if_stmt: Box::new(if_stmt_node),
+							el_opt_stmt: None,
+						},
+						full_loc,
+					)))
+				}
 				_ => todo!(),
 			}
 		} else if let Some(stmt) = self.maybe_parse_assign_stmt(tfr)? {
@@ -179,7 +198,7 @@ impl Parser {
 		match (&tfr.peek_prepared()[0], &tfr.peek_prepared()[1]) {
 			((Tok::Name(name), name_loc), (Tok::StmtBinOp(StmtBinOp::ToLeft), _)) => {
 				let target_node =
-					Node::from(AssignTarget::VariableName(name.clone()), name_loc.clone());
+					Node::from(TargetExpr::VariableName(name.clone()), name_loc.clone());
 				tfr.discard_peeked();
 				tfr.discard_peeked();
 				let expr_node = self.parse_expr(tfr)?;
