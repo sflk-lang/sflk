@@ -115,14 +115,14 @@ impl ProgReadingHead {
 }
 
 enum BlockEnd {
-	Void,
+	Eof,
 	Curly,
 }
 
 impl Tok {
 	fn is_block_end(&self, end: &BlockEnd) -> bool {
 		match (end, self) {
-			(BlockEnd::Void, Tok::Void) => true,
+			(BlockEnd::Eof, Tok::Eof) => true,
 			(BlockEnd::Curly, Tok::Right(Matched::Curly)) => true,
 			_ => false,
 		}
@@ -168,7 +168,7 @@ impl From<Tok> for Op {
 
 impl ProgReadingHead {
 	pub fn parse_prog(&mut self) -> Result<Located<Prog>, ParsingError> {
-		self.parse_block(BlockEnd::Void)
+		self.parse_block(BlockEnd::Eof)
 	}
 
 	fn parse_stmts(&mut self, end: BlockEnd) -> Result<(Vec<Stmt>, Loc), ParsingError> {

@@ -119,11 +119,13 @@ pub enum Tok {
 	Keyword(Keyword),
 	Integer(String),
 	String(String),
+	StringUnfinished(String),
 	BinOp(BinOp),
 	Left(Matched),
 	Right(Matched),
 	StmtBinOp(StmtBinOp),
-	Void,
+	InvalidCharacter(char),
+	Eof,
 }
 
 impl std::fmt::Display for Tok {
@@ -137,7 +139,8 @@ impl std::fmt::Display for Tok {
 			Tok::Left(s) => write!(f, "{:#}", s),
 			Tok::Right(s) => write!(f, "{}", s),
 			Tok::StmtBinOp(op) => write!(f, "{}", op),
-			Tok::Void => write!(f, ""),
+			Tok::InvalidCharacter(c) => write!(f, "{}", c),
+			Tok::Eof => write!(f, ""),
 		}
 	}
 }
@@ -350,7 +353,7 @@ impl TokReadingHead {
 				ch,
 				loc: self.cur_char_loc(),
 			}),
-			None => Ok((Tok::Void, self.cur_char_loc())),
+			None => Ok((Tok::Eof, self.cur_char_loc())),
 		}
 	}
 
