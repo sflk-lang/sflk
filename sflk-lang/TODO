@@ -1,4 +1,9 @@
 
+- add the ability for string trees to have anotations to nodes
+- add th and el anotations to the if stmt string tree node
+- etc.
+
+#########################################################
 - display runtime errors nicely (embbed optionnal statement loc ?)
 - display parsed tree even in case of a parsing error
 - display indented_log even in case of a runtime error

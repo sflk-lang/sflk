@@ -168,15 +168,20 @@ impl Parser {
 					let kw_loc = first_loc.clone();
 					tfr.discard_peeked();
 					let cond_expr_node = self.parse_expr(tfr)?;
-					let if_stmt_node = self.parse_stmt(tfr)?;
-					let el_opt_stmt_node =
-						self.maybe_parse_stmt_extension_stmt(tfr, Keyword::El)?;
-					let full_loc = &kw_loc + if_stmt_node.loc();
+					let th_stmt_node = self.maybe_parse_stmt_extension_stmt(tfr, Keyword::Th)?;
+					let el_stmt_node = self.maybe_parse_stmt_extension_stmt(tfr, Keyword::El)?;
+					let mut full_loc = kw_loc;
+					if let Some(stmt_node) = &th_stmt_node {
+						full_loc += stmt_node.loc();
+					}
+					if let Some(stmt_node) = &el_stmt_node {
+						full_loc += stmt_node.loc();
+					}
 					Ok(Some(Node::from(
 						Stmt::If {
 							cond_expr: cond_expr_node,
-							if_stmt: Box::new(if_stmt_node),
-							el_opt_stmt: el_opt_stmt_node.map(Box::new),
+							th_stmt: th_stmt_node.map(Box::new),
+							el_stmt: el_stmt_node.map(Box::new),
 						},
 						full_loc,
 					)))

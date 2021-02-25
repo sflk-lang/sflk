@@ -100,8 +100,8 @@ pub enum Stmt {
 	},
 	If {
 		cond_expr: Node<Expr>,
-		if_stmt: Box<Node<Stmt>>,
-		el_opt_stmt: Option<Box<Node<Stmt>>>,
+		th_stmt: Option<Box<Node<Stmt>>>,
+		el_stmt: Option<Box<Node<Stmt>>>,
 	},
 	Invalid, // TODO: Add error details
 }
@@ -257,15 +257,27 @@ impl Treeable for Stmt {
 			),
 			Stmt::If {
 				cond_expr,
-				if_stmt,
-				el_opt_stmt,
+				th_stmt,
+				el_stmt,
 			} => StringTree::new_node(format!("if"), styles::NORMAL, {
 				let mut vec: Vec<StringTree> = Vec::with_capacity(3);
 				vec.push(StringTree::from(cond_expr));
-				vec.push(StringTree::from(&**if_stmt));
-				el_opt_stmt
-					.as_ref()
-					.map(|el_stmt| vec.push(StringTree::from(&**el_stmt)));
+				if let Some(stmt) = th_stmt {
+					vec.push(StringTree::from(&**stmt));
+				} else {
+					vec.push(StringTree::new_leaf(
+						format!("no then branch"),
+						styles::NORMAL,
+					));
+				}
+				if let Some(stmt) = el_stmt {
+					vec.push(StringTree::from(&**stmt));
+				} else {
+					vec.push(StringTree::new_leaf(
+						format!("no else branch"),
+						styles::NORMAL,
+					));
+				}
 				vec
 			}),
 			Stmt::Invalid => todo!("TODO"),

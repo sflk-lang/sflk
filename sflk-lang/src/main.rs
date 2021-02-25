@@ -133,7 +133,8 @@ fn main() {
 	let mut log = crate::log::IndentedLog::new();
 	use crate::utils::styles;
 
-	use crate::parser::ProgReadingHead;
+	use crate::ast::Treeable;
+	use crate::parser2::{Parser, TokForwardRh};
 	use crate::scu::SourceCodeUnit;
 	use crate::stringtree::StringTree;
 	use crate::tokenizer::TokReadingHead;
@@ -143,9 +144,10 @@ fn main() {
 		&settings.root_filename.as_ref().unwrap(),
 	));
 
-	let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
-	let prog = match prh.parse_prog() {
-		Ok(located_porg) => located_porg.unwrap(),
+	let mut tfr = TokForwardRh::from(TokReadingHead::from_scu(scu));
+	let mut parser = Parser::new();
+	let prog_node = match parser.parse_program(&mut tfr) {
+		Ok(prog_node) => prog_node,
 		Err(parsing_error) => {
 			log.log_line(
 				format!(
@@ -154,12 +156,13 @@ fn main() {
 				),
 				styles::NORMAL,
 			);
+			log.print();
 			return;
 		}
 	};
 	log.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
 	if settings.debug_mode {
-		StringTree::from(&prog).print(&mut log);
+		StringTree::from(&prog_node).print(&mut log);
 	}
 
 	let scu = Rc::new(SourceCodeUnit::from_filename(

@@ -156,6 +156,7 @@ pub enum Keyword {
 	Imp,
 	Exp,
 	If,
+	Th,
 	El,
 }
 
@@ -174,6 +175,7 @@ impl std::fmt::Display for Keyword {
 			Keyword::Imp => write!(f, "{}", "imp"),
 			Keyword::Exp => write!(f, "{}", "exp"),
 			Keyword::If => write!(f, "{}", "if"),
+			Keyword::Th => write!(f, "{}", "th"),
 			Keyword::El => write!(f, "{}", "el"),
 		}
 	}
@@ -195,6 +197,7 @@ impl Tok {
 			keywords.insert("imp", Keyword::Imp);
 			keywords.insert("exp", Keyword::Exp);
 			keywords.insert("if", Keyword::If);
+			keywords.insert("th", Keyword::Th);
 			keywords.insert("el", Keyword::El);
 			keywords
 		};
