@@ -25,15 +25,17 @@ pub struct ParsingWarning {
 	// TODO
 }
 
-pub struct TokForwardRh {
-	trh: TokReadingHead,
+pub struct TokBuf {
+	trh: CharReadingHead,
+	tokenizer: Tokenizer,
 	toks_ahead: VecDeque<(Tok, Loc)>,
 }
 
-impl TokForwardRh {
-	pub fn from(trh: TokReadingHead) -> TokForwardRh {
-		TokForwardRh {
+impl TokBuf {
+	pub fn from(trh: CharReadingHead) -> TokBuf {
+		TokBuf {
 			trh,
+			tokenizer: Tokenizer::new(),
 			toks_ahead: VecDeque::new(),
 		}
 	}
@@ -74,7 +76,7 @@ impl TokForwardRh {
 	}
 }
 
-impl TokForwardRh {
+impl TokBuf {
 	fn scu(&self) -> Rc<SourceCodeUnit> {
 		self.trh.scu()
 	}
@@ -89,12 +91,12 @@ impl Parser {
 }
 
 impl Parser {
-	pub fn parse_program(&mut self, tfr: &mut TokForwardRh) -> Result<Node<Program>, ParsingError> {
+	pub fn parse_program(&mut self, tfr: &mut TokBuf) -> Result<Node<Program>, ParsingError> {
 		let stmts = self.parse_stmts(tfr)?;
 		Ok(Node::from(Program { stmts }, Loc::total_of(tfr.scu())))
 	}
 
-	fn parse_stmts(&mut self, tfr: &mut TokForwardRh) -> Result<Vec<Node<Stmt>>, ParsingError> {
+	fn parse_stmts(&mut self, tfr: &mut TokBuf) -> Result<Vec<Node<Stmt>>, ParsingError> {
 		let mut stmts: Vec<Node<Stmt>> = Vec::new();
 		while let Some(stmt) = self.maybe_parse_stmt(tfr)? {
 			stmts.push(stmt);
@@ -102,7 +104,7 @@ impl Parser {
 		Ok(stmts)
 	}
 
-	fn parse_stmt(&mut self, tfr: &mut TokForwardRh) -> Result<Node<Stmt>, ParsingError> {
+	fn parse_stmt(&mut self, tfr: &mut TokBuf) -> Result<Node<Stmt>, ParsingError> {
 		if let Some(stmt_node) = self.maybe_parse_stmt(tfr)? {
 			Ok(stmt_node)
 		} else {
@@ -111,10 +113,7 @@ impl Parser {
 		}
 	}
 
-	fn maybe_parse_stmt(
-		&mut self,
-		tfr: &mut TokForwardRh,
-	) -> Result<Option<Node<Stmt>>, ParsingError> {
+	fn maybe_parse_stmt(&mut self, tfr: &mut TokBuf) -> Result<Option<Node<Stmt>>, ParsingError> {
 		let (first_tok, first_loc) = tfr.peek(0)?;
 		if let Tok::Keyword(kw) = first_tok {
 			match kw {
@@ -202,7 +201,7 @@ impl Parser {
 
 	fn maybe_parse_stmt_extension_stmt(
 		&mut self,
-		tfr: &mut TokForwardRh,
+		tfr: &mut TokBuf,
 		kw: Keyword,
 	) -> Result<Option<Node<Stmt>>, ParsingError> {
 		let (tok, _) = tfr.peek(0)?;
@@ -216,7 +215,7 @@ impl Parser {
 
 	fn maybe_parse_assign_stmt(
 		&mut self,
-		tfr: &mut TokForwardRh,
+		tfr: &mut TokBuf,
 	) -> Result<Option<Node<Stmt>>, ParsingError> {
 		// TODO:
 		// Make this beautiful
@@ -241,7 +240,7 @@ impl Parser {
 		}
 	}
 
-	fn parse_expr(&mut self, tfr: &mut TokForwardRh) -> Result<Node<Expr>, ParsingError> {
+	fn parse_expr(&mut self, tfr: &mut TokBuf) -> Result<Node<Expr>, ParsingError> {
 		let expr_node = self.parse_expr_beg(tfr)?;
 		let mut chops: Vec<Node<Chop>> = Vec::new();
 		while let Some(chop_node) = self.maybe_parse_chop(tfr)? {
@@ -261,7 +260,7 @@ impl Parser {
 		}
 	}
 
-	fn parse_expr_beg(&mut self, tfr: &mut TokForwardRh) -> Result<Node<Expr>, ParsingError> {
+	fn parse_expr_beg(&mut self, tfr: &mut TokBuf) -> Result<Node<Expr>, ParsingError> {
 		let (tok, left_loc) = tfr.pop()?;
 		match tok {
 			Tok::Name(name) => Ok(Node::from(Expr::VariableName(name), left_loc)),
@@ -291,10 +290,7 @@ impl Parser {
 		}
 	}
 
-	fn maybe_parse_chop(
-		&mut self,
-		tfr: &mut TokForwardRh,
-	) -> Result<Option<Node<Chop>>, ParsingError> {
+	fn maybe_parse_chop(&mut self, tfr: &mut TokBuf) -> Result<Option<Node<Chop>>, ParsingError> {
 		let (op_tok, op_loc) = tfr.peek(0)?.clone();
 		if let Tok::BinOp(op) = op_tok {
 			tfr.discard_peeked();

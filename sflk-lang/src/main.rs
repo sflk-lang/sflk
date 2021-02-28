@@ -137,14 +137,14 @@ fn main() {
 	use crate::parser2::{Parser, TokForwardRh};
 	use crate::scu::SourceCodeUnit;
 	use crate::stringtree::StringTree;
-	use crate::tokenizer::TokReadingHead;
+	use crate::tokenizer::CharReadingHead;
 	use std::rc::Rc;
 
 	let scu = Rc::new(SourceCodeUnit::from_filename(
 		&settings.root_filename.as_ref().unwrap(),
 	));
 
-	let mut tfr = TokForwardRh::from(TokReadingHead::from_scu(scu));
+	let mut tfr = TokForwardRh::from(CharReadingHead::from_scu(scu));
 	let mut parser = Parser::new();
 	let prog_node = match parser.parse_program(&mut tfr) {
 		Ok(prog_node) => prog_node,
@@ -169,7 +169,7 @@ fn main() {
 		&settings.root_filename.unwrap().clone(),
 	));
 	let ast = match parser2::Parser::new().parse_program(&mut parser2::TokForwardRh::from(
-		TokReadingHead::from_scu(scu),
+		CharReadingHead::from_scu(scu),
 	)) {
 		Ok(ast) => ast,
 		Err(err) => panic!("{}", err),

@@ -69,7 +69,7 @@ pub enum Tok {
 		string: String,
 		unstable_warning: bool,
 	},
-	Keyword(Kw),
+	Kw(Kw),
 	Integer(String),
 	String {
 		content: String,
@@ -120,7 +120,76 @@ pub enum StmtBinOp {
 
 pub struct Tokenizer {}
 
-impl Tokenizer {}
+impl Tokenizer {
+	pub fn new() -> Tokenizer {
+		Tokenizer {}
+	}
+}
+
+impl Tokenizer {
+	pub fn pop_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
+		let loc = crh.loc();
+		match crh.peek() {
+			Some(ch) if ch.is_ascii_alphabetic() => {
+				let (word_string, word_loc) = self.pop_word(crh);
+				(self.word_to_tok(word_string), word_loc)
+			}
+			Some(ch) if ch.is_ascii_digit() => {
+				let (integer_string, word_loc) = self.pop_integer(crh);
+				(Tok::Integer(integer_string), word_loc)
+			}
+			Some(ch) => {
+				crh.disc();
+				(Tok::InvalidCharacter(ch), loc)
+			}
+			None => (Tok::Eof, loc),
+		}
+	}
+
+	fn pop_word(&mut self, crh: &mut CharReadingHead) -> (String, Loc) {
+		let mut word_string = String::new();
+		let mut loc = crh.loc();
+		while let Some(ch) = crh.peek() {
+			if !ch.is_ascii_alphabetic() {
+				break;
+			}
+			word_string.push(ch);
+			crh.disc();
+		}
+		std::assert!(word_string.len() >= 1);
+		loc.raw_length = word_string.bytes().len();
+		(word_string, loc)
+	}
+
+	fn word_to_tok(&self, word: String) -> Tok {
+		match &word[..] {
+			"pr" => Tok::Kw(Kw::Pr),
+			"nl" => Tok::Kw(Kw::Nl),
+			"if" => Tok::Kw(Kw::If),
+			"th" => Tok::Kw(Kw::Th),
+			"el" => Tok::Kw(Kw::El),
+			_ => Tok::Name {
+				string: word,
+				unstable_warning: word.len() == 2,
+			},
+		}
+	}
+
+	fn pop_integer(&mut self, crh: &mut CharReadingHead) -> (String, Loc) {
+		let mut integer_string = String::new();
+		let mut loc = crh.loc();
+		while let Some(ch) = crh.peek() {
+			if !ch.is_ascii_digit() {
+				break;
+			}
+			integer_string.push(ch);
+			crh.disc();
+		}
+		std::assert!(integer_string.len() >= 1);
+		loc.raw_length = integer_string.bytes().len();
+		(integer_string, loc)
+	}
+}
 
 /*
 #[derive(Debug)]
