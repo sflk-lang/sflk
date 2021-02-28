@@ -63,7 +63,7 @@ impl CharReadingHead {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum Tok {
 	Name {
 		string: String,
@@ -87,6 +87,40 @@ pub enum Tok {
 	},
 	Eof,
 }
+
+#[derive(Debug, Clone)]
+pub enum Kw {
+	Pr,
+	Nl,
+	If,
+	Th,
+	El,
+}
+
+#[derive(Debug, Clone)]
+pub enum BinOp {
+	Plus,
+	Minus,
+	Star,
+	Slash,
+	ToRight,
+}
+
+#[derive(Debug, Clone)]
+pub enum Matched {
+	Paren,
+	Curly,
+	Bracket,
+}
+
+#[derive(Debug, Clone)]
+pub enum StmtBinOp {
+	ToLeft,
+}
+
+pub struct Tokenizer {}
+
+impl Tokenizer {}
 
 /*
 #[derive(Debug)]
