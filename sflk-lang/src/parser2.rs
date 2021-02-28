@@ -103,7 +103,12 @@ impl Parser {
 	}
 
 	fn parse_stmt(&mut self, tfr: &mut TokForwardRh) -> Result<Node<Stmt>, ParsingError> {
-		Ok(self.maybe_parse_stmt(tfr)?.unwrap())
+		if let Some(stmt_node) = self.maybe_parse_stmt(tfr)? {
+			Ok(stmt_node)
+		} else {
+			let (tok, loc) = tfr.pop()?;
+			Ok(Node::from(Stmt::Invalid, loc))
+		}
 	}
 
 	fn maybe_parse_stmt(

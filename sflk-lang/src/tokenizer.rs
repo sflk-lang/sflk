@@ -4,6 +4,92 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug)]
+pub struct CharReadingHead {
+	scu: Rc<SourceCodeUnit>,
+	raw_index: usize,
+	line: usize,
+}
+
+impl CharReadingHead {
+	pub fn from_scu(scu: Rc<SourceCodeUnit>) -> CharReadingHead {
+		CharReadingHead {
+			scu,
+			raw_index: 0,
+			line: 1,
+		}
+	}
+}
+
+impl CharReadingHead {
+	fn peek(&self) -> Option<char> {
+		self.scu.content[self.raw_index..].chars().next()
+	}
+
+	fn disc(&mut self) {
+		if let Some(ch) = self.peek() {
+			self.raw_index += ch.len_utf8();
+			match ch {
+				'\n' => self.line += 1,
+				_ => (),
+			}
+		}
+	}
+
+	fn loc(&self) -> Loc {
+		Loc {
+			scu: Rc::clone(&self.scu),
+			line_start: self.line,
+			raw_index_start: self.raw_index,
+			raw_length: match self.peek() {
+				Some(ch) => ch.len_utf8(),
+				None => 0,
+			},
+		}
+	}
+
+	fn skip_ws(&mut self) {
+		loop {
+			match self.peek() {
+				Some(ch) if ch.is_ascii_whitespace() => self.disc(),
+				_ => break,
+			}
+		}
+	}
+}
+
+impl CharReadingHead {
+	pub fn scu(&self) -> Rc<SourceCodeUnit> {
+		Rc::clone(&self.scu)
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Tok {
+	Name {
+		string: String,
+		unstable_warning: bool,
+	},
+	Keyword(Kw),
+	Integer(String),
+	String {
+		content: String,
+		no_end_quote_warning: bool,
+		invalid_escape_sequence_errors: Vec<(String, usize)>, // usize if offset
+	},
+	BinOp(BinOp),
+	Left(Matched),
+	Right(Matched),
+	StmtBinOp(StmtBinOp),
+	InvalidCharacter(char),
+	Comment {
+		content: String,
+		no_end_hash_warning: bool,
+	},
+	Eof,
+}
+
+/*
+#[derive(Debug)]
 pub enum TokenizingError {
 	EofInComment { loc: Loc },
 	EofInString { loc: Loc },
@@ -118,8 +204,7 @@ pub enum Tok {
 	Name(String),
 	Keyword(Keyword),
 	Integer(String),
-	String(String),
-	StringUnfinished(String),
+	String(String, Vec<StringWarning>),
 	BinOp(BinOp),
 	Left(Matched),
 	Right(Matched),
@@ -140,7 +225,7 @@ impl std::fmt::Display for Tok {
 			Tok::Right(s) => write!(f, "{}", s),
 			Tok::StmtBinOp(op) => write!(f, "{}", op),
 			Tok::InvalidCharacter(c) => write!(f, "{}", c),
-			Tok::Eof => write!(f, ""),
+			Tok::Eof(_) => write!(f, ""),
 		}
 	}
 }
@@ -215,6 +300,11 @@ impl Tok {
 			_ => self,
 		}
 	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StringWarning {
+
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -349,11 +439,15 @@ impl TokReadingHead {
 					_ => Ok((Tok::StmtBinOp(StmtBinOp::ToLeft), self.cur_char_loc())),
 				}
 			}
-			Some(ch) => Err(TokenizingError::UnexpectedCharacter {
-				ch,
-				loc: self.cur_char_loc(),
-			}),
-			None => Ok((Tok::Eof, self.cur_char_loc())),
+			Some(ch) => {
+				/*Err(TokenizingError::UnexpectedCharacter {
+					ch,
+					loc: self.cur_char_loc(),
+				}),*/
+				self.goto_next_char();
+				Ok((Tok::InvalidCharacter(ch), self.cur_char_loc()))
+			}
+			None => Ok((Tok::Eof(EofStatus::Normal), self.cur_char_loc())),
 		}
 	}
 
@@ -395,8 +489,12 @@ impl TokReadingHead {
 		loop {
 			match self.peek_cur_char() {
 				None => {
+					/*
 					loc.raw_length = string_string.bytes().len() + 1;
 					return Err(TokenizingError::EofInString { loc });
+					*/
+					self.eof_status = EofStatus::InString;
+					break;
 				}
 				Some('\"') => {
 					self.goto_next_char();
@@ -502,3 +600,4 @@ impl TokReadingHead {
 		}
 	}
 }
+*/

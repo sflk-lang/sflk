@@ -1,7 +1,19 @@
 
-- add the ability for string trees to have anotations to nodes
-- add th and el anotations to the if stmt string tree node
-- etc.
+TOKENIZER REVISION
+- produce comment tokens
+- attach a warning list to tokens
+- attach an error list to tokens
+- no more `Result`s, errors and warnings are attached to the tokens now
+
+PARSER REVISION
+- no more `Result`s, errors and warnings are dropped in the AST now
+
+AST REVISION
+- attach a warning list to nodes
+- nodes may have erroneous variants describing the error
+
+PROGRAM REVISION
+- statements, expressions, chops and literals may be erroneous
 
 #########################################################
 - display runtime errors nicely (embbed optionnal statement loc ?)
@@ -26,3 +38,9 @@
 - lazy expressions
 - signals (print is a signal going down the stack, input goes up, etc.)
 - make runtime objects embed their trace
+- call stack is actually a tree
+	- signals going downward leave a way up the tree
+	- signals going upward follow a way up the tree, consuming it
+	- printing is a signal
+	- reading input is a signal
+	- reading and writing may be signals
