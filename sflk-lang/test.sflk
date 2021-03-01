@@ -1,6 +1,5 @@
 
-@
-if 1 @
-#th pr "uwu"#
-el pr "owo"
+
+if 1 
+el pr 8
 nl

@@ -173,7 +173,7 @@ impl Treeable for Chop {
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
-			Chop::Invalid => todo!("TODO"),
+			Chop::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -206,7 +206,7 @@ impl Treeable for Expr {
 					.chain(chops.iter().map(|chop_node| StringTree::from(chop_node)))
 					.collect(),
 			),
-			Expr::Invalid => todo!("TODO"),
+			Expr::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -217,7 +217,7 @@ impl Treeable for TargetExpr {
 			TargetExpr::VariableName(name) => {
 				StringTree::new_leaf(format!("target variable {}", name), styles::NORMAL)
 			}
-			TargetExpr::Invalid => todo!("TODO"),
+			TargetExpr::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -280,7 +280,7 @@ impl Treeable for Stmt {
 				}
 				vec
 			}),
-			Stmt::Invalid => todo!("TODO"),
+			Stmt::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }

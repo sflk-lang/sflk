@@ -134,7 +134,7 @@ fn main() {
 	use crate::utils::styles;
 
 	use crate::ast::Treeable;
-	use crate::parser2::{Parser, TokForwardRh};
+	use crate::parser2::{Parser, TokBuffer};
 	use crate::scu::SourceCodeUnit;
 	use crate::stringtree::StringTree;
 	use crate::tokenizer::CharReadingHead;
@@ -144,11 +144,11 @@ fn main() {
 		&settings.root_filename.as_ref().unwrap(),
 	));
 
-	let mut tfr = TokForwardRh::from(CharReadingHead::from_scu(scu));
+	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 	let mut parser = Parser::new();
 	let prog_node = match parser.parse_program(&mut tfr) {
-		Ok(prog_node) => prog_node,
-		Err(parsing_error) => {
+		prog_node => prog_node,
+		/*Err(parsing_error) => {
 			log.log_line(
 				format!(
 					"\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}",
@@ -158,7 +158,7 @@ fn main() {
 			);
 			log.print();
 			return;
-		}
+		}*/
 	};
 	log.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
 	if settings.debug_mode {
@@ -168,12 +168,9 @@ fn main() {
 	let scu = Rc::new(SourceCodeUnit::from_filename(
 		&settings.root_filename.unwrap().clone(),
 	));
-	let ast = match parser2::Parser::new().parse_program(&mut parser2::TokForwardRh::from(
+	let ast = parser2::Parser::new().parse_program(&mut parser2::TokBuffer::from(
 		CharReadingHead::from_scu(scu),
-	)) {
-		Ok(ast) => ast,
-		Err(err) => panic!("{}", err),
-	};
+	));
 	let mut log = crate::log::IndentedLog::new();
 	let tree = StringTree::from(&ast);
 	tree.print(&mut log);

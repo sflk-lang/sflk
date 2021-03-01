@@ -25,60 +25,60 @@ pub struct ParsingWarning {
 	// TODO
 }
 
-pub struct TokBuf {
-	trh: CharReadingHead,
+pub struct TokBuffer {
+	crh: CharReadingHead,
 	tokenizer: Tokenizer,
 	toks_ahead: VecDeque<(Tok, Loc)>,
 }
 
-impl TokBuf {
-	pub fn from(trh: CharReadingHead) -> TokBuf {
-		TokBuf {
-			trh,
+impl TokBuffer {
+	pub fn from(crh: CharReadingHead) -> TokBuffer {
+		TokBuffer {
+			crh,
 			tokenizer: Tokenizer::new(),
 			toks_ahead: VecDeque::new(),
 		}
 	}
 
-	fn peek_prepare_max_index(&mut self, n: usize) -> Result<(), ParsingError> {
+	fn prepare_max_index(&mut self, n: usize) {
 		if self.toks_ahead.len() < n + 1 {
 			self.toks_ahead.reserve(n - self.toks_ahead.len());
 		}
 		while self.toks_ahead.len() < n + 1 {
-			self.toks_ahead.push_back(self.trh.read_cur_tok()?);
+			self.toks_ahead
+				.push_back(self.tokenizer.pop_tok(&mut self.crh));
 		}
-		Ok(())
 	}
 
-	fn peek(&mut self, n: usize) -> Result<&(Tok, Loc), ParsingError> {
-		self.peek_prepare_max_index(n)?;
-		Ok(&self.toks_ahead[n])
+	fn peek(&mut self, n: usize) -> &(Tok, Loc) {
+		self.prepare_max_index(n);
+		&self.toks_ahead[n]
 	}
 
-	fn peek_prepared(&self) -> &VecDeque<(Tok, Loc)> {
+	fn prepared(&self) -> &VecDeque<(Tok, Loc)> {
 		&self.toks_ahead
 	}
 
-	fn pop(&mut self) -> Result<(Tok, Loc), ParsingError> {
-		self.peek(0)?;
+	fn pop(&mut self) -> (Tok, Loc) {
+		self.peek(0);
 		let tok_loc_opt = self.toks_ahead.pop_front();
 		if let Some(tok_loc) = tok_loc_opt {
-			Ok(tok_loc)
+			tok_loc
 		} else {
 			panic!("bug: no token to pop")
 		}
 	}
 
-	fn discard_peeked(&mut self) {
+	fn disc(&mut self) {
 		if self.toks_ahead.pop_front().is_none() {
 			panic!("bug: token discarded but not peeked before")
 		}
 	}
 }
 
-impl TokBuf {
+impl TokBuffer {
 	fn scu(&self) -> Rc<SourceCodeUnit> {
-		self.trh.scu()
+		self.crh.scu()
 	}
 }
 
@@ -91,89 +91,91 @@ impl Parser {
 }
 
 impl Parser {
-	pub fn parse_program(&mut self, tfr: &mut TokBuf) -> Result<Node<Program>, ParsingError> {
-		let stmts = self.parse_stmts(tfr)?;
-		Ok(Node::from(Program { stmts }, Loc::total_of(tfr.scu())))
+	pub fn parse_program(&mut self, tb: &mut TokBuffer) -> Node<Program> {
+		let stmts = self.parse_all_as_stmts(tb);
+		Node::from(Program { stmts }, Loc::total_of(tb.scu()))
 	}
 
-	fn parse_stmts(&mut self, tfr: &mut TokBuf) -> Result<Vec<Node<Stmt>>, ParsingError> {
+	fn parse_all_as_stmts(&mut self, tb: &mut TokBuffer) -> Vec<Node<Stmt>> {
 		let mut stmts: Vec<Node<Stmt>> = Vec::new();
-		while let Some(stmt) = self.maybe_parse_stmt(tfr)? {
+		while !matches!(tb.peek(0).0, Tok::Eof) {
+			stmts.push(self.parse_stmt(tb));
+		}
+		stmts
+	}
+
+	fn parse_stmts(&mut self, tb: &mut TokBuffer) -> Vec<Node<Stmt>> {
+		let mut stmts: Vec<Node<Stmt>> = Vec::new();
+		while let Some(stmt) = self.maybe_parse_stmt(tb) {
 			stmts.push(stmt);
 		}
-		Ok(stmts)
+		stmts
 	}
 
-	fn parse_stmt(&mut self, tfr: &mut TokBuf) -> Result<Node<Stmt>, ParsingError> {
-		if let Some(stmt_node) = self.maybe_parse_stmt(tfr)? {
-			Ok(stmt_node)
+	fn parse_stmt(&mut self, tb: &mut TokBuffer) -> Node<Stmt> {
+		if let Some(stmt_node) = self.maybe_parse_stmt(tb) {
+			stmt_node
 		} else {
-			let (tok, loc) = tfr.pop()?;
-			Ok(Node::from(Stmt::Invalid, loc))
+			let (tok, loc) = tb.pop();
+			Node::from(Stmt::Invalid, loc)
 		}
 	}
 
-	fn maybe_parse_stmt(&mut self, tfr: &mut TokBuf) -> Result<Option<Node<Stmt>>, ParsingError> {
-		let (first_tok, first_loc) = tfr.peek(0)?;
-		if let Tok::Keyword(kw) = first_tok {
+	fn maybe_parse_stmt(&mut self, tb: &mut TokBuffer) -> Option<Node<Stmt>> {
+		let (first_tok, first_loc) = tb.peek(0);
+		if let Tok::Kw(kw) = first_tok {
 			match kw {
-				Keyword::Np => {
+				Kw::Np => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					Ok(Some(Node::from(Stmt::Nop, kw_loc)))
+					tb.disc();
+					Some(Node::from(Stmt::Nop, kw_loc))
 				}
-				Keyword::Pr => {
+				Kw::Pr => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					let expr_node = self.parse_expr(tfr)?;
+					tb.disc();
+					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
-					Ok(Some(Node::from(Stmt::Print { expr: expr_node }, full_loc)))
+					Some(Node::from(Stmt::Print { expr: expr_node }, full_loc))
 				}
-				Keyword::Nl => {
+				Kw::Nl => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					Ok(Some(Node::from(Stmt::Newline, kw_loc)))
+					tb.disc();
+					Some(Node::from(Stmt::Newline, kw_loc))
 				}
-				Keyword::Ev => {
+				Kw::Ev => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					let expr_node = self.parse_expr(tfr)?;
+					tb.disc();
+					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
-					Ok(Some(Node::from(
-						Stmt::Evaluate { expr: expr_node },
-						full_loc,
-					)))
+					Some(Node::from(Stmt::Evaluate { expr: expr_node }, full_loc))
 				}
-				Keyword::Do => {
+				Kw::Do => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					let expr_node = self.parse_expr(tfr)?;
+					tb.disc();
+					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
-					Ok(Some(Node::from(Stmt::Do { expr: expr_node }, full_loc)))
+					Some(Node::from(Stmt::Do { expr: expr_node }, full_loc))
 				}
-				Keyword::Dh => {
+				Kw::Dh => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					let expr_node = self.parse_expr(tfr)?;
+					tb.disc();
+					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
-					Ok(Some(Node::from(Stmt::DoHere { expr: expr_node }, full_loc)))
+					Some(Node::from(Stmt::DoHere { expr: expr_node }, full_loc))
 				}
-				Keyword::Fh => {
+				Kw::Fh => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					let expr_node = self.parse_expr(tfr)?;
+					tb.disc();
+					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
-					Ok(Some(Node::from(
-						Stmt::DoFileHere { expr: expr_node },
-						full_loc,
-					)))
+					Some(Node::from(Stmt::DoFileHere { expr: expr_node }, full_loc))
 				}
-				Keyword::If => {
+				Kw::If => {
 					let kw_loc = first_loc.clone();
-					tfr.discard_peeked();
-					let cond_expr_node = self.parse_expr(tfr)?;
-					let th_stmt_node = self.maybe_parse_stmt_extension_stmt(tfr, Keyword::Th)?;
-					let el_stmt_node = self.maybe_parse_stmt_extension_stmt(tfr, Keyword::El)?;
+					tb.disc();
+					let cond_expr_node = self.parse_expr(tb);
+					let th_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::Th);
+					let el_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::El);
 					let mut full_loc = kw_loc;
 					if let Some(stmt_node) = &th_stmt_node {
 						full_loc += stmt_node.loc();
@@ -181,130 +183,149 @@ impl Parser {
 					if let Some(stmt_node) = &el_stmt_node {
 						full_loc += stmt_node.loc();
 					}
-					Ok(Some(Node::from(
+					Some(Node::from(
 						Stmt::If {
 							cond_expr: cond_expr_node,
 							th_stmt: th_stmt_node.map(Box::new),
 							el_stmt: el_stmt_node.map(Box::new),
 						},
 						full_loc,
-					)))
+					))
 				}
-				_ => todo!(),
+				_ => {
+					let kw_loc = first_loc.clone();
+					tb.disc();
+					Some(Node::from(Stmt::Invalid, kw_loc)) // TODO: do
+				}
 			}
-		} else if let Some(stmt) = self.maybe_parse_assign_stmt(tfr)? {
-			Ok(Some(stmt))
+		} else if let Some(stmt) = self.maybe_parse_assign_stmt(tb) {
+			Some(stmt)
 		} else {
-			Ok(None)
+			None
 		}
 	}
 
 	fn maybe_parse_stmt_extension_stmt(
 		&mut self,
-		tfr: &mut TokBuf,
-		kw: Keyword,
-	) -> Result<Option<Node<Stmt>>, ParsingError> {
-		let (tok, _) = tfr.peek(0)?;
-		if *tok == Tok::Keyword(kw) {
-			tfr.discard_peeked();
-			Ok(Some(self.parse_stmt(tfr)?))
-		} else {
-			Ok(None)
+		tb: &mut TokBuffer,
+		kw: Kw,
+	) -> Option<Node<Stmt>> {
+		let (tok, _) = tb.peek(0);
+		match tok {
+			Tok::Kw(tok_kw) if *tok_kw == kw => {
+				tb.disc();
+				Some(self.parse_stmt(tb))
+			}
+			_ => None,
 		}
 	}
 
-	fn maybe_parse_assign_stmt(
-		&mut self,
-		tfr: &mut TokBuf,
-	) -> Result<Option<Node<Stmt>>, ParsingError> {
+	fn maybe_parse_assign_stmt(&mut self, tb: &mut TokBuffer) -> Option<Node<Stmt>> {
 		// TODO:
 		// Make this beautiful
-		tfr.peek_prepare_max_index(1)?;
-		match (&tfr.peek_prepared()[0], &tfr.peek_prepared()[1]) {
-			((Tok::Name(name), name_loc), (Tok::StmtBinOp(StmtBinOp::ToLeft), _)) => {
+		tb.prepare_max_index(1);
+		let prepared = tb.prepared();
+		match (&prepared[0], &prepared[1]) {
+			(
+				(
+					Tok::Name {
+						string,
+						unstable_warning,
+					},
+					name_loc,
+				),
+				(Tok::StmtBinOp(StmtBinOp::ToLeft), _),
+			) => {
 				let target_node =
-					Node::from(TargetExpr::VariableName(name.clone()), name_loc.clone());
-				tfr.discard_peeked();
-				tfr.discard_peeked();
-				let expr_node = self.parse_expr(tfr)?;
+					Node::from(TargetExpr::VariableName(string.clone()), name_loc.clone());
+				tb.disc();
+				tb.disc();
+				let expr_node = self.parse_expr(tb);
 				let total_loc = target_node.loc() + expr_node.loc();
-				Ok(Some(Node::from(
+				Some(Node::from(
 					Stmt::Assign {
 						target: target_node,
 						expr: expr_node,
 					},
 					total_loc,
-				)))
+				))
 			}
-			_ => Ok(None),
+			_ => None,
 		}
 	}
 
-	fn parse_expr(&mut self, tfr: &mut TokBuf) -> Result<Node<Expr>, ParsingError> {
-		let expr_node = self.parse_expr_beg(tfr)?;
+	fn parse_expr(&mut self, tb: &mut TokBuffer) -> Node<Expr> {
+		let expr_node = self.parse_expr_beg(tb);
 		let mut chops: Vec<Node<Chop>> = Vec::new();
-		while let Some(chop_node) = self.maybe_parse_chop(tfr)? {
+		while let Some(chop_node) = self.maybe_parse_chop(tb) {
 			chops.push(chop_node);
 		}
 		if chops.is_empty() {
-			Ok(expr_node)
+			expr_node
 		} else {
 			let loc = expr_node.loc() + chops.last().unwrap().loc();
-			Ok(Node::from(
+			Node::from(
 				Expr::Chain {
 					init: Box::new(expr_node),
 					chops,
 				},
 				loc,
-			))
+			)
 		}
 	}
 
-	fn parse_expr_beg(&mut self, tfr: &mut TokBuf) -> Result<Node<Expr>, ParsingError> {
-		let (tok, left_loc) = tfr.pop()?;
+	fn parse_expr_beg(&mut self, tb: &mut TokBuffer) -> Node<Expr> {
+		let (tok, left_loc) = tb.pop();
 		match tok {
-			Tok::Name(name) => Ok(Node::from(Expr::VariableName(name), left_loc)),
-			Tok::Integer(integer) => Ok(Node::from(Expr::IntegerLiteral(integer), left_loc)),
-			Tok::String(string) => Ok(Node::from(Expr::StringLiteral(string), left_loc)),
+			Tok::Name {
+				string,
+				unstable_warning,
+			} => Node::from(Expr::VariableName(string), left_loc),
+			Tok::Integer(integer) => Node::from(Expr::IntegerLiteral(integer), left_loc),
+			Tok::String {
+				content,
+				no_end_quote_warning,
+				invalid_escape_sequence_errors,
+			} => Node::from(Expr::StringLiteral(content), left_loc),
 			Tok::Left(Matched::Curly) => {
-				let stmts = self.parse_stmts(tfr)?;
-				let (right_tok, right_loc) = tfr.pop()?;
+				let stmts = self.parse_stmts(tb);
+				let (right_tok, right_loc) = tb.pop();
 				match right_tok {
 					Tok::Right(Matched::Curly) => {
-						Ok(Node::from(Expr::BlockLiteral(stmts), left_loc + right_loc))
+						Node::from(Expr::BlockLiteral(stmts), left_loc + right_loc)
 					}
 					_ => panic!("TODO: generate an error here"),
 				}
 			}
 			Tok::Left(Matched::Paren) => {
-				let expr_node = self.parse_expr(tfr)?;
-				let (right_tok, right_loc) = tfr.pop()?;
+				let expr_node = self.parse_expr(tb);
+				let (right_tok, right_loc) = tb.pop();
 				match right_tok {
 					Tok::Right(Matched::Paren) => {
-						Ok(Node::from(expr_node.unwrap(), left_loc + right_loc))
+						Node::from(expr_node.unwrap(), left_loc + right_loc)
 					}
 					_ => panic!("TODO: generate an error here"),
 				}
 			}
-			_ => todo!(),
+			_ => Node::from(Expr::Invalid, left_loc), // TODO: do!
 		}
 	}
 
-	fn maybe_parse_chop(&mut self, tfr: &mut TokBuf) -> Result<Option<Node<Chop>>, ParsingError> {
-		let (op_tok, op_loc) = tfr.peek(0)?.clone();
+	fn maybe_parse_chop(&mut self, tb: &mut TokBuffer) -> Option<Node<Chop>> {
+		let (op_tok, op_loc) = tb.peek(0).clone();
 		if let Tok::BinOp(op) = op_tok {
-			tfr.discard_peeked();
-			let expr_node = self.parse_expr_beg(tfr)?;
+			tb.disc();
+			let expr_node = self.parse_expr_beg(tb);
 			let full_loc = &op_loc + expr_node.loc();
 			match op {
-				BinOp::Plus => Ok(Some(Node::from(Chop::Plus(expr_node), full_loc))),
-				BinOp::Minus => Ok(Some(Node::from(Chop::Minus(expr_node), full_loc))),
-				BinOp::Star => Ok(Some(Node::from(Chop::Star(expr_node), full_loc))),
-				BinOp::Slash => Ok(Some(Node::from(Chop::Slash(expr_node), full_loc))),
-				BinOp::ToRight => Ok(Some(Node::from(Chop::ToRight(expr_node), full_loc))),
+				BinOp::Plus => Some(Node::from(Chop::Plus(expr_node), full_loc)),
+				BinOp::Minus => Some(Node::from(Chop::Minus(expr_node), full_loc)),
+				BinOp::Star => Some(Node::from(Chop::Star(expr_node), full_loc)),
+				BinOp::Slash => Some(Node::from(Chop::Slash(expr_node), full_loc)),
+				BinOp::ToRight => Some(Node::from(Chop::ToRight(expr_node), full_loc)),
 			}
 		} else {
-			Ok(None)
+			None
 		}
 	}
 }

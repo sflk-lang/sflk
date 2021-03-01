@@ -88,10 +88,15 @@ pub enum Tok {
 	Eof,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kw {
+	Np,
 	Pr,
 	Nl,
+	Do,
+	Dh,
+	Fh,
+	Ev,
 	If,
 	Th,
 	El,
@@ -128,6 +133,7 @@ impl Tokenizer {
 
 impl Tokenizer {
 	pub fn pop_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
+		crh.skip_ws();
 		let loc = crh.loc();
 		match crh.peek() {
 			Some(ch) if ch.is_ascii_alphabetic() => {
@@ -138,6 +144,7 @@ impl Tokenizer {
 				let (integer_string, word_loc) = self.pop_integer(crh);
 				(Tok::Integer(integer_string), word_loc)
 			}
+			// TODO: do !!!!!!!!!!
 			Some(ch) => {
 				crh.disc();
 				(Tok::InvalidCharacter(ch), loc)
@@ -163,15 +170,23 @@ impl Tokenizer {
 
 	fn word_to_tok(&self, word: String) -> Tok {
 		match &word[..] {
+			"np" => Tok::Kw(Kw::Np),
 			"pr" => Tok::Kw(Kw::Pr),
 			"nl" => Tok::Kw(Kw::Nl),
+			"do" => Tok::Kw(Kw::Do),
+			"dh" => Tok::Kw(Kw::Dh),
+			"fh" => Tok::Kw(Kw::Fh),
+			"ev" => Tok::Kw(Kw::Ev),
 			"if" => Tok::Kw(Kw::If),
 			"th" => Tok::Kw(Kw::Th),
 			"el" => Tok::Kw(Kw::El),
-			_ => Tok::Name {
-				string: word,
-				unstable_warning: word.len() == 2,
-			},
+			_ => {
+				let len = word.len();
+				Tok::Name {
+					string: word,
+					unstable_warning: len == 2,
+				}
+			}
 		}
 	}
 
