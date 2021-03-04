@@ -1,12 +1,30 @@
 
-TOKENIZER REVISION
-- produce comment tokens
-- attach a warning list to tokens
-- attach an error list to tokens
-- no more `Result`s, errors and warnings are attached to the tokens now
-
-PARSER REVISION
-- no more `Result`s, errors and warnings are dropped in the AST now
+STRING TREE STYLES REVISION
+- string tree may have named nodes that are printed like that:
+		program
+		├─if
+		│ │condition
+		│ ├─invalid
+		│ │then branch
+		│ ├─no then branch
+		│ │else branch
+		│ └─invalid
+		└─invalid
+	or
+		program
+		├─if
+		│ │┌condition
+		│ ├┴─invalid
+		│ │┌then branch
+		│ ├┴─no then branch
+		│ │┌else branch
+		│ └┴─invalid
+		└─invalid
+	or ohter styles,
+	actually it should be very customisable,
+	with the named node style being choosble from a list of styles
+	and with empty nodes being able to be disabled
+	and named nodes being able to be disabled
 
 AST REVISION
 - attach a warning list to nodes
@@ -14,6 +32,10 @@ AST REVISION
 
 PROGRAM REVISION
 - statements, expressions, chops and literals may be erroneous
+
+TODO
+- lp wh 1 ao bd dh {} sp dh {}
+- ev ,,, ,8 ,4 ,2
 
 #########################################################
 - display runtime errors nicely (embbed optionnal statement loc ?)
