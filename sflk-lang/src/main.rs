@@ -85,7 +85,7 @@ fn main() {
 		);
 	}
 
-	let mut mem = machine::Mem::new(settings.debug_mode);
+	//let mut mem = machine::Mem::new(settings.debug_mode);
 	/*
 	if let Some(root_filename) = settings.root_filename {
 		mem.exec_file(root_filename);
@@ -160,7 +160,7 @@ fn main() {
 			return;
 		}*/
 	};
-	log.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
+
 	if settings.debug_mode {
 		StringTree::from(&prog_node).print(&mut log);
 	}
@@ -173,6 +173,25 @@ fn main() {
 	));
 	let mut log = crate::log::IndentedLog::new();
 	let tree = StringTree::from(&ast);
+	let block_program = ast.unwrap().to_machine_block();
+	let mut mem = machine::Mem::new(settings.debug_mode);
+	mem.push_excx(machine::ExCx::new());
+	mem.exec_block_here(&block_program);
+	mem.pop_excx();
+
+	log.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
 	tree.print(&mut log);
-	log.print();
+	log.log_line(
+		String::from("\x1b[7mProgram execution\x1b[27m"),
+		styles::NORMAL,
+	);
+	if let Some(mem_log) = mem.debug_mode {
+		mem_log.print(&mut log);
+	} else {
+		panic!("h");
+	}
+	log.log_line(String::from("\x1b[7mProgram end\x1b[27m"), styles::NORMAL);
+	let mut string = String::new();
+	log.print(&mut string);
+	print!("{}", string);
 }

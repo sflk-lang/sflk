@@ -1,2 +1,4 @@
 
-pr "uwu\x(99b)\?" nl
+if 0 el dh {
+	pr "uwu\x(99b)\?" nl
+}

@@ -75,14 +75,14 @@ const INDENT_NORMAL: &str = "│";
 const INDENT_WEAK: &str = "╎";
 
 impl IndentedLog {
-	pub fn print(&self) {
+	pub fn print(&self, writer: &mut impl std::fmt::Write) {
 		let mut indents: Vec<Indent> = Vec::new();
 		let mut is_newline: bool = true;
 		for item in &self.items {
 			match item {
 				Item::IndentAdd { string, indent } => {
-					print_indents(&indents, Some(indent));
-					println!("{}{}{}", indent.style.0, string, indent.style.1);
+					print_indents(writer, &indents, Some(indent));
+					writeln!(writer, "{}{}{}", indent.style.0, string, indent.style.1);
 					is_newline = true;
 					indents.push(indent.clone());
 				}
@@ -95,9 +95,9 @@ impl IndentedLog {
 					style,
 				} => {
 					if is_newline {
-						print_indents(&indents, None);
+						print_indents(writer, &indents, None);
 					}
-					println!("{}{}{}", style.0, string, style.1);
+					writeln!(writer, "{}{}{}", style.0, string, style.1);
 					is_newline = true;
 				}
 				Item::String {
@@ -110,16 +110,16 @@ impl IndentedLog {
 					if let Some((end, lines)) = fragments.split_last() {
 						for line in lines {
 							if is_newline {
-								print_indents(&indents, None);
+								print_indents(writer, &indents, None);
 							}
-							println!("{}{}{}", style.0, line, style.1);
+							writeln!(writer, "{}{}{}", style.0, line, style.1);
 							is_newline = true;
 						}
 						if *end != "" {
 							if is_newline {
-								print_indents(&indents, None);
+								print_indents(writer, &indents, None);
 							}
-							print!("{}{}{}", style.0, end, style.1);
+							write!(writer, "{}{}{}", style.0, end, style.1);
 							is_newline = false;
 						}
 					}
@@ -129,7 +129,11 @@ impl IndentedLog {
 	}
 }
 
-fn print_indents(indents: &Vec<Indent>, add_start: Option<&Indent>) {
+fn print_indents(
+	writer: &mut impl std::fmt::Write,
+	indents: &Vec<Indent>,
+	add_start: Option<&Indent>,
+) {
 	let last_cx_index = match add_start {
 		Some(indent) if indent.is_context => indents.len(),
 		_ => indents
@@ -138,7 +142,8 @@ fn print_indents(indents: &Vec<Indent>, add_start: Option<&Indent>) {
 			.unwrap_or(0),
 	};
 	for indent in indents[..last_cx_index].iter() {
-		print!(
+		write!(
+			writer,
 			"{}{}{}",
 			indent.style.0,
 			if indent.is_context {
@@ -150,9 +155,17 @@ fn print_indents(indents: &Vec<Indent>, add_start: Option<&Indent>) {
 		);
 	}
 	for indent in indents[last_cx_index..].iter() {
-		print!("{}{}{}", indent.style.0, INDENT_NORMAL, indent.style.1);
+		write!(
+			writer,
+			"{}{}{}",
+			indent.style.0, INDENT_NORMAL, indent.style.1
+		);
 	}
 	if let Some(indent) = add_start {
-		print!("{}{}{}", indent.style.0, INDENT_START, indent.style.1);
+		write!(
+			writer,
+			"{}{}{}",
+			indent.style.0, INDENT_START, indent.style.1
+		);
 	}
 }

@@ -1,10 +1,12 @@
+use crate::object::Obj;
 use crate::parser2::ParsingWarning;
+use crate::program;
 use crate::scu::Loc;
 use crate::stringtree::StringTree;
 use crate::utils::{escape_string, styles};
 
 // TODO:
-// - move Loc here
+// - move Loc here, or not ?
 // - delete Located
 // - parser->program must become parser->ast->program
 
@@ -295,5 +297,173 @@ impl Treeable for Program {
 				.map(|stmt_node| StringTree::from(stmt_node))
 				.collect(),
 		)
+	}
+}
+
+impl Program {
+	pub fn to_machine_block(&self) -> program::Block {
+		program::Block {
+			stmts: self
+				.stmts
+				.iter()
+				.map(|stmt_node| stmt_node.content.to_machine_stmt())
+				.collect(),
+		}
+	}
+}
+
+impl Stmt {
+	fn is_invalid(&self) -> bool {
+		match self {
+			Stmt::Nop => false,
+			Stmt::Print { expr } => expr.content.is_invalid(),
+			Stmt::Newline => false,
+			Stmt::Assign { target, expr } => {
+				target.content.is_invalid() || expr.content.is_invalid()
+			}
+			Stmt::Evaluate { expr } => expr.content.is_invalid(),
+			Stmt::Do { expr } => expr.content.is_invalid(),
+			Stmt::DoHere { expr } => expr.content.is_invalid(),
+			Stmt::DoFileHere { expr } => expr.content.is_invalid(),
+			#[rustfmt::skip]
+			Stmt::If {
+				cond_expr,
+				th_stmt,
+				el_stmt,
+			} => {
+				cond_expr.content.is_invalid()
+					|| th_stmt
+						.as_ref()
+						.map(|stmt| (*stmt).content.is_invalid())
+						.unwrap_or(false)
+					|| el_stmt
+						.as_ref()
+						.map(|stmt| (*stmt).content.is_invalid())
+						.unwrap_or(false)
+			},
+			Stmt::Invalid => true,
+		}
+	}
+
+	fn to_machine_stmt(&self) -> program::Stmt {
+		match self {
+			Stmt::Nop => program::Stmt::Nop,
+			Stmt::Print { expr } => program::Stmt::Print {
+				expr: expr.content.to_machine_expr(),
+			},
+			Stmt::Newline => program::Stmt::Newline,
+			Stmt::Assign { target, expr } => program::Stmt::Assign {
+				varname: match &target.content {
+					TargetExpr::VariableName(varname) => varname.to_string(),
+					TargetExpr::Invalid => todo!(),
+				},
+				expr: expr.content.to_machine_expr(),
+			},
+			Stmt::Evaluate { expr } => program::Stmt::Evaluate {
+				expr: expr.content.to_machine_expr(),
+			},
+			Stmt::Do { expr } => program::Stmt::Do {
+				expr: expr.content.to_machine_expr(),
+			},
+			Stmt::DoHere { expr } => program::Stmt::DoHere {
+				expr: expr.content.to_machine_expr(),
+			},
+			Stmt::DoFileHere { expr } => program::Stmt::DoFileHere {
+				expr: expr.content.to_machine_expr(),
+			},
+			Stmt::If {
+				cond_expr,
+				th_stmt,
+				el_stmt,
+			} => program::Stmt::If {
+				cond_expr: cond_expr.content.to_machine_expr(),
+				th_stmt: th_stmt
+					.as_ref()
+					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+				el_stmt: el_stmt
+					.as_ref()
+					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+			},
+			Stmt::Invalid => program::Stmt::Invalid,
+		}
+	}
+}
+
+impl TargetExpr {
+	fn is_invalid(&self) -> bool {
+		match self {
+			TargetExpr::VariableName(_) => false,
+			TargetExpr::Invalid => true,
+		}
+	}
+}
+
+impl Expr {
+	fn is_invalid(&self) -> bool {
+		match self {
+			Expr::VariableName(varname) => false,
+			Expr::IntegerLiteral(integer_string) => false,
+			Expr::StringLiteral(string_string) => false,
+			Expr::BlockLiteral(stmts) => false,
+			Expr::Chain { init, chops } => {
+				(*init).content.is_invalid()
+					|| chops.iter().any(|chop| (*chop).content.is_invalid())
+			}
+			Expr::Invalid => true,
+		}
+	}
+
+	fn to_machine_expr(&self) -> program::Expr {
+		match self {
+			Expr::VariableName(varname) => program::Expr::Var {
+				varname: varname.to_string(),
+			},
+			Expr::IntegerLiteral(integer_string) => program::Expr::Const {
+				val: Obj::Integer(str::parse(&integer_string).expect("TODO: bigints")),
+			},
+			Expr::StringLiteral(string_string) => program::Expr::Const {
+				val: Obj::String(string_string.clone()),
+			},
+			Expr::BlockLiteral(stmts) => program::Expr::Const {
+				val: Obj::Block(program::Block {
+					stmts: stmts
+						.iter()
+						.map(|stmt_node| stmt_node.content.to_machine_stmt())
+						.collect(),
+				}),
+			},
+			Expr::Chain { init, chops } => program::Expr::Chain {
+				init_expr: Box::new(init.content.to_machine_expr()),
+				chops: chops
+					.iter()
+					.map(|chop_node| chop_node.content.to_machine_chop())
+					.collect(),
+			},
+			Expr::Invalid => unreachable!(),
+		}
+	}
+}
+
+impl Chop {
+	fn is_invalid(&self) -> bool {
+		match self {
+			Chop::Plus(expr) => expr.content.is_invalid(),
+			Chop::Minus(expr) => expr.content.is_invalid(),
+			Chop::Star(expr) => expr.content.is_invalid(),
+			Chop::Slash(expr) => expr.content.is_invalid(),
+			Chop::ToRight(expr) => expr.content.is_invalid(),
+			Chop::Invalid => true,
+		}
+	}
+
+	fn to_machine_chop(&self) -> program::Chop {
+		match self {
+			Chop::Plus(expr) => program::Chop::Plus(expr.content.to_machine_expr()),
+			Chop::Minus(expr) => program::Chop::Minus(expr.content.to_machine_expr()),
+			Chop::Star(expr) => program::Chop::Star(expr.content.to_machine_expr()),
+			Chop::Slash(expr) => program::Chop::Slash(expr.content.to_machine_expr()),
+			Chop::ToRight(expr) => program::Chop::ToRight(expr.content.to_machine_expr()),
+			Chop::Invalid => unreachable!(),
+		}
 	}
 }

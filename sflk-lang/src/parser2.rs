@@ -50,6 +50,16 @@ impl TokBuffer {
 		}
 	}
 
+	fn prepare_all(&mut self) {
+		loop {
+			self.toks_ahead
+				.push_back(self.tokenizer.pop_tok(&mut self.crh));
+			if matches!(self.toks_ahead.back().map(|t| &t.0), Some(Tok::Eof)) {
+				break;
+			}
+		}
+	}
+
 	fn peek(&mut self, n: usize) -> &(Tok, Loc) {
 		self.prepare_max_index(n);
 		&self.toks_ahead[n]

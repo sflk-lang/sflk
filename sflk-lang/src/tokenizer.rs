@@ -1,6 +1,4 @@
 use crate::scu::{Loc, SourceCodeUnit};
-use crate::utils::{escape_string, styles};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug)]

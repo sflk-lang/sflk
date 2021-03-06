@@ -1,4 +1,7 @@
 
+BEFORE EVERYTHING ELSE
+- clean up everything !!!!
+
 STRING TREE STYLES REVISION
 - string tree may have named nodes that are printed like that:
 		program
@@ -28,10 +31,14 @@ STRING TREE STYLES REVISION
 
 AST REVISION
 - attach a warning list to nodes
-- nodes may have erroneous variants describing the error
+- nodes may have erroneous variants *describing the error*
 
 PROGRAM REVISION
 - statements, expressions, chops and literals may be erroneous
+
+DEBUG REVISION
+- see the tokens
+- see the indented log of token reading and AST building
 
 TODO
 - lp wh 1 ao bd dh {} sp dh {}
