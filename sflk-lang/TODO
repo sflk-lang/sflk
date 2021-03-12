@@ -1,6 +1,7 @@
 
 BEFORE EVERYTHING ELSE
 - clean up everything !!!!
+- put the file execution in the machine as it was the case before the changes
 
 STRING TREE STYLES REVISION
 - string tree may have named nodes that are printed like that:
@@ -35,19 +36,72 @@ AST REVISION
 
 PROGRAM REVISION
 - statements, expressions, chops and literals may be erroneous
+- errors should carry information about the nature of the errors
 
 DEBUG REVISION
 - see the tokens
 - see the indented log of token reading and AST building
 
-TODO
+ADD SIGNALS
+- a signal has a type that defines the signal behavior and the payload type
+- a signal type can go either up or down
+- a signal going down can either
+	draw a path or
+	destroy every node of the call tree on its way
+- a signal going up must follow a path and consume it
+- a signal takes the instruction pointer with it
+- there are some built-in signal types
+	- print object, print newline, 
+	- warning, error, halt
+	- input
+	- read variable (maybe?), write variable (maybe?)
+	- and every "going up" variants
+	- etc.
+- the call stack is actually an execution tree, with the root at the bottom
+- a node of the execution tree is an execution context
+- signals travel along this tree
+- if a node wants to, it may catch some types of signals passing through it
+	- such catching is actually executing a code block with v as the signal
+	- such an execution may result in a new temporary subtree (on the right)
+	- it may result in anything, including
+		letting the original signal go where it was originally going, or
+		sending an other signal, or
+		not sending a signal, or
+		destroying subtrees of the execution tree, or
+		anything else, including a combination of the above examples, but
+		in any case, the preperties below are to be respected
+			this is enforced by the interpreter no matter what
+	- it may itself send unrelated signals
+		it will pop new new temporary subtrees (on the right)
+- due to all this, some properties of the execution tree can be deduced
+	- for a non-right-most node to exist, a path must lead to or go through it
+	- maybe others properties i haven't found yet
+- every interaction with outside of the interpreter is done at the root
+	- I/O, file manipulation, physical device, network, OS, etc.
+	- using signals is the only way for a program to perform such actions
+		a print statement sends a print signal carrying the object to print
+		the signal goes downward eventually reaching the root (if not caught)
+		then the root performs the printing and sends an other signal
+		following the path left by the prnting signal
+		up to the execution context that emitted the print signal
+		and the execution continues as if the print statement just printed
+	- this ensures that every SFLK program is completely sandboxable
+		- a node of the execution tree may imitate the behavior of the root
+			from the point of view of its subtrees
+
+ADD GLOBALS
+- define how it must work
+
+ADD STATEMENTS AND EXPRESSIONS AND TYPES
 - lp wh 1 ao bd dh {} sp dh {}
+	- add statement extensions to allow having the iteration number
+	- add statement extensions to iter over collections
 - ev ,,, ,8 ,4 ,2
+- if tr th pr "true" if fa el pr "false"
 
 #########################################################
+IDEAS
 - display runtime errors nicely (embbed optionnal statement loc ?)
-- display parsed tree even in case of a parsing error
-- display indented_log even in case of a runtime error
 - be able to display warning
 - modular parser ?
 - lib build target for integration in the language server
@@ -58,18 +112,10 @@ TODO
 - debug repl commands can be used in the code with prefix $$
 - normal repl
 - read and write to variables of other contexts with more precision
-- good loop and conditional syntaxes
 - bock *call* syntax (or not ?)
 - @ is now the current cx (or not ?)
 - maybe merge
-- globals
 - types, conersions
 - lazy expressions
 - signals (print is a signal going down the stack, input goes up, etc.)
 - make runtime objects embed their trace
-- call stack is actually a tree
-	- signals going downward leave a way up the tree
-	- signals going upward follow a way up the tree, consuming it
-	- printing is a signal
-	- reading input is a signal
-	- reading and writing may be signals

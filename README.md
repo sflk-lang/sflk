@@ -1,4 +1,4 @@
-<img src="/logo/sflk-logo-color.svg" align="right" width="300" alt="SFLK logo" />
+<img src="/logo/sflk-logo-color.svg" align="right" width="20%" alt="SFLK logo" />
 
 # SFLK programming language
 
@@ -6,73 +6,62 @@ The language is very unstable as it is still in very early development.
 The examples provided here may not be accurate.
 
 ```sflk
-uwu < "o"
-uwu < uwu + "wo"
-pr uwu # prints owo # nl
+# Comments are blocks delimited by hashes. #
 ```
+
+There is no statement separator
+and whitespace is not significant.
 
 ```sflk
-pr  3  - (1  +  1) # prints 1 # nl
-pr (3  -  1) +  1  # prints 3 # nl
-pr  3  -  1  +  1  # prints 3 # nl
-# default is ((( ) ) ) #
+pr "uwu" nl
 ```
+
+These are two statements:
+a print statement that is the `pr` keyword and an expression
+and a newline statement that only consists of the `nl` keyword.
 
 ```sflk
-f < {
-    x < 2
-    pr x + 2 # prints 4 # nl
-}
-do f
-do { pr "uwu" # prints uwu # nl }
+     pr
+"uwu"nl
 ```
+
+These are exactly the same as above.
+
+`"uwu"` is a string literal that get parsed to a string object.
+There are other types, although more are coming soon.
 
 ```sflk
-pr "u" + ("wu" * 3) # prints uwuwuwu # nl
-pr "lalala" / "la"  # prints 3 # nl
-pr (100/10) - (2*5) # prints 0 # nl
-pr  100/10  -  2*5  # prints 40 # nl
-# operations are computed from left to right #
+ev 8 # Integer type. #
+ev {pr "uwu" nl} # Code block type. #
+# Boolean type is coming soon. #
+# List type is coming soon. #
 ```
+
+The evaluation statement consists of the keyword `ev` and an expression.
+It evaluates the expression.
+Note that the line introducing the code block doesn't prints "uwu" because
+evaluating the code block literal expression only create the code block object
+and doesn't execute it. The do statement does.
 
 ```sflk
-x <~ 9 # assign only if x is free #
-pr x pr " "
-x < x -1
-if x redo 0 # 0 is the current execution context #
-nl
-# prints 9 8 7 6 5 4 3 2 1 #
+do {pr "uwu" nl}
 ```
+
+Code blocks are objects, and like any other objects they can be values assigned
+to variables.
 
 ```sflk
-x <~ 4 do {
-    imp 1 # import variables from 1 context below #
-        pr x pr " "
-        x < x -1
-    exp 1 # export variables to 1 context below #
-} if x redo 0
-# prints numbers from 4 down to 1 #
+x < {pr "u"}
+y < {pr "w"}
+do x + y + x + {nl} # Prints the string "uwu" and a newline. #
 ```
 
-```sflk
-f < { pr "uwu" pr " " }
-g < { pr "owo" nl }
-do f + g # prints what you want to belive it prints ^^ #
-```
+Assignment statement begins with a target (assign to what),
+then the statement operator `<`, and then an expression.
+Code blocks can be concatenated with the `+` binary operator.
 
-```sflk
-n < 9
-b < { imp 1 x <~ n pr x x < x -1 exp 1 }
-do b * n # prints 987654321 # nl
-```
+Note that `{pr} + {"uwu"}` doesn't evaluate to the code block `{pr "uwu"}`,
+as the blocks are created before being concatenated and concatenation doesn't
+try to merge incomplete statements together into a valid statement.
 
-```sflk
-x < 1
-if x (pr "uwu " pr x nl) # prints uwu 1 #
-f < {pr v *10 nl}
-ev 8 >{pr v nl} -4 >f # print 8 and then 40 #
-```
-
-It has assignments, `+`, `-`, strings, integers, prints, parenthesis, comments,
-first class code blocks, `*`, `/`, assignments if free, loops, nops.
-And more is comming soon!
+TODO: write about expressions, chains, chops, operations on strings, and `>`.
