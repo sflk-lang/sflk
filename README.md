@@ -1,7 +1,6 @@
+<img src="/logo/sflk-logo-color.svg" align="right" width="20%" alt="SFLK logo" />
 
 # SFLK programming language
-
-<img src="/logo/sflk-logo-color.svg"align="right"width="20%"alt="SFLK logo" />
 
 ## Introduction
 
@@ -14,7 +13,7 @@ Enjoy!
 ## Presentation
 
 The language is very unstable as it is still in very early development.
-The examples provided here may not be accurate.
+What is written here may not be accurate.
 
 ```sflk
 # Comments are blocks delimited by hashes #
@@ -127,9 +126,9 @@ the evaluation of which is printed without trailing newline.
 The *newline* statement consists of the `nl` keyword and prints a newline
 character.
 
-### Evaluation
+### Evaluate
 
-The *evaluation* statement consists of the `ev` keyword followed by an
+The *evaluate* statement consists of the `ev` keyword followed by an
 expression, which is evaluated. The result of the evaluation is discarded.
 It is to be noted that an expression evaluation may have intended side effects.
 
@@ -155,12 +154,18 @@ The optional *then* extension's statement is called the *then branch*, and
 the optional *else* extension's statement is called the *else branch*.
 
 The expression is evaluated. If it was evaluated in a truthy value,
-then executes the then branch if it exists,
-else executes the else branch if it exists.
+then the *then branch* is executed if it exists,
+else the *else branch* is executed if it exists.
+
+### Assign
+
+The *assign* statement consists of a target (like a variable name) flollowed by
+a *to left statement operator* `<` followed by an expression.
+The expession is evaluated and the target is assigned the result.
 
 ## Binary operators
 
-### Plus (+)
+### Plus `+`
 
 | accumulator type | right type | effect
 |:----------------:|:----------:| ------
@@ -168,13 +173,13 @@ else executes the else branch if it exists.
 | string           | string     | String concatenation
 | code block       | code block | Code block concatenation
 
-### Minus (-)
+### Minus `-`
 
 | accumulator type | right type | effect
 |:----------------:|:----------:| ------
 | integer          | integer    | Arithmetic substraction
 
-### Star (*)
+### Star `*`
 
 | accumulator type | right type | effect
 |:----------------:|:----------:| ------
@@ -182,15 +187,24 @@ else executes the else branch if it exists.
 | string           | integer    | String repetition
 | code block       | integer    | Code block repetition
 
-### Slash (/)
+### Slash `/`
 
 | accumulator type | right type | effect
 |:----------------:|:----------:| ------
 | integer          | integer    | Arithmetic euclidean division
 | string           | string     | Count non-overlaping occurences of right in left
 
-### To right (>)
+### To right `>`
 
 | accumulator type | right type | effect
 |:----------------:|:----------:| ------
 | any type         | code block | Execute right with left as `v`, then sets to `v`
+
+# Contribute
+
+If you want to contribute in any way, please feel free to do so ^^.
+
+Note that there is a Discord server dedicated to
+the *development and use* of SFLK
+(how to get in there? we don't know haha,
+maybe ask an invite some way or something).

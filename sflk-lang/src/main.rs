@@ -146,6 +146,7 @@ fn main() {
 
 	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 	let mut parser = Parser::new();
+	/*
 	let prog_node = match parser.parse_program(&mut tfr) {
 		prog_node => prog_node,
 		/*Err(parsing_error) => {
@@ -159,7 +160,8 @@ fn main() {
 			log.print();
 			return;
 		}*/
-	};
+	};*/
+	let prog_node = parser.parse_program(&mut tfr);
 
 	if settings.debug_mode {
 		StringTree::from(&prog_node).print(&mut log);

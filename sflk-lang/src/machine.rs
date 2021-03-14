@@ -177,7 +177,6 @@ impl Mem {
 		self.exec_prog_here(&prog);
 		self.log_line(String::from("\x1b[7mProgram end\x1b[27m"), styles::NORMAL);
 		*/
-		todo!()
 	}
 
 	fn exec_prog_here(&mut self, prog: &Prog) {

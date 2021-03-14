@@ -3,6 +3,10 @@ BEFORE EVERYTHING ELSE
 - clean up everything !!!!
 - put the file execution in the machine as it was the case before the changes
 
+COMMENTS
+- comments may start and end with the same number of consecutive hashes
+- any other number of consecutive hashes in the comment doesn't end it
+
 STRING TREE STYLES REVISION
 - string tree may have named nodes that are printed like that:
 		program
@@ -99,8 +103,11 @@ ADD STATEMENTS AND EXPRESSIONS AND TYPES
 - ev ,,, ,8 ,4 ,2
 - if tr th pr "true" if fa el pr "false"
 
+ADD A REPL
+- add a repl
+
 #########################################################
-IDEAS
+VAGUE IDEAS
 - display runtime errors nicely (embbed optionnal statement loc ?)
 - be able to display warning
 - modular parser ?
@@ -110,12 +117,9 @@ IDEAS
 	(or not ?)
 - breakpoints that open a debug repl
 - debug repl commands can be used in the code with prefix $$
-- normal repl
 - read and write to variables of other contexts with more precision
 - bock *call* syntax (or not ?)
 - @ is now the current cx (or not ?)
-- maybe merge
-- types, conersions
+- types, conversions
 - lazy expressions
-- signals (print is a signal going down the stack, input goes up, etc.)
 - make runtime objects embed their trace
