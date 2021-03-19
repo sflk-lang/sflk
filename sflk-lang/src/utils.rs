@@ -2,6 +2,7 @@ pub type Style = (&'static str, &'static str);
 
 pub mod styles {
 	pub const NORMAL: super::Style = ("", "");
+	pub const NEGATIVE: super::Style = ("\x1b[7m", "\x1b[27m");
 	pub const CYAN: super::Style = ("\x1b[36m", "\x1b[39m");
 	pub const YELLOW: super::Style = ("\x1b[33m", "\x1b[39m");
 	pub const BLUE: super::Style = ("\x1b[34m", "\x1b[39m");

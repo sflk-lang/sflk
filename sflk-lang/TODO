@@ -46,6 +46,13 @@ DEBUG REVISION
 - see the tokens
 - see the indented log of token reading and AST building
 
+REFACTOR THE CALL STACK
+- the call stack is an exec tree (see ADD SIGNALS)
+- each node has an instruction pointer and a code block
+- groups of nodes share contexts
+- some nodes have a context
+- todo...
+
 ADD SIGNALS
 - a signal has a type that defines the signal behavior and the payload type
 - a signal type can go either up or down

@@ -30,6 +30,10 @@ impl<T> Node<T> {
 	pub fn unwrap(self) -> T {
 		self.content
 	}
+
+	pub fn unwrap_ref(&self) -> &T {
+		&self.content
+	}
 }
 
 struct Comments {

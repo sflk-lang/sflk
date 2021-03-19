@@ -19,8 +19,8 @@ What is written here may not be accurate.
 # Comments are blocks delimited by hashes #
 ```
 
-There is no statement separator
-and whitespace is not significant.
+There is no statement separator and whitespace is not significant.
+If one is to indent, one is encourged to use the indentation method one loves.
 
 ```sflk
 pr "uwu" nl
@@ -108,7 +108,7 @@ ev 4 +4 >{v<5} >{v<v+2} >print
 #  4  8      5        7      7 #
 ```
 
-Bellow is a list of operators and their effects on different types.
+There is a list of operators and their effects on different types down below.
 
 ## Statements
 

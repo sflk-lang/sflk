@@ -49,20 +49,66 @@ enum Flow {
 	End,
 }
 
+pub struct DebugMem {
+	pub log: IndentedLog,
+}
+
+impl DebugMem {
+	fn new() -> DebugMem {
+		DebugMem {
+			log: IndentedLog::new(),
+		}
+	}
+}
+
 pub struct Mem {
 	excx_stack: Vec<ExCx>,
-	pub debug_mode: Option<IndentedLog>,
+	pub debug_mem_opt: Option<DebugMem>,
 }
 
 impl Mem {
 	pub fn new(is_debug_mode: bool) -> Mem {
 		Mem {
 			excx_stack: Vec::new(),
-			debug_mode: if is_debug_mode {
-				Some(IndentedLog::new())
+			debug_mem_opt: if is_debug_mode {
+				Some(DebugMem::new())
 			} else {
 				None
 			},
+		}
+	}
+}
+
+impl DebugMem {
+	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
+		self.log.indent(string, is_context, style);
+	}
+
+	fn log_deindent(&mut self) {
+		self.log.deindent();
+	}
+
+	fn log_line(&mut self, string: String, style: Style) {
+		self.log.log_line(string, style);
+	}
+}
+
+impl Mem {
+	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem.log_indent(string, is_context, style);
+		}
+	}
+
+	fn log_deindent(&mut self) {
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem.log_deindent();
+		}
+	}
+
+	fn log_line(&mut self, string: String, style: Style) {
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem.log_line(string, style);
 		}
 	}
 }
@@ -115,26 +161,6 @@ impl Mem {
 }
 
 impl Mem {
-	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
-		if let Some(indented_log) = &mut self.debug_mode {
-			indented_log.indent(string, is_context, style);
-		}
-	}
-
-	fn log_deindent(&mut self) {
-		if let Some(indented_log) = &mut self.debug_mode {
-			indented_log.deindent();
-		}
-	}
-
-	fn log_line(&mut self, string: String, style: Style) {
-		if let Some(indented_log) = &mut self.debug_mode {
-			indented_log.log_line(string, style);
-		}
-	}
-}
-
-impl Mem {
 	pub fn exec_file(&mut self, filename: String) {
 		self.push_excx(ExCx::new());
 		self.exec_file_here(filename);
@@ -166,8 +192,8 @@ impl Mem {
 			}
 		};
 		self.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
-		if let Some(_) = self.debug_mode {
-			StringTree::from(&prog).print(self.debug_mode.as_mut().unwrap());
+		if let Some(_) = self.debug_mem_opt {
+			StringTree::from(&prog).print(self.debug_mem_opt.as_mut().unwrap());
 		}
 
 		self.log_line(
@@ -177,6 +203,26 @@ impl Mem {
 		self.exec_prog_here(&prog);
 		self.log_line(String::from("\x1b[7mProgram end\x1b[27m"), styles::NORMAL);
 		*/
+
+		use std::rc::Rc;
+
+		let scu = Rc::new(crate::scu::SourceCodeUnit::from_filename(&filename));
+		let mut tfr =
+			crate::parser2::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
+
+		let mut parser = crate::parser2::Parser::new();
+		let ast = parser.parse_program(&mut tfr);
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem
+				.log
+				.log_line(String::from("Program tree"), styles::NEGATIVE);
+			crate::stringtree::StringTree::from(&ast).print(&mut debug_mem.log);
+		}
+		let block_program = ast.unwrap_ref().to_machine_block();
+
+		self.log_line(String::from("Program execution"), styles::NEGATIVE);
+		self.exec_block_here(&block_program);
+		self.log_line(String::from("Program end"), styles::NEGATIVE);
 	}
 
 	fn exec_prog_here(&mut self, prog: &Prog) {
@@ -231,7 +277,7 @@ impl Mem {
 			Stmt::Print { expr } => {
 				self.log_indent(String::from("print"), false, styles::NORMAL);
 				let val = self.eval_expr(expr);
-				if let Some(_) = self.debug_mode {
+				if let Some(_) = self.debug_mem_opt {
 					self.log_line(format!("output {}", val), styles::NORMAL);
 				} else {
 					match val {
@@ -244,7 +290,7 @@ impl Mem {
 			}
 			Stmt::Newline => {
 				self.log_indent(String::from("newline"), false, styles::NORMAL);
-				if let Some(_) = self.debug_mode {
+				if let Some(_) = self.debug_mem_opt {
 					self.log_line(String::from("output newline"), styles::NORMAL);
 				} else {
 					println!("");
