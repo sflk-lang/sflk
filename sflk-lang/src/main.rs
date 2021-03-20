@@ -3,7 +3,6 @@ mod log;
 mod machine;
 mod object;
 mod parser;
-mod parser2;
 mod program;
 mod scu;
 mod stringtree;
@@ -88,8 +87,6 @@ fn main() {
 	let mut mem = machine::Mem::new(settings.debug_mode);
 	mem.exec_file(settings.root_filename.unwrap());
 	if let Some(debug_mem) = mem.debug_mem_opt {
-		let mut string = String::new();
-		debug_mem.log.print(&mut string);
-		print!("{}", string);
+		debug_mem.log.print_to_stdout();
 	}
 }

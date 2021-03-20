@@ -1,4 +1,4 @@
-use crate::utils::{styles, Style};
+use crate::utils::{styles, StdoutWriter, Style};
 
 pub struct IndentedLog {
 	items: Vec<Item>,
@@ -50,6 +50,12 @@ impl std::fmt::Write for IndentedLog {
 	}
 }
 
+impl IndentedLog {
+	pub fn print_to_stdout(&self) {
+		self.print(&mut StdoutWriter::new());
+	}
+}
+
 #[derive(Debug)]
 enum Item {
 	IndentAdd {
@@ -82,7 +88,8 @@ impl IndentedLog {
 			match item {
 				Item::IndentAdd { string, indent } => {
 					print_indents(writer, &indents, Some(indent));
-					writeln!(writer, "{}{}{}", indent.style.0, string, indent.style.1);
+					writeln!(writer, "{}{}{}", indent.style.0, string, indent.style.1)
+						.expect("TODO");
 					is_newline = true;
 					indents.push(indent.clone());
 				}
@@ -97,7 +104,7 @@ impl IndentedLog {
 					if is_newline {
 						print_indents(writer, &indents, None);
 					}
-					writeln!(writer, "{}{}{}", style.0, string, style.1);
+					writeln!(writer, "{}{}{}", style.0, string, style.1).expect("TODO");
 					is_newline = true;
 				}
 				Item::String {
@@ -112,14 +119,14 @@ impl IndentedLog {
 							if is_newline {
 								print_indents(writer, &indents, None);
 							}
-							writeln!(writer, "{}{}{}", style.0, line, style.1);
+							writeln!(writer, "{}{}{}", style.0, line, style.1).expect("TODO");
 							is_newline = true;
 						}
 						if *end != "" {
 							if is_newline {
 								print_indents(writer, &indents, None);
 							}
-							write!(writer, "{}{}{}", style.0, end, style.1);
+							write!(writer, "{}{}{}", style.0, end, style.1).expect("TODO");
 							is_newline = false;
 						}
 					}
@@ -152,20 +159,23 @@ fn print_indents(
 				INDENT_WEAK
 			},
 			indent.style.1
-		);
+		)
+		.expect("TODO");
 	}
 	for indent in indents[last_cx_index..].iter() {
 		write!(
 			writer,
 			"{}{}{}",
 			indent.style.0, INDENT_NORMAL, indent.style.1
-		);
+		)
+		.expect("TODO");
 	}
 	if let Some(indent) = add_start {
 		write!(
 			writer,
 			"{}{}{}",
 			indent.style.0, INDENT_START, indent.style.1
-		);
+		)
+		.expect("TODO");
 	}
 }

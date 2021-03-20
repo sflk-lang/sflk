@@ -2,8 +2,6 @@ use crate::object::Obj;
 use crate::stringtree::StringTree;
 use crate::utils::styles;
 
-pub type Prog = Block;
-
 #[derive(Debug, Clone)]
 pub struct Block {
 	pub stmts: Vec<Stmt>,
@@ -52,11 +50,6 @@ pub enum Stmt {
 		varname: String,
 		expr: Expr,
 	},
-	/*
-	AssignIfFree {
-		varname: String,
-		expr: Expr,
-	},*/
 	Do {
 		expr: Expr,
 	},
@@ -69,24 +62,6 @@ pub enum Stmt {
 	Evaluate {
 		expr: Expr,
 	},
-	/*
-	Imp {
-		expr: Expr,
-	},
-	Exp {
-		expr: Expr,
-	},
-	Redo {
-		expr: Expr,
-	},
-	End {
-		expr: Expr,
-	},
-	If {
-		cond_expr: Expr,
-		if_stmt: Box<Stmt>,
-		el_stmt: Option<Box<Stmt>>,
-	},*/
 	If {
 		cond_expr: Expr,
 		th_stmt: Option<Box<Stmt>>,
@@ -110,12 +85,6 @@ impl From<&Stmt> for StringTree {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			/*
-			Stmt::AssignIfFree { varname, expr } => StringTree::new_node(
-				format!("assign if free to variable {}", varname),
-				styles::NORMAL,
-				vec![StringTree::from(expr)],
-			),*/
 			Stmt::Do { expr } => StringTree::new_node(
 				String::from("do"),
 				styles::NORMAL,
@@ -136,27 +105,6 @@ impl From<&Stmt> for StringTree {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			/*
-			Stmt::Imp { expr } => StringTree::new_node(
-				String::from("imp"),
-				styles::NORMAL,
-				vec![StringTree::from(expr)],
-			),
-			Stmt::Exp { expr } => StringTree::new_node(
-				String::from("exp"),
-				styles::NORMAL,
-				vec![StringTree::from(expr)],
-			),
-			Stmt::Redo { expr } => StringTree::new_node(
-				String::from("redo"),
-				styles::NORMAL,
-				vec![StringTree::from(expr)],
-			),
-			Stmt::End { expr } => StringTree::new_node(
-				String::from("end"),
-				styles::NORMAL,
-				vec![StringTree::from(expr)],
-			),*/
 			Stmt::If {
 				cond_expr,
 				th_stmt,
@@ -208,45 +156,6 @@ impl From<&Expr> for StringTree {
 		}
 	}
 }
-
-/*
-#[derive(Debug, Clone)]
-pub struct Chop {
-	pub op: Op,
-	pub expr: Expr,
-}
-
-impl From<&Chop> for StringTree {
-	fn from(chop: &Chop) -> StringTree {
-		StringTree::new_node(
-			format!("chop {}", chop.op),
-			styles::NORMAL,
-			vec![StringTree::from(&chop.expr)],
-		)
-	}
-}
-
-#[derive(Debug, Clone)]
-pub enum Op {
-	Plus,
-	Minus,
-	Star,
-	Slash,
-	ToRight,
-}
-
-impl std::fmt::Display for Op {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Op::Plus => write!(f, "plus"),
-			Op::Minus => write!(f, "minus"),
-			Op::Star => write!(f, "star"),
-			Op::Slash => write!(f, "slash"),
-			Op::ToRight => write!(f, "to right"),
-		}
-	}
-}
-*/
 
 #[derive(Debug, Clone)]
 pub enum Chop {

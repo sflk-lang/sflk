@@ -1,7 +1,6 @@
 use crate::log::IndentedLog;
 use crate::object::Obj;
-use crate::program::{Block, Chop, Expr, Prog, Stmt};
-use crate::scu::Located;
+use crate::program::{Block, Chop, Expr, Stmt};
 use crate::utils::{styles, Style};
 use std::collections::HashMap;
 
@@ -24,16 +23,14 @@ impl Cx {
 	}
 }
 
-// TODO: remove pub
-pub struct ExCx {
+struct ExCx {
 	cx: Cx,
 	i: Vec<usize>,
 	flow: Flow,
 }
 
 impl ExCx {
-	// TODO: remove pub
-	pub fn new() -> ExCx {
+	fn new() -> ExCx {
 		ExCx {
 			cx: Cx::new(),
 			i: Vec::new(),
@@ -114,13 +111,11 @@ impl Mem {
 }
 
 impl Mem {
-	// TODO: remove pub
-	pub fn push_excx(&mut self, excx: ExCx) {
+	fn push_excx(&mut self, excx: ExCx) {
 		self.excx_stack.push(excx);
 	}
 
-	// TODO: remove pub
-	pub fn pop_excx(&mut self) -> ExCx {
+	fn pop_excx(&mut self) -> ExCx {
 		self.excx_stack.pop().unwrap()
 	}
 
@@ -168,49 +163,11 @@ impl Mem {
 	}
 
 	fn exec_file_here(&mut self, filename: String) {
-		/*
-		use crate::parser::ProgReadingHead;
-		use crate::scu::SourceCodeUnit;
-		use crate::stringtree::StringTree;
-		use crate::tokenizer::TokReadingHead;
-		use std::rc::Rc;
-
-		let scu = Rc::new(SourceCodeUnit::from_filename(&filename));
-
-		let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
-		let prog = match prh.parse_prog() {
-			Ok(located_porg) => located_porg.unwrap(),
-			Err(parsing_error) => {
-				self.log_line(
-					format!(
-						"\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}",
-						parsing_error
-					),
-					styles::NORMAL,
-				);
-				return;
-			}
-		};
-		self.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
-		if let Some(_) = self.debug_mem_opt {
-			StringTree::from(&prog).print(self.debug_mem_opt.as_mut().unwrap());
-		}
-
-		self.log_line(
-			String::from("\x1b[7mProgram execution\x1b[27m"),
-			styles::NORMAL,
-		);
-		self.exec_prog_here(&prog);
-		self.log_line(String::from("\x1b[7mProgram end\x1b[27m"), styles::NORMAL);
-		*/
-
-		use std::rc::Rc;
-
-		let scu = Rc::new(crate::scu::SourceCodeUnit::from_filename(&filename));
+		let scu = std::rc::Rc::new(crate::scu::SourceCodeUnit::from_filename(&filename));
 		let mut tfr =
-			crate::parser2::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
+			crate::parser::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
 
-		let mut parser = crate::parser2::Parser::new();
+		let mut parser = crate::parser::Parser::new();
 		let ast = parser.parse_program(&mut tfr);
 		if let Some(debug_mem) = &mut self.debug_mem_opt {
 			debug_mem
@@ -223,10 +180,6 @@ impl Mem {
 		self.log_line(String::from("Program execution"), styles::NEGATIVE);
 		self.exec_block_here(&block_program);
 		self.log_line(String::from("Program end"), styles::NEGATIVE);
-	}
-
-	fn exec_prog_here(&mut self, prog: &Prog) {
-		self.exec_block_here(prog as &Block);
 	}
 
 	fn exec_stmts_here(&mut self, stmts: &Vec<Stmt>) {
@@ -308,25 +261,6 @@ impl Mem {
 				);
 				self.log_deindent();
 			}
-			/*
-			Stmt::AssignIfFree { varname, expr } => {
-				self.log_indent(String::from("assign if free"), false, styles::NORMAL);
-				self.log_line(format!("to variable {}", varname), styles::NORMAL);
-				let val = self.eval_expr(expr);
-				let was_free = self.varset_if_free(varname, val);
-				if was_free {
-					self.log_line(
-						format!("now variable {} is {}", varname, self.varget(varname)),
-						styles::NORMAL,
-					);
-				} else {
-					self.log_line(
-						format!("variable {} was already {}", varname, self.varget(varname)),
-						styles::NORMAL,
-					);
-				}
-				self.log_deindent();
-			}*/
 			Stmt::Do { expr } => {
 				self.log_indent(String::from("do"), true, styles::BOLD_LIGHT_RED);
 				match self.eval_expr(expr) {
@@ -356,45 +290,6 @@ impl Mem {
 				self.eval_expr(expr);
 				self.log_deindent();
 			}
-			/*
-			Stmt::Imp { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("imp"), false, styles::NORMAL);
-					let cx_to_import = self.excx(integer as usize).cx.clone();
-					self.log_line(format!("import from excx {}", integer), styles::NORMAL);
-					self.excx_mut(0).cx.import(cx_to_import);
-					self.log_deindent();
-				}
-				invalid_obj => panic!("imp expected integer but found {}", invalid_obj),
-			},
-			Stmt::Exp { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("exp"), false, styles::NORMAL);
-					let cx_to_export = self.excx(0).cx.clone();
-					self.log_line(format!("export to excx {}", integer), styles::NORMAL);
-					self.excx_mut(integer as usize).cx.import(cx_to_export);
-					self.log_deindent();
-				}
-				invalid_obj => panic!("exp expected integer but found {}", invalid_obj),
-			},
-			Stmt::Redo { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("redo"), false, styles::NORMAL);
-					self.log_line(format!("redo excx {}", integer), styles::NORMAL);
-					self.excx_mut(integer as usize).flow = Flow::Restart;
-					self.log_deindent();
-				}
-				invalid_obj => panic!("redo expected integer but found {}", invalid_obj),
-			},
-			Stmt::End { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("end"), false, styles::NORMAL);
-					self.log_line(format!("end excx {}", integer), styles::NORMAL);
-					self.excx_mut(integer as usize).flow = Flow::End;
-					self.log_deindent();
-				}
-				invalid_obj => panic!("end expected integer but found {}", invalid_obj),
-			},*/
 			Stmt::If {
 				cond_expr,
 				th_stmt,
@@ -454,39 +349,6 @@ impl Mem {
 	}
 
 	fn apply_chop(&mut self, val: &mut Obj, chop: &Chop) {
-		/*
-		let right = self.eval_expr(&chop.expr);
-		match &chop.op {
-			Op::ToRight => {
-				self.log_indent(String::from("chop to right"), true, styles::BOLD_LIGHT_RED);
-				match right {
-					Obj::Block(block) => {
-						let mut excx = ExCx::new();
-						excx.cx.varmap.insert("v".to_string(), val.clone());
-						excx = self.exec_block_excx(&block, excx);
-						if let Some(v_value) = excx.cx.varmap.get("v") {
-							*val = v_value.to_owned();
-						}
-					}
-					invalid_obj => panic!("can't do {} for now", invalid_obj),
-				}
-				self.log_deindent();
-			}
-			op => {
-				self.log_indent(String::from("chop"), false, styles::NORMAL);
-				self.log_line(format!("op {}", chop.op), styles::NORMAL);
-				self.log_line(format!("value {}", right), styles::NORMAL);
-				match op {
-					Op::Plus => val.plus(right),
-					Op::Minus => val.minus(right),
-					Op::Star => val.star(right),
-					Op::Slash => val.slash(right),
-					_ => unreachable!(),
-				}
-				self.log_deindent();
-			}
-		}
-		*/
 		match chop {
 			Chop::Plus(expr) => {
 				self.log_indent(String::from("chop plus"), false, styles::NORMAL);
