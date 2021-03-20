@@ -103,12 +103,18 @@ ADD SIGNALS
 ADD GLOBALS
 - define how it must work
 
+ADD GROUP STATEMENTS
+- a group of statements between ( ) are treated as a single statement
+- ( ... ) is kind of equivalent to dh{ ... } but only kind of
+- putting a single statement between ( ) can be useful (nested ifs, lps, etc.)
+
 ADD STATEMENTS AND EXPRESSIONS AND TYPES
 - lp wh 1 ao bd dh {} sp dh {}
 	- add statement extensions to allow having the iteration number
 	- add statement extensions to iter over collections
 - ev ,,, ,8 ,4 ,2
 - if tr th pr "true" if fa el pr "false"
+- ... # pr "(Doing stuff at line n...)" nl #
 
 ADD A REPL
 - add a repl

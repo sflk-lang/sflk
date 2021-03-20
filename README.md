@@ -157,11 +157,24 @@ The expression is evaluated. If it was evaluated in a truthy value,
 then the *then branch* is executed if it exists,
 else the *else branch* is executed if it exists.
 
+Example:
+```sflk
+if x
+th pr "true"
+el pr "false"
+```
+
 ### Assign
 
 The *assign* statement consists of a target (like a variable name) flollowed by
 a *to left statement operator* `<` followed by an expression.
 The expession is evaluated and the target is assigned the result.
+
+Examples:
+```sflk
+x < 8
+uwu < "owo"
+```
 
 ## Binary operators
 
