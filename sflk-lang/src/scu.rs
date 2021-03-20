@@ -39,6 +39,17 @@ impl SourceCodeUnit {
 	}
 }
 
+impl Loc {
+	pub fn total_of(scu: Rc<SourceCodeUnit>) -> Loc {
+		Loc {
+			scu: Rc::clone(&scu),
+			line_start: 1,
+			raw_index_start: 0,
+			raw_length: scu.content.len(),
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct Loc {
 	pub scu: Rc<SourceCodeUnit>,
@@ -53,12 +64,24 @@ impl Loc {
 	}
 }
 
-impl AddAssign for Loc {
-	fn add_assign(&mut self, right: Loc) {
+impl AddAssign<&Loc> for Loc {
+	fn add_assign(&mut self, right: &Loc) {
 		std::assert_eq!(Rc::as_ptr(&self.scu), Rc::as_ptr(&right.scu));
 		std::assert!(self.line_start <= right.line_start);
 		std::assert!(self.raw_index_start <= right.raw_index_start);
 		self.raw_length += (right.raw_index_start - self.raw_index_start) + right.raw_length;
+	}
+}
+
+impl AddAssign for Loc {
+	fn add_assign(&mut self, right: Loc) {
+		*self += &right;
+	}
+}
+
+impl AddAssign<&Loc> for &mut Loc {
+	fn add_assign(&mut self, right: &Loc) {
+		**self += right;
 	}
 }
 
@@ -70,48 +93,11 @@ impl Add for Loc {
 	}
 }
 
-#[derive(Debug, Clone)]
-pub struct Located<T> {
-	pub content: T,
-	pub loc: Loc,
-}
-
-impl<T> Located<T> {
-	pub fn new(content: T, loc: Loc) -> Located<T> {
-		Located { content, loc }
-	}
-
-	pub fn unwrap(self) -> T {
-		self.content
+impl Add for &Loc {
+	type Output = Loc;
+	fn add(self, right: &Loc) -> Loc {
+		let mut loc = self.clone();
+		loc += right;
+		loc
 	}
 }
-
-impl<T> Located<T> {
-	#[allow(dead_code)] // TODO: remoe this attribute one way or another
-	pub fn rightmost_loc(mut self, loc: Loc) -> Located<T> {
-		self.loc += loc;
-		self
-	}
-
-	pub fn leftmost_loc(mut self, loc: Loc) -> Located<T> {
-		self.loc = loc + self.loc;
-		self
-	}
-}
-
-impl<T> Located<T> {
-	pub fn map<U>(self, func: impl FnOnce(T) -> U) -> Located<U> {
-		Located {
-			content: func(self.content),
-			loc: self.loc,
-		}
-	}
-}
-
-// This doesn't work ><
-//
-//impl<T> From<Located<T>> for T {
-//	fn from(located: Located<T>) -> T {
-//		located.content
-//	}
-//}

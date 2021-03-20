@@ -37,7 +37,7 @@ impl std::fmt::Display for Obj {
 }
 
 impl Obj {
-	pub fn plus(&mut self, other: Obj) {
+	pub fn apply_plus(&mut self, other: Obj) {
 		match (self, &other) {
 			(Obj::Integer(val), Obj::Integer(right)) => *val += right,
 			(Obj::String(val), Obj::String(right)) => *val += right.as_str(),
@@ -49,7 +49,7 @@ impl Obj {
 		}
 	}
 
-	pub fn minus(&mut self, other: Obj) {
+	pub fn apply_minus(&mut self, other: Obj) {
 		match (self, other) {
 			(Obj::Integer(val), Obj::Integer(right)) => *val -= right,
 			(obj_left, obj_right) => panic!(
@@ -59,7 +59,7 @@ impl Obj {
 		}
 	}
 
-	pub fn star(&mut self, other: Obj) {
+	pub fn apply_star(&mut self, other: Obj) {
 		match (self, other) {
 			(Obj::Integer(val), Obj::Integer(right)) => *val *= right,
 			(Obj::String(val), Obj::Integer(right)) => *val = val.repeat(right as usize),
@@ -71,7 +71,7 @@ impl Obj {
 		}
 	}
 
-	pub fn slash(&mut self, other: Obj) {
+	pub fn apply_slash(&mut self, other: Obj) {
 		match (&self, &other) {
 			(Obj::Integer(val), Obj::Integer(right)) => *self = Obj::Integer(val / right),
 			(Obj::String(val), Obj::String(right)) => {

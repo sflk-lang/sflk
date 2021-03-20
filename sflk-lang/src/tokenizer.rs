@@ -1,71 +1,30 @@
 use crate::scu::{Loc, SourceCodeUnit};
-use crate::utils::{escape_string, styles};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub enum TokenizingError {
-	EofInComment { loc: Loc },
-	EofInString { loc: Loc },
-	EofInEscapeSequence { loc: Loc },
-	UnexpectedCharacter { ch: char, loc: Loc },
-	InvalidEscapeSequence { sequence: String, loc: Loc },
-}
-
-impl std::fmt::Display for TokenizingError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			TokenizingError::EofInComment { loc } => write!(
-				f,
-				"end-of-file in comment (started at line {})",
-				loc.line_start
-			),
-			TokenizingError::EofInString { loc } => write!(
-				f,
-				"end-of-file in string literal (started at line {})",
-				loc.line_start
-			),
-			TokenizingError::EofInEscapeSequence { loc } => write!(
-				f,
-				"end-of-file in escape sequence (at line {})",
-				loc.line_start
-			),
-			TokenizingError::UnexpectedCharacter { ch, loc } => write!(
-				f,
-				"unexpected character `{}` (at line {})",
-				ch, loc.line_start
-			),
-			TokenizingError::InvalidEscapeSequence { sequence, loc } => write!(
-				f,
-				"invalid escape sequence `{}` (at line {})",
-				sequence, loc.line_start
-			),
-		}
-	}
-}
-
-#[derive(Debug)]
-pub struct TokReadingHead {
+pub struct CharReadingHead {
 	scu: Rc<SourceCodeUnit>,
 	raw_index: usize,
 	line: usize,
 }
 
-impl TokReadingHead {
-	pub fn from_scu(scu: Rc<SourceCodeUnit>) -> TokReadingHead {
-		TokReadingHead {
+impl CharReadingHead {
+	pub fn from_scu(scu: Rc<SourceCodeUnit>) -> CharReadingHead {
+		CharReadingHead {
 			scu,
 			raw_index: 0,
 			line: 1,
 		}
 	}
+}
 
-	fn peek_cur_char(&self) -> Option<char> {
+impl CharReadingHead {
+	fn peek(&self) -> Option<char> {
 		self.scu.content[self.raw_index..].chars().next()
 	}
 
-	fn goto_next_char(&mut self) {
-		if let Some(ch) = self.peek_cur_char() {
+	fn disc(&mut self) {
+		if let Some(ch) = self.peek() {
 			self.raw_index += ch.len_utf8();
 			match ch {
 				'\n' => self.line += 1,
@@ -74,70 +33,70 @@ impl TokReadingHead {
 		}
 	}
 
-	fn cur_char_loc(&self) -> Loc {
+	fn loc(&self) -> Loc {
 		Loc {
 			scu: Rc::clone(&self.scu),
 			line_start: self.line,
 			raw_index_start: self.raw_index,
-			raw_length: match self.peek_cur_char() {
+			raw_length: match self.peek() {
 				Some(ch) => ch.len_utf8(),
 				None => 0,
 			},
 		}
 	}
 
-	fn skip_ws(&mut self) -> Result<(), TokenizingError> {
-		let mut comment: Option<Loc> = None;
+	fn skip_ws(&mut self) {
 		loop {
-			match (self.peek_cur_char(), &comment) {
-				(Some('#'), None) => comment = Some(self.cur_char_loc()),
-				(Some(ch), None) if !ch.is_ascii_whitespace() => break,
-				(Some('#'), Some(_)) => comment = None,
-				(None, Some(comment_loc)) => {
-					return Err(TokenizingError::EofInComment {
-						loc: comment_loc.clone(),
-					})
-				}
-				(None, None) => break,
-				_ => (),
+			match self.peek() {
+				Some(ch) if ch.is_ascii_whitespace() => self.disc(),
+				_ => break,
 			}
-			self.goto_next_char();
 		}
-		Ok(())
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl CharReadingHead {
+	pub fn scu(&self) -> Rc<SourceCodeUnit> {
+		Rc::clone(&self.scu)
+	}
+}
+
+#[derive(Debug, Clone)]
 pub enum Tok {
-	Name(String),
-	Keyword(Keyword),
+	Name {
+		string: String,
+		unstable_warning: bool,
+	},
+	Kw(Kw),
 	Integer(String),
-	String(String),
+	String {
+		content: String,
+		no_end_quote_warning: bool,
+		invalid_escape_sequence_errors: Vec<(EscapeSequenceError, usize)>,
+		// The usize is the `\` character offset in literal
+	},
 	BinOp(BinOp),
 	Left(Matched),
 	Right(Matched),
 	StmtBinOp(StmtBinOp),
-	Void,
-}
-
-impl std::fmt::Display for Tok {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Tok::Name(s) => write!(f, "{}", s),
-			Tok::Keyword(kw) => write!(f, "{}", kw),
-			Tok::Integer(s) => write!(f, "{}", s),
-			Tok::String(s) => write!(f, "\"{}\"", escape_string(s, &styles::UNDERLINE)),
-			Tok::BinOp(op) => write!(f, "{}", op),
-			Tok::Left(s) => write!(f, "{:#}", s),
-			Tok::Right(s) => write!(f, "{}", s),
-			Tok::StmtBinOp(op) => write!(f, "{}", op),
-			Tok::Void => write!(f, ""),
-		}
-	}
+	InvalidCharacter(char),
+	Comment {
+		content: String,
+		no_end_hash_warning: bool,
+	},
+	Eof,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Keyword {
+pub enum EscapeSequenceError {
+	InvalidFirstCharacter(char),
+	InvalidDigitCharacter(char),
+	UnexpectedEof,
+	InvalidUnicodeCodePoint(u32),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Kw {
 	Np,
 	Pr,
 	Nl,
@@ -145,67 +104,12 @@ pub enum Keyword {
 	Dh,
 	Fh,
 	Ev,
-	Redo,
-	End,
-	Imp,
-	Exp,
 	If,
+	Th,
 	El,
 }
 
-impl std::fmt::Display for Keyword {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Keyword::Np => write!(f, "{}", "np"),
-			Keyword::Pr => write!(f, "{}", "pr"),
-			Keyword::Nl => write!(f, "{}", "nl"),
-			Keyword::Do => write!(f, "{}", "do"),
-			Keyword::Dh => write!(f, "{}", "dh"),
-			Keyword::Fh => write!(f, "{}", "fh"),
-			Keyword::Ev => write!(f, "{}", "ev"),
-			Keyword::Redo => write!(f, "{}", "redo"),
-			Keyword::End => write!(f, "{}", "end"),
-			Keyword::Imp => write!(f, "{}", "imp"),
-			Keyword::Exp => write!(f, "{}", "exp"),
-			Keyword::If => write!(f, "{}", "if"),
-			Keyword::El => write!(f, "{}", "el"),
-		}
-	}
-}
-
-impl Tok {
-	fn maybe_to_keyword(self) -> Tok {
-		let keywords = {
-			let mut keywords: HashMap<&str, Keyword> = HashMap::new();
-			keywords.insert("np", Keyword::Np);
-			keywords.insert("pr", Keyword::Pr);
-			keywords.insert("nl", Keyword::Nl);
-			keywords.insert("do", Keyword::Do);
-			keywords.insert("dh", Keyword::Dh);
-			keywords.insert("fh", Keyword::Fh);
-			keywords.insert("ev", Keyword::Ev);
-			keywords.insert("redo", Keyword::Redo);
-			keywords.insert("end", Keyword::End);
-			keywords.insert("imp", Keyword::Imp);
-			keywords.insert("exp", Keyword::Exp);
-			keywords.insert("if", Keyword::If);
-			keywords.insert("el", Keyword::El);
-			keywords
-		};
-		match &self {
-			Tok::Name(s) => {
-				if let Some(keyword) = keywords.get(s.as_str()) {
-					Tok::Keyword(keyword.clone())
-				} else {
-					self
-				}
-			}
-			_ => self,
-		}
-	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum BinOp {
 	Plus,
 	Minus,
@@ -214,279 +118,392 @@ pub enum BinOp {
 	ToRight,
 }
 
-impl std::fmt::Display for BinOp {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			BinOp::Plus => write!(f, "{}", "+"),
-			BinOp::Minus => write!(f, "{}", "-"),
-			BinOp::Star => write!(f, "{}", "*"),
-			BinOp::Slash => write!(f, "{}", "/"),
-			BinOp::ToRight => write!(f, "{}", ">"),
-		}
-	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum Matched {
 	Paren,
-	Bracket,
 	Curly,
+	Bracket,
 }
 
-impl std::fmt::Display for Matched {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Matched::Paren => write!(f, "{}", if f.alternate() { "(" } else { ")" }),
-			Matched::Bracket => write!(f, "{}", if f.alternate() { "[" } else { "]" }),
-			Matched::Curly => write!(f, "{}", if f.alternate() { "{" } else { "}" }),
-		}
-	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum StmtBinOp {
 	ToLeft,
-	ToLeftTilde,
 }
 
-impl std::fmt::Display for StmtBinOp {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			StmtBinOp::ToLeft => write!(f, "{}", "<"),
-			StmtBinOp::ToLeftTilde => write!(f, "{}", "<~"),
-		}
+pub struct Tokenizer {}
+
+impl Tokenizer {
+	pub fn new() -> Tokenizer {
+		Tokenizer {}
 	}
 }
 
-impl Tok {
-	pub fn is_bin_op(&self) -> bool {
-		match self {
-			Tok::BinOp(_) => true,
-			_ => false,
-		}
-	}
-}
-
-impl TokReadingHead {
-	pub fn read_cur_tok(&mut self) -> Result<(Tok, Loc), TokenizingError> {
-		self.skip_ws()?;
-		match self.peek_cur_char() {
+impl Tokenizer {
+	pub fn pop_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
+		crh.skip_ws();
+		let loc = crh.loc();
+		match crh.peek() {
 			Some(ch) if ch.is_ascii_alphabetic() => {
-				let (word, loc) = self.read_cur_word();
-				Ok((Tok::Name(word).maybe_to_keyword(), loc))
+				let (word_string, word_loc) = self.pop_word(crh);
+				(self.word_to_tok(word_string), word_loc)
 			}
 			Some(ch) if ch.is_ascii_digit() => {
-				let (integer, loc) = self.read_cur_integer();
-				Ok((Tok::Integer(integer), loc))
+				let (integer_string, word_loc) = self.pop_integer(crh);
+				(Tok::Integer(integer_string), word_loc)
 			}
-			Some(ch) if ch == '\"' => {
-				let (string, loc) = self.read_cur_string()?;
-				Ok((Tok::String(string), loc))
+			Some('\"') => self.pop_string_tok(crh),
+			Some('+') => {
+				crh.disc();
+				(Tok::BinOp(BinOp::Plus), loc)
 			}
-			Some(ch) if ch == '+' => {
-				self.goto_next_char();
-				Ok((Tok::BinOp(BinOp::Plus), self.cur_char_loc()))
+			Some('-') => {
+				crh.disc();
+				(Tok::BinOp(BinOp::Minus), loc)
 			}
-			Some(ch) if ch == '-' => {
-				self.goto_next_char();
-				Ok((Tok::BinOp(BinOp::Minus), self.cur_char_loc()))
+			Some('*') => {
+				crh.disc();
+				(Tok::BinOp(BinOp::Star), loc)
 			}
-			Some(ch) if ch == '*' => {
-				self.goto_next_char();
-				Ok((Tok::BinOp(BinOp::Star), self.cur_char_loc()))
+			Some('/') => {
+				crh.disc();
+				(Tok::BinOp(BinOp::Slash), loc)
 			}
-			Some(ch) if ch == '/' => {
-				self.goto_next_char();
-				Ok((Tok::BinOp(BinOp::Slash), self.cur_char_loc()))
+			Some('>') => {
+				crh.disc();
+				(Tok::BinOp(BinOp::ToRight), loc)
 			}
-			Some(ch) if ch == '>' => {
-				self.goto_next_char();
-				Ok((Tok::BinOp(BinOp::ToRight), self.cur_char_loc()))
+			Some('(') => {
+				crh.disc();
+				(Tok::Left(Matched::Paren), loc)
 			}
-			Some(ch) if ch == '(' => {
-				self.goto_next_char();
-				Ok((Tok::Left(Matched::Paren), self.cur_char_loc()))
+			Some('[') => {
+				crh.disc();
+				(Tok::Left(Matched::Bracket), loc)
 			}
-			Some(ch) if ch == ')' => {
-				self.goto_next_char();
-				Ok((Tok::Right(Matched::Paren), self.cur_char_loc()))
+			Some('{') => {
+				crh.disc();
+				(Tok::Left(Matched::Curly), loc)
 			}
-			Some(ch) if ch == '[' => {
-				self.goto_next_char();
-				Ok((Tok::Left(Matched::Bracket), self.cur_char_loc()))
+			Some(')') => {
+				crh.disc();
+				(Tok::Right(Matched::Paren), loc)
 			}
-			Some(ch) if ch == ']' => {
-				self.goto_next_char();
-				Ok((Tok::Right(Matched::Bracket), self.cur_char_loc()))
+			Some(']') => {
+				crh.disc();
+				(Tok::Right(Matched::Bracket), loc)
 			}
-			Some(ch) if ch == '{' => {
-				self.goto_next_char();
-				Ok((Tok::Left(Matched::Curly), self.cur_char_loc()))
+			Some('}') => {
+				crh.disc();
+				(Tok::Right(Matched::Curly), loc)
 			}
-			Some(ch) if ch == '}' => {
-				self.goto_next_char();
-				Ok((Tok::Right(Matched::Curly), self.cur_char_loc()))
+			Some('<') => {
+				crh.disc();
+				(Tok::StmtBinOp(StmtBinOp::ToLeft), loc)
 			}
-			Some(ch) if ch == '<' => {
-				self.goto_next_char();
-				match self.peek_cur_char() {
-					Some('~') => {
-						self.goto_next_char();
-						Ok((Tok::StmtBinOp(StmtBinOp::ToLeftTilde), self.cur_char_loc()))
-					}
-					_ => Ok((Tok::StmtBinOp(StmtBinOp::ToLeft), self.cur_char_loc())),
-				}
+			Some('#') => self.pop_comment_tok(crh),
+			Some(ch) => {
+				crh.disc();
+				(Tok::InvalidCharacter(ch), loc)
 			}
-			Some(ch) => Err(TokenizingError::UnexpectedCharacter {
-				ch,
-				loc: self.cur_char_loc(),
-			}),
-			None => Ok((Tok::Void, self.cur_char_loc())),
+			None => (Tok::Eof, loc),
 		}
 	}
 
-	fn read_cur_word(&mut self) -> (String, Loc) {
+	fn pop_word(&mut self, crh: &mut CharReadingHead) -> (String, Loc) {
 		let mut word_string = String::new();
-		let mut loc = self.cur_char_loc();
-		while let Some(ch) = self.peek_cur_char() {
+		let mut loc = crh.loc();
+		while let Some(ch) = crh.peek() {
 			if !ch.is_ascii_alphabetic() {
 				break;
 			}
 			word_string.push(ch);
-			self.goto_next_char();
+			crh.disc();
 		}
 		std::assert!(word_string.len() >= 1);
 		loc.raw_length = word_string.bytes().len();
 		(word_string, loc)
 	}
 
-	fn read_cur_integer(&mut self) -> (String, Loc) {
+	fn word_to_tok(&self, word: String) -> Tok {
+		match &word[..] {
+			"np" => Tok::Kw(Kw::Np),
+			"pr" => Tok::Kw(Kw::Pr),
+			"nl" => Tok::Kw(Kw::Nl),
+			"do" => Tok::Kw(Kw::Do),
+			"dh" => Tok::Kw(Kw::Dh),
+			"fh" => Tok::Kw(Kw::Fh),
+			"ev" => Tok::Kw(Kw::Ev),
+			"if" => Tok::Kw(Kw::If),
+			"th" => Tok::Kw(Kw::Th),
+			"el" => Tok::Kw(Kw::El),
+			_ => {
+				let len = word.len();
+				Tok::Name {
+					string: word,
+					unstable_warning: len == 2,
+				}
+			}
+		}
+	}
+
+	fn pop_integer(&mut self, crh: &mut CharReadingHead) -> (String, Loc) {
 		let mut integer_string = String::new();
-		let mut loc = self.cur_char_loc();
-		while let Some(ch) = self.peek_cur_char() {
+		let mut loc = crh.loc();
+		while let Some(ch) = crh.peek() {
 			if !ch.is_ascii_digit() {
 				break;
 			}
 			integer_string.push(ch);
-			self.goto_next_char();
+			crh.disc();
 		}
 		std::assert!(integer_string.len() >= 1);
 		loc.raw_length = integer_string.bytes().len();
 		(integer_string, loc)
 	}
 
-	fn read_cur_string(&mut self) -> Result<(String, Loc), TokenizingError> {
-		let mut string_string = String::new();
-		let mut loc = self.cur_char_loc();
-		std::assert_eq!(self.peek_cur_char(), Some('\"'));
-		self.goto_next_char();
+	fn pop_string_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
+		let mut content = String::new();
+		let mut no_end_quote_warning = false;
+		let mut invalid_escape_sequence_errors: Vec<(EscapeSequenceError, usize)> = Vec::new();
+		let mut offset = 0;
+		let mut loc = crh.loc();
+		std::assert_eq!(crh.peek(), Some('\"'));
+		crh.disc();
 		loop {
-			match self.peek_cur_char() {
+			match crh.peek() {
 				None => {
-					loc.raw_length = string_string.bytes().len() + 1;
-					return Err(TokenizingError::EofInString { loc });
+					no_end_quote_warning = true;
+					break;
 				}
 				Some('\"') => {
-					self.goto_next_char();
+					loc += crh.loc();
+					crh.disc();
 					break;
 				}
 				Some('\\') => {
-					string_string += &self.read_cur_escape_sequence()?.0;
+					let (escaped, len, escaped_loc) = self.pop_escaped(crh);
+					loc += escaped_loc;
+					match escaped {
+						Ok(escaped_string) => {
+							content += &escaped_string;
+						}
+						Err(error) => {
+							content += "�";
+							invalid_escape_sequence_errors.push((error, offset));
+						}
+					}
+					offset += len;
 				}
 				Some(ch) => {
-					self.goto_next_char();
-					string_string.push(ch);
+					loc += crh.loc();
+					offset += 1;
+					crh.disc();
+					content.push(ch);
 				}
 			}
 		}
-		loc.raw_length = string_string.bytes().len() + 2;
-		Ok((string_string, loc))
+		(
+			Tok::String {
+				content,
+				no_end_quote_warning,
+				invalid_escape_sequence_errors,
+			},
+			loc,
+		)
 	}
 
-	fn read_cur_escape_sequence(&mut self) -> Result<(String, Loc), TokenizingError> {
-		let loc_beg = self.cur_char_loc();
-		std::assert_eq!(self.peek_cur_char(), Some('\\'));
-		self.goto_next_char();
-		match self.peek_cur_char() {
+	fn pop_escaped(
+		&mut self,
+		crh: &mut CharReadingHead,
+	) -> (Result<String, EscapeSequenceError>, usize, Loc) {
+		let loc_beg = crh.loc();
+		std::assert_eq!(crh.peek(), Some('\\'));
+		crh.disc();
+		match crh.peek() {
 			Some('\n') => {
-				self.goto_next_char();
-				Ok(("".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('\\') => {
-				self.goto_next_char();
-				Ok(("\\".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\\".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('\"') => {
-				self.goto_next_char();
-				Ok(("\"".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\"".to_string()), 2, loc_beg + loc_end)
+			}
+			Some('?') => {
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("�".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('n') => {
-				self.goto_next_char();
-				Ok(("\n".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\n".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('t') => {
-				self.goto_next_char();
-				Ok(("\t".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\t".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('e') => {
-				self.goto_next_char();
-				Ok(("\x1b".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\x1b".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('a') => {
-				self.goto_next_char();
-				Ok(("\x07".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\x07".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('b') => {
-				self.goto_next_char();
-				Ok(("\x08".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\x08".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('v') => {
-				self.goto_next_char();
-				Ok(("\x0b".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\x0b".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('f') => {
-				self.goto_next_char();
-				Ok(("\x0c".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\x0c".to_string()), 2, loc_beg + loc_end)
 			}
 			Some('r') => {
-				self.goto_next_char();
-				Ok(("\r".to_string(), loc_beg))
+				let loc_end = crh.loc();
+				crh.disc();
+				(Ok("\r".to_string()), 2, loc_beg + loc_end)
 			}
-			Some('x') => {
-				self.goto_next_char();
-				let (ch, loc) = self.read_cur_hex_escape_sequence()?;
-				Ok((ch.to_string(), loc))
+			Some('x') | Some('d') => {
+				let (escaped, len, loc_end) = self.pop_hex_escaped(crh);
+				(escaped, len + 1, loc_beg + loc_end)
 			}
-			Some(ch) => Err(TokenizingError::InvalidEscapeSequence {
-				sequence: ch.to_string(),
-				loc: loc_beg,
-			}),
-			None => Err(TokenizingError::EofInEscapeSequence { loc: loc_beg }),
+			Some(ch) => (
+				Err(EscapeSequenceError::InvalidFirstCharacter(ch)),
+				1,
+				loc_beg,
+			),
+			None => (Err(EscapeSequenceError::UnexpectedEof), 1, loc_beg),
 		}
 	}
 
-	fn read_cur_hex_escape_sequence(&mut self) -> Result<(char, Loc), TokenizingError> {
-		let loc_beg = self.cur_char_loc();
-		let ch1 = self.peek_cur_char();
-		self.goto_next_char();
-		let ch2 = self.peek_cur_char();
-		let loc = loc_beg + self.cur_char_loc();
-		self.goto_next_char();
-		match (ch1, ch2) {
-			(Some(ch1), Some(ch2)) => {
-				let digit1 = ch1.to_digit(16);
-				let digit2 = ch2.to_digit(16);
-				if digit1.is_none() || digit2.is_none() {
-					return Err(TokenizingError::InvalidEscapeSequence {
-						sequence: format!("x{}{}", ch1, ch2),
-						loc,
-					});
+	fn pop_hex_escaped(
+		&mut self,
+		crh: &mut CharReadingHead,
+	) -> (Result<String, EscapeSequenceError>, usize, Loc) {
+		let mut loc = crh.loc();
+		let mut len = 1;
+		let base = {
+			match crh.peek() {
+				Some('x') => {
+					crh.disc();
+					16
+				}
+				Some('d') => {
+					crh.disc();
+					10
+				}
+				_ => unreachable!(),
+			}
+		};
+		let mut character_code = 0;
+		if crh.peek() == Some('(') {
+			loc += crh.loc();
+			len += 1;
+			crh.disc();
+			loop {
+				if let Some(ch) = crh.peek() {
+					match ch.to_digit(base) {
+						Some(digit) => {
+							loc += crh.loc();
+							len += 1;
+							crh.disc();
+							character_code = character_code * base + digit;
+						}
+						None if ch == ')' => {
+							loc += crh.loc();
+							len += 1;
+							crh.disc();
+							break;
+						}
+						None => {
+							return (
+								Err(EscapeSequenceError::InvalidDigitCharacter(ch)),
+								len,
+								loc,
+							)
+						}
+					}
 				} else {
-					let value = digit1.unwrap() * 16 + digit2.unwrap();
-					Ok((value as u8 as char, loc))
+					return (Err(EscapeSequenceError::UnexpectedEof), len, loc);
 				}
 			}
-			(None, _) | (_, None) => Err(TokenizingError::EofInEscapeSequence { loc }),
+		} else {
+			for _ in 0..2 {
+				if let Some(ch) = crh.peek() {
+					match ch.to_digit(base) {
+						Some(digit) => {
+							loc += crh.loc();
+							len += 1;
+							crh.disc();
+							character_code = character_code * base + digit;
+						}
+						None => {
+							return (
+								Err(EscapeSequenceError::InvalidDigitCharacter(ch)),
+								len,
+								loc,
+							)
+						}
+					}
+				} else {
+					return (Err(EscapeSequenceError::UnexpectedEof), len, loc);
+				}
+			}
 		}
+		if let Some(ch) = std::char::from_u32(character_code) {
+			(Ok(ch.to_string()), len, loc)
+		} else {
+			(
+				Err(EscapeSequenceError::InvalidUnicodeCodePoint(character_code)),
+				len,
+				loc,
+			)
+		}
+	}
+
+	fn pop_comment_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
+		assert_eq!(crh.peek(), Some('#'));
+		let mut loc = crh.loc();
+		crh.disc();
+		let mut content = String::new();
+		let mut no_end_hash_warning = false;
+		loop {
+			if let Some(ch) = crh.peek() {
+				loc += crh.loc();
+				crh.disc();
+				if ch == '#' {
+					break;
+				} else {
+					content.push(ch);
+				}
+			} else {
+				no_end_hash_warning = true;
+				break;
+			}
+		}
+		(
+			Tok::Comment {
+				content,
+				no_end_hash_warning,
+			},
+			loc,
+		)
 	}
 }

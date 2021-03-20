@@ -1,5 +1,6 @@
 
-fh "sflk-lang/std.sflk"
+f < {
+	pr 2*3 nl
+}
 
-ev 8 >prnl >{pr v nl}
-np
+do f*2

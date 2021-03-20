@@ -3,7 +3,6 @@ mod log;
 mod machine;
 mod object;
 mod parser;
-mod parser2;
 mod program;
 mod scu;
 mod stringtree;
@@ -86,10 +85,8 @@ fn main() {
 	}
 
 	let mut mem = machine::Mem::new(settings.debug_mode);
-	if let Some(root_filename) = settings.root_filename {
-		mem.exec_file(root_filename);
-		if let Some(indented_log) = mem.debug_mode {
-			indented_log.print();
-		}
+	mem.exec_file(settings.root_filename.unwrap());
+	if let Some(debug_mem) = mem.debug_mem_opt {
+		debug_mem.log.print_to_stdout();
 	}
 }

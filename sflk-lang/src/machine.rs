@@ -1,7 +1,6 @@
 use crate::log::IndentedLog;
 use crate::object::Obj;
-use crate::program::{Block, ChOp, Expr, Op, Prog, Stmt};
-use crate::scu::Located;
+use crate::program::{Block, Chop, Expr, Stmt};
 use crate::utils::{styles, Style};
 use std::collections::HashMap;
 
@@ -47,20 +46,66 @@ enum Flow {
 	End,
 }
 
+pub struct DebugMem {
+	pub log: IndentedLog,
+}
+
+impl DebugMem {
+	fn new() -> DebugMem {
+		DebugMem {
+			log: IndentedLog::new(),
+		}
+	}
+}
+
 pub struct Mem {
 	excx_stack: Vec<ExCx>,
-	pub debug_mode: Option<IndentedLog>,
+	pub debug_mem_opt: Option<DebugMem>,
 }
 
 impl Mem {
 	pub fn new(is_debug_mode: bool) -> Mem {
 		Mem {
 			excx_stack: Vec::new(),
-			debug_mode: if is_debug_mode {
-				Some(IndentedLog::new())
+			debug_mem_opt: if is_debug_mode {
+				Some(DebugMem::new())
 			} else {
 				None
 			},
+		}
+	}
+}
+
+impl DebugMem {
+	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
+		self.log.indent(string, is_context, style);
+	}
+
+	fn log_deindent(&mut self) {
+		self.log.deindent();
+	}
+
+	fn log_line(&mut self, string: String, style: Style) {
+		self.log.log_line(string, style);
+	}
+}
+
+impl Mem {
+	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem.log_indent(string, is_context, style);
+		}
+	}
+
+	fn log_deindent(&mut self) {
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem.log_deindent();
+		}
+	}
+
+	fn log_line(&mut self, string: String, style: Style) {
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem.log_line(string, style);
 		}
 	}
 }
@@ -111,26 +156,6 @@ impl Mem {
 }
 
 impl Mem {
-	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
-		if let Some(indented_log) = &mut self.debug_mode {
-			indented_log.indent(string, is_context, style);
-		}
-	}
-
-	fn log_deindent(&mut self) {
-		if let Some(indented_log) = &mut self.debug_mode {
-			indented_log.deindent();
-		}
-	}
-
-	fn log_line(&mut self, string: String, style: Style) {
-		if let Some(indented_log) = &mut self.debug_mode {
-			indented_log.log_line(string, style);
-		}
-	}
-}
-
-impl Mem {
 	pub fn exec_file(&mut self, filename: String) {
 		self.push_excx(ExCx::new());
 		self.exec_file_here(filename);
@@ -138,43 +163,23 @@ impl Mem {
 	}
 
 	fn exec_file_here(&mut self, filename: String) {
-		use crate::parser::ProgReadingHead;
-		use crate::scu::SourceCodeUnit;
-		use crate::stringtree::StringTree;
-		use crate::tokenizer::TokReadingHead;
-		use std::rc::Rc;
+		let scu = std::rc::Rc::new(crate::scu::SourceCodeUnit::from_filename(&filename));
+		let mut tfr =
+			crate::parser::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
 
-		let scu = Rc::new(SourceCodeUnit::from_filename(&filename));
-
-		let mut prh = ProgReadingHead::from(TokReadingHead::from_scu(scu));
-		let prog = match prh.parse_prog() {
-			Ok(located_porg) => located_porg.unwrap(),
-			Err(parsing_error) => {
-				self.log_line(
-					format!(
-						"\x1b[91m\x1b[1mParsing error:\x1b[22m\x1b[39m {}",
-						parsing_error
-					),
-					styles::NORMAL,
-				);
-				return;
-			}
-		};
-		self.log_line(String::from("\x1b[7mProgram tree\x1b[27m"), styles::NORMAL);
-		if let Some(_) = self.debug_mode {
-			StringTree::from(&prog).print(self.debug_mode.as_mut().unwrap());
+		let mut parser = crate::parser::Parser::new();
+		let ast = parser.parse_program(&mut tfr);
+		if let Some(debug_mem) = &mut self.debug_mem_opt {
+			debug_mem
+				.log
+				.log_line(String::from("Program tree"), styles::NEGATIVE);
+			crate::stringtree::StringTree::from(&ast).print(&mut debug_mem.log);
 		}
+		let block_program = ast.unwrap_ref().to_machine_block();
 
-		self.log_line(
-			String::from("\x1b[7mProgram execution\x1b[27m"),
-			styles::NORMAL,
-		);
-		self.exec_prog_here(&prog);
-		self.log_line(String::from("\x1b[7mProgram end\x1b[27m"), styles::NORMAL);
-	}
-
-	fn exec_prog_here(&mut self, prog: &Prog) {
-		self.exec_block_here(prog as &Block);
+		self.log_line(String::from("Program execution"), styles::NEGATIVE);
+		self.exec_block_here(&block_program);
+		self.log_line(String::from("Program end"), styles::NEGATIVE);
 	}
 
 	fn exec_stmts_here(&mut self, stmts: &Vec<Stmt>) {
@@ -211,20 +216,21 @@ impl Mem {
 		self.exec_block_excx(block, ExCx::new());
 	}
 
-	fn exec_block_here(&mut self, block: &Block) {
+	// TODO: remove pub
+	pub fn exec_block_here(&mut self, block: &Block) {
 		self.exec_stmts_here(&block.stmts);
 	}
 
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Nop => {
-				self.log_indent(String::from("np"), false, styles::NORMAL);
+				self.log_indent(String::from("nop"), false, styles::NORMAL);
 				self.log_deindent();
 			}
 			Stmt::Print { expr } => {
-				self.log_indent(String::from("pr"), false, styles::NORMAL);
+				self.log_indent(String::from("print"), false, styles::NORMAL);
 				let val = self.eval_expr(expr);
-				if let Some(_) = self.debug_mode {
+				if let Some(_) = self.debug_mem_opt {
 					self.log_line(format!("output {}", val), styles::NORMAL);
 				} else {
 					match val {
@@ -235,9 +241,9 @@ impl Mem {
 				}
 				self.log_deindent();
 			}
-			Stmt::PrintNewline => {
-				self.log_indent(String::from("nl"), false, styles::NORMAL);
-				if let Some(_) = self.debug_mode {
+			Stmt::Newline => {
+				self.log_indent(String::from("newline"), false, styles::NORMAL);
+				if let Some(_) = self.debug_mem_opt {
 					self.log_line(String::from("output newline"), styles::NORMAL);
 				} else {
 					println!("");
@@ -255,24 +261,6 @@ impl Mem {
 				);
 				self.log_deindent();
 			}
-			Stmt::AssignIfFree { varname, expr } => {
-				self.log_indent(String::from("assign if free"), false, styles::NORMAL);
-				self.log_line(format!("to variable {}", varname), styles::NORMAL);
-				let val = self.eval_expr(expr);
-				let was_free = self.varset_if_free(varname, val);
-				if was_free {
-					self.log_line(
-						format!("now variable {} is {}", varname, self.varget(varname)),
-						styles::NORMAL,
-					);
-				} else {
-					self.log_line(
-						format!("variable {} was already {}", varname, self.varget(varname)),
-						styles::NORMAL,
-					);
-				}
-				self.log_deindent();
-			}
 			Stmt::Do { expr } => {
 				self.log_indent(String::from("do"), true, styles::BOLD_LIGHT_RED);
 				match self.eval_expr(expr) {
@@ -282,82 +270,50 @@ impl Mem {
 				self.log_deindent();
 			}
 			Stmt::DoHere { expr } => {
-				self.log_indent(String::from("dh"), false, styles::YELLOW);
+				self.log_indent(String::from("do here"), false, styles::YELLOW);
 				match self.eval_expr(expr) {
 					Obj::Block(block) => self.exec_block_here(&block),
-					obj => panic!("can't dh {} for now", obj),
+					obj => panic!("can't do here {} for now", obj),
 				}
 				self.log_deindent();
 			}
-			Stmt::FileDoHere { expr } => {
-				self.log_indent(String::from("fh"), false, styles::YELLOW);
+			Stmt::DoFileHere { expr } => {
+				self.log_indent(String::from("do file here"), false, styles::YELLOW);
 				match self.eval_expr(expr) {
 					Obj::String(filename) => self.exec_file_here(filename),
-					obj => panic!("can't fh {} for now", obj),
+					obj => panic!("can't do file here {} for now", obj),
 				}
 				self.log_deindent();
 			}
 			Stmt::Evaluate { expr } => {
-				self.log_indent(String::from("ev"), false, styles::NORMAL);
+				self.log_indent(String::from("evaluate"), false, styles::NORMAL);
 				self.eval_expr(expr);
 				self.log_deindent();
 			}
-			Stmt::Imp { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("imp"), false, styles::NORMAL);
-					let cx_to_import = self.excx(integer as usize).cx.clone();
-					self.log_line(format!("import from excx {}", integer), styles::NORMAL);
-					self.excx_mut(0).cx.import(cx_to_import);
-					self.log_deindent();
-				}
-				invalid_obj => panic!("imp expected integer but found {}", invalid_obj),
-			},
-			Stmt::Exp { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("exp"), false, styles::NORMAL);
-					let cx_to_export = self.excx(0).cx.clone();
-					self.log_line(format!("export to excx {}", integer), styles::NORMAL);
-					self.excx_mut(integer as usize).cx.import(cx_to_export);
-					self.log_deindent();
-				}
-				invalid_obj => panic!("exp expected integer but found {}", invalid_obj),
-			},
-			Stmt::Redo { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("redo"), false, styles::NORMAL);
-					self.log_line(format!("redo excx {}", integer), styles::NORMAL);
-					self.excx_mut(integer as usize).flow = Flow::Restart;
-					self.log_deindent();
-				}
-				invalid_obj => panic!("redo expected integer but found {}", invalid_obj),
-			},
-			Stmt::End { expr } => match self.eval_expr(expr) {
-				Obj::Integer(integer) => {
-					self.log_indent(String::from("end"), false, styles::NORMAL);
-					self.log_line(format!("end excx {}", integer), styles::NORMAL);
-					self.excx_mut(integer as usize).flow = Flow::End;
-					self.log_deindent();
-				}
-				invalid_obj => panic!("end expected integer but found {}", invalid_obj),
-			},
 			Stmt::If {
 				cond_expr,
-				if_stmt,
+				th_stmt,
 				el_stmt,
 			} => {
 				self.log_indent(String::from("if"), false, styles::NORMAL);
 				if self.eval_expr(cond_expr).as_cond() {
-					self.log_line(String::from("condition is true"), styles::NORMAL);
-					self.exec_stmt(if_stmt)
+					if let Some(stmt) = th_stmt {
+						self.log_line(String::from("then branch"), styles::NORMAL);
+						self.exec_stmt(stmt);
+					} else {
+						self.log_line(String::from("no then branch"), styles::NORMAL);
+					}
 				} else {
-					self.log_line(String::from("condition is false"), styles::NORMAL);
-					match el_stmt {
-						Some(stmt) => self.exec_stmt(stmt),
-						None => (),
+					if let Some(stmt) = el_stmt {
+						self.log_line(String::from("else branch"), styles::NORMAL);
+						self.exec_stmt(stmt);
+					} else {
+						self.log_line(String::from("no else branch"), styles::NORMAL);
 					}
 				}
 				self.log_deindent();
 			}
+			Stmt::Invalid => println!("TODO: invalid stmt"),
 		}
 	}
 
@@ -392,11 +348,39 @@ impl Mem {
 		}
 	}
 
-	fn apply_chop(&mut self, val: &mut Obj, chop: &ChOp) {
-		let right = self.eval_expr(&chop.expr);
-		match &chop.op {
-			Op::ToRight => {
+	fn apply_chop(&mut self, val: &mut Obj, chop: &Chop) {
+		match chop {
+			Chop::Plus(expr) => {
+				self.log_indent(String::from("chop plus"), false, styles::NORMAL);
+				let right = self.eval_expr(expr);
+				self.log_line(format!("value {}", right), styles::NORMAL);
+				val.apply_plus(right);
+				self.log_deindent();
+			}
+			Chop::Minus(expr) => {
+				self.log_indent(String::from("chop minus"), false, styles::NORMAL);
+				let right = self.eval_expr(expr);
+				self.log_line(format!("value {}", right), styles::NORMAL);
+				val.apply_minus(right);
+				self.log_deindent();
+			}
+			Chop::Star(expr) => {
+				self.log_indent(String::from("chop star"), false, styles::NORMAL);
+				let right = self.eval_expr(expr);
+				self.log_line(format!("value {}", right), styles::NORMAL);
+				val.apply_star(right);
+				self.log_deindent();
+			}
+			Chop::Slash(expr) => {
+				self.log_indent(String::from("chop slash"), false, styles::NORMAL);
+				let right = self.eval_expr(expr);
+				self.log_line(format!("value {}", right), styles::NORMAL);
+				val.apply_slash(right);
+				self.log_deindent();
+			}
+			Chop::ToRight(expr) => {
 				self.log_indent(String::from("chop to right"), true, styles::BOLD_LIGHT_RED);
+				let right = self.eval_expr(expr);
 				match right {
 					Obj::Block(block) => {
 						let mut excx = ExCx::new();
@@ -407,19 +391,6 @@ impl Mem {
 						}
 					}
 					invalid_obj => panic!("can't do {} for now", invalid_obj),
-				}
-				self.log_deindent();
-			}
-			op => {
-				self.log_indent(String::from("chop"), false, styles::NORMAL);
-				self.log_line(format!("op {}", chop.op), styles::NORMAL);
-				self.log_line(format!("value {}", right), styles::NORMAL);
-				match op {
-					Op::Plus => val.plus(right),
-					Op::Minus => val.minus(right),
-					Op::Star => val.star(right),
-					Op::Slash => val.slash(right),
-					_ => unreachable!(),
 				}
 				self.log_deindent();
 			}
