@@ -1,4 +1,4 @@
-use crate::ast::{Chop, Expr, Node, Program, Stmt, TargetExpr};
+use crate::ast::{Chop, Comment, Expr, Node, Program, Stmt, TargetExpr};
 use crate::scu::{Loc, SourceCodeUnit};
 use crate::tokenizer::{BinOp, CharReadingHead, Kw, Matched, StmtBinOp, Tok, Tokenizer};
 use std::{collections::VecDeque, rc::Rc};
@@ -300,6 +300,31 @@ impl Parser {
 				BinOp::Slash => Some(Node::from(Chop::Slash(expr_node), full_loc)),
 				BinOp::ToRight => Some(Node::from(Chop::ToRight(expr_node), full_loc)),
 			}
+		} else {
+			None
+		}
+	}
+
+	fn maybe_parse_comments(&mut self, tb: &mut TokBuffer) -> Vec<Node<Comment>> {
+		let mut comments: Vec<Node<Comment>> = Vec::new();
+		while let Some(comment) = self.maybe_parse_comment(tb) {
+			comments.push(comment);
+		}
+		comments
+	}
+
+	fn maybe_parse_comment(&mut self, tb: &mut TokBuffer) -> Option<Node<Comment>> {
+		let (tok, loc) = tb.peek(0);
+		if let Tok::Comment {
+			content,
+			delimitation_thickness,
+			no_end_hash_warning,
+		} = tok
+		{
+			Some(Node::from(
+				Comment::new(content.to_owned(), delimitation_thickness.to_owned()),
+				loc.to_owned(),
+			))
 		} else {
 			None
 		}

@@ -82,6 +82,7 @@ pub enum Tok {
 	InvalidCharacter(char),
 	Comment {
 		content: String,
+		delimitation_thickness: usize,
 		no_end_hash_warning: bool,
 	},
 	Eof,
@@ -481,18 +482,32 @@ impl Tokenizer {
 	fn pop_comment_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
 		assert_eq!(crh.peek(), Some('#'));
 		let mut loc = crh.loc();
-		crh.disc();
+		let mut delimitation_thickness = 0;
+		while let Some('#') = crh.peek() {
+			delimitation_thickness += 1;
+			loc += crh.loc();
+			crh.disc();
+		}
+		let delimitation_thickness = delimitation_thickness;
 		let mut content = String::new();
 		let mut no_end_hash_warning = false;
 		loop {
-			if let Some(ch) = crh.peek() {
-				loc += crh.loc();
-				crh.disc();
-				if ch == '#' {
+			if let Some('#') = crh.peek() {
+				let mut hashes_thickness = 0;
+				while let Some('#') = crh.peek() {
+					hashes_thickness += 1;
+					loc += crh.loc();
+					crh.disc();
+				}
+				if hashes_thickness == delimitation_thickness {
 					break;
 				} else {
-					content.push(ch);
+					content.extend(std::iter::repeat('#').take(hashes_thickness));
 				}
+			} else if let Some(ch) = crh.peek() {
+				content.push(ch);
+				loc += crh.loc();
+				crh.disc();
 			} else {
 				no_end_hash_warning = true;
 				break;
@@ -501,6 +516,7 @@ impl Tokenizer {
 		(
 			Tok::Comment {
 				content,
+				delimitation_thickness,
 				no_end_hash_warning,
 			},
 			loc,

@@ -17,6 +17,8 @@ What is written here may not be accurate.
 
 ```sflk
 # Comments are blocks delimited by hashes #
+#### Or by any number
+of successive #s ####
 ```
 
 There is no statement separator and whitespace is not significant.
@@ -158,6 +160,7 @@ then the *then branch* is executed if it exists,
 else the *else branch* is executed if it exists.
 
 Example:
+
 ```sflk
 if x
 th pr "true"
@@ -171,6 +174,7 @@ a *to left statement operator* `<` followed by an expression.
 The expession is evaluated and the target is assigned the result.
 
 Examples:
+
 ```sflk
 x < 8
 uwu < "owo"

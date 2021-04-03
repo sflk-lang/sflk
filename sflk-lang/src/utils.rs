@@ -24,6 +24,7 @@ pub fn escape_string(string: &str, escape_style: &Style) -> String {
 
 fn escape_character(ch: char) -> Option<String> {
 	match ch {
+		// ASCII range escapes
 		'\"' => Some(String::from("\\\"")),
 		'\\' => Some(String::from("\\\\")),
 		'\n' => Some(String::from("\\n")),
@@ -35,6 +36,9 @@ fn escape_character(ch: char) -> Option<String> {
 		'\x0c' => Some(String::from("\\f")),
 		'\r' => Some(String::from("\\r")),
 		ch if (ch as u32) < (' ' as u32) => Some(format!("\\x{:02x}", ch as u32)),
+		// Non-ASCII range espaces
+		'�' => Some(String::from("\\?")),
+		// Not to be escaped
 		_ => None,
 	}
 }

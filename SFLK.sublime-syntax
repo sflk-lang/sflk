@@ -7,9 +7,21 @@ scope: source.sflk
 contexts:
 
   main:
+    - match: '#####'
+      scope: punctuation.definition.comment.begin.sflk
+      push: comment_5
+    - match: '####'
+      scope: punctuation.definition.comment.begin.sflk
+      push: comment_4
+    - match: '###'
+      scope: punctuation.definition.comment.begin.sflk
+      push: comment_3
+    - match: '##'
+      scope: punctuation.definition.comment.begin.sflk
+      push: comment_2
     - match: '#'
       scope: punctuation.definition.comment.begin.sflk
-      push: comment
+      push: comment_1
     - match: '\('
       scope: punctuation.section.parens.begin.sflk
       push: paren
@@ -50,9 +62,38 @@ contexts:
     - match: '[a-zA-Z]+'
       scope: variable.sflk
 
-  comment:
+  comment_1:
     - meta_scope: comment.block.sflk
+    - match: '##'
     - match: '#'
+      scope: punctuation.definition.comment.end.sflk
+      pop: true
+
+  comment_2:
+    - meta_scope: comment.block.sflk
+    - match: '###'
+    - match: '##'
+      scope: punctuation.definition.comment.end.sflk
+      pop: true
+
+  comment_3:
+    - meta_scope: comment.block.sflk
+    - match: '####'
+    - match: '###'
+      scope: punctuation.definition.comment.end.sflk
+      pop: true
+
+  comment_4:
+    - meta_scope: comment.block.sflk
+    - match: '#####'
+    - match: '####'
+      scope: punctuation.definition.comment.end.sflk
+      pop: true
+
+  comment_5:
+    - meta_scope: comment.block.sflk
+    - match: '######'
+    - match: '#####'
       scope: punctuation.definition.comment.end.sflk
       pop: true
 

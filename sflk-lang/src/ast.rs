@@ -34,12 +34,30 @@ impl<T> Node<T> {
 	pub fn unwrap_ref(&self) -> &T {
 		&self.content
 	}
+
+	pub fn add_left_comment(&mut self, comment: Comment) {
+		self.comments.left_comments.push(comment);
+	}
+}
+
+pub struct Comment {
+	content: String,
+	delimitation_thickness: usize,
+}
+
+impl Comment {
+	pub fn new(content: String, delimitation_thickness: usize) -> Comment {
+		Comment {
+			content,
+			delimitation_thickness,
+		}
+	}
 }
 
 struct Comments {
-	left_comments: Vec<String>,
-	right_comments: Vec<String>,
-	internal_comments: Vec<String>,
+	left_comments: Vec<Comment>,
+	right_comments: Vec<Comment>,
+	internal_comments: Vec<Comment>,
 }
 
 impl Comments {

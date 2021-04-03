@@ -1,8 +1,7 @@
 
-f < {
-	pr 2*3 nl
-}
+fh "sflk-lang/std.sflk"
 
-do f*2
+## heyyy ##
+ev 8 > prnl
 
-pr "\e[31mred\e[39m" nl
+# uwu #

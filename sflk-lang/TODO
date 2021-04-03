@@ -7,6 +7,10 @@ COMMENTS
 - comments may start and end with the same number of consecutive hashes
 - any other number of consecutive hashes in the comment doesn't end it
 
+INDENTED LOG
+- should be able to be "live", ie to be printed while being generated
+	so that s statement like, say, input, does workout correctly
+
 STRING TREE STYLES REVISION
 - string tree may have named nodes that are printed like that:
 		program
@@ -115,6 +119,7 @@ ADD STATEMENTS AND EXPRESSIONS AND TYPES
 - ev ,,, ,8 ,4 ,2
 - if tr th pr "true" if fa el pr "false"
 - ... # pr "(Doing stuff at line n...)" nl #
+- x < in pr "Enter x plz > "
 
 ADD A REPL
 - add a repl
