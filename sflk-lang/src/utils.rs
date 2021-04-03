@@ -12,23 +12,31 @@ pub mod styles {
 
 pub fn escape_string(string: &str, escape_style: &Style) -> String {
 	let mut ret = String::new();
-	string.chars().for_each(|ch| match ch {
-		'\"' => ret.extend(format!("{}\\\"{}", escape_style.0, escape_style.1).chars()),
-		'\\' => ret.extend(format!("{}\\\\{}", escape_style.0, escape_style.1).chars()),
-		'\n' => ret.extend(format!("{}\\n{}", escape_style.0, escape_style.1).chars()),
-		'\t' => ret.extend(format!("{}\\t{}", escape_style.0, escape_style.1).chars()),
-		'\x1b' => ret.extend(format!("{}\\e{}", escape_style.0, escape_style.1).chars()),
-		'\x07' => ret.extend(format!("{}\\a{}", escape_style.0, escape_style.1).chars()),
-		'\x08' => ret.extend(format!("{}\\b{}", escape_style.0, escape_style.1).chars()),
-		'\x0b' => ret.extend(format!("{}\\v{}", escape_style.0, escape_style.1).chars()),
-		'\x0c' => ret.extend(format!("{}\\f{}", escape_style.0, escape_style.1).chars()),
-		'\r' => ret.extend(format!("{}\\r{}", escape_style.0, escape_style.1).chars()),
-		ch if (ch as u32) < (' ' as u32) => {
-			ret.extend(format!("{}\\x{:02x}{}", escape_style.0, ch as u32, escape_style.1).chars())
+	string.chars().for_each(|ch| {
+		if let Some(escaped) = escape_character(ch) {
+			ret.extend(format!("{}{}{}", escape_style.0, escaped, escape_style.1).chars());
+		} else {
+			ret.push(ch);
 		}
-		ch => ret.push(ch),
 	});
 	ret
+}
+
+fn escape_character(ch: char) -> Option<String> {
+	match ch {
+		'\"' => Some(String::from("\\\"")),
+		'\\' => Some(String::from("\\\\")),
+		'\n' => Some(String::from("\\n")),
+		'\t' => Some(String::from("\\t")),
+		'\x1b' => Some(String::from("\\e")),
+		'\x07' => Some(String::from("\\a")),
+		'\x08' => Some(String::from("\\b")),
+		'\x0b' => Some(String::from("\\v")),
+		'\x0c' => Some(String::from("\\f")),
+		'\r' => Some(String::from("\\r")),
+		ch if (ch as u32) < (' ' as u32) => Some(format!("\\x{:02x}", ch as u32)),
+		_ => None,
+	}
 }
 
 pub struct StdoutWriter;

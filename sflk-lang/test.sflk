@@ -4,3 +4,5 @@ f < {
 }
 
 do f*2
+
+pr "\e[31mred\e[39m" nl
