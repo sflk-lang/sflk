@@ -35,8 +35,20 @@ impl<T> Node<T> {
 		&self.content
 	}
 
-	pub fn add_left_comment(&mut self, comment: Comment) {
-		self.comments.left_comments.push(comment);
+	pub fn add_left_comments(&mut self, comments: Vec<Node<Comment>>) {
+		self.comments.left_comments.extend(
+			comments
+				.into_iter()
+				.map(|node_comment| node_comment.unwrap()),
+		);
+	}
+
+	pub fn add_internal_comments(&mut self, comments: Vec<Node<Comment>>) {
+		self.comments.internal_comments.extend(
+			comments
+				.into_iter()
+				.map(|node_comment| node_comment.unwrap()),
+		);
 	}
 }
 
@@ -56,7 +68,6 @@ impl Comment {
 
 struct Comments {
 	left_comments: Vec<Comment>,
-	right_comments: Vec<Comment>,
 	internal_comments: Vec<Comment>,
 }
 
@@ -64,7 +75,6 @@ impl Comments {
 	fn new() -> Comments {
 		Comments {
 			left_comments: Vec::new(),
-			right_comments: Vec::new(),
 			internal_comments: Vec::new(),
 		}
 	}

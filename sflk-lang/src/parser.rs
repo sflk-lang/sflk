@@ -90,12 +90,25 @@ impl Parser {
 
 	fn parse_all_as_stmts(&mut self, tb: &mut TokBuffer) -> Vec<Node<Stmt>> {
 		let mut stmts: Vec<Node<Stmt>> = Vec::new();
-		while !matches!(tb.peek(0).0, Tok::Eof) {
-			stmts.push(self.parse_stmt(tb));
+		loop {
+			let comments = self.parse_comments(tb);
+			if matches!(tb.peek(0).0, Tok::Eof) {
+				// TODO:
+				// find a non-dirty way to put the last comments into the
+				// internal_comments field of the Node containing this statement vector
+				break;
+			}
+			let mut stmt_node = self.parse_stmt(tb);
+			stmt_node.add_left_comments(comments);
+			stmts.push(stmt_node);
 		}
 		stmts
 	}
 
+	// TODO:
+	// Remove this function
+	// and instead add an end parameter to parse_all_as_stmts
+	// so that it can stop at either EOF or '}'
 	fn parse_stmts(&mut self, tb: &mut TokBuffer) -> Vec<Node<Stmt>> {
 		let mut stmts: Vec<Node<Stmt>> = Vec::new();
 		while let Some(stmt) = self.maybe_parse_stmt(tb) {
@@ -105,12 +118,15 @@ impl Parser {
 	}
 
 	fn parse_stmt(&mut self, tb: &mut TokBuffer) -> Node<Stmt> {
-		if let Some(stmt_node) = self.maybe_parse_stmt(tb) {
+		let left_comments = self.parse_comments(tb);
+		let mut stmt_node = if let Some(stmt_node) = self.maybe_parse_stmt(tb) {
 			stmt_node
 		} else {
 			let (_tok, loc) = tb.pop();
 			Node::from(Stmt::Invalid, loc)
-		}
+		};
+		stmt_node.add_left_comments(left_comments);
+		stmt_node
 	}
 
 	fn maybe_parse_stmt(&mut self, tb: &mut TokBuffer) -> Option<Node<Stmt>> {
@@ -305,7 +321,7 @@ impl Parser {
 		}
 	}
 
-	fn maybe_parse_comments(&mut self, tb: &mut TokBuffer) -> Vec<Node<Comment>> {
+	fn parse_comments(&mut self, tb: &mut TokBuffer) -> Vec<Node<Comment>> {
 		let mut comments: Vec<Node<Comment>> = Vec::new();
 		while let Some(comment) = self.maybe_parse_comment(tb) {
 			comments.push(comment);
@@ -321,10 +337,12 @@ impl Parser {
 			no_end_hash_warning,
 		} = tok
 		{
-			Some(Node::from(
+			let comment_node = Node::from(
 				Comment::new(content.to_owned(), delimitation_thickness.to_owned()),
 				loc.to_owned(),
-			))
+			);
+			tb.disc();
+			Some(comment_node)
 		} else {
 			None
 		}

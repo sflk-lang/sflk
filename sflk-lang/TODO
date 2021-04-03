@@ -53,9 +53,22 @@ DEBUG REVISION
 REFACTOR THE CALL STACK
 - the call stack is an exec tree (see ADD SIGNALS)
 - each node has an instruction pointer and a code block
-- groups of nodes share contexts
-- some nodes have a context
-- todo...
+- groups of nodes share contexts NO!!!
+- some nodes have a context NO!!!
+- actually
+	- there are no contexts
+	- when reading a variable, if the variable is not defined, then
+		a reading signal traves down the exec tree until
+			it finds the variable or it encounters a read-blocking
+	- a read-blocking is something (not well defined for now) that says to
+		the reading signal "hey don't try reading beyond this point"
+	- a do here statement will not set up a read-blocking
+		but a do statement will
+	- read-blockings should actually be more subtle than that, and may check
+		the reading signal to see if it wants to read a white-listed variable
+		or something (that could emulate global variables, but in a way that
+		can be controlled with a lot more precision than usual global
+		variables hehe ^^)
 
 ADD SIGNALS
 - a signal has a type that defines the signal behavior and the payload type

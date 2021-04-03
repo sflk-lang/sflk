@@ -224,4 +224,4 @@ If you want to contribute in any way, please feel free to do so ^^.
 Note that there is a Discord server dedicated to
 the *development and use* of SFLK
 (how to get in there? we don't know haha,
-maybe ask an invite some way or something).
+maybe ask for an invite in one way or another).
