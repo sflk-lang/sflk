@@ -1,6 +1,6 @@
 use crate::log::IndentedLog;
 use crate::object::Obj;
-use crate::program::{Block, Chop, Expr, Stmt};
+use crate::program::{Block, Chain, Chop, Expr, Stmt};
 use crate::utils::{styles, Style};
 use std::collections::HashMap;
 
@@ -334,7 +334,7 @@ impl Mem {
 				self.log_deindent();
 				val
 			}
-			Expr::Chain { init_expr, chops } => {
+			Expr::Chain(Chain { init_expr, chops }) => {
 				self.log_indent(String::from("chain"), false, styles::BLUE);
 				let mut val = self.eval_expr(init_expr);
 				self.log_line(format!("initial value is {}", val), styles::NORMAL);

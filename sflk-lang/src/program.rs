@@ -127,16 +127,15 @@ impl From<&Stmt> for StringTree {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-	Var {
-		varname: String,
-	},
-	Const {
-		val: Obj,
-	},
-	Chain {
-		init_expr: Box<Expr>,
-		chops: Vec<Chop>,
-	},
+	Var { varname: String },
+	Const { val: Obj },
+	Chain(Chain),
+}
+
+#[derive(Debug, Clone)]
+pub struct Chain {
+	pub init_expr: Box<Expr>,
+	pub chops: Vec<Chop>,
 }
 
 impl From<&Expr> for StringTree {
@@ -146,7 +145,7 @@ impl From<&Expr> for StringTree {
 				StringTree::new_leaf(format!("variable {}", varname), styles::NORMAL)
 			}
 			Expr::Const { val } => StringTree::from(val),
-			Expr::Chain { init_expr, chops } => StringTree::new_node(
+			Expr::Chain(Chain { init_expr, chops }) => StringTree::new_node(
 				"chain".to_string(),
 				styles::BLUE,
 				std::iter::once(StringTree::from(&**init_expr))

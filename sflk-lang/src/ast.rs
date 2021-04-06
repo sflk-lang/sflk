@@ -464,13 +464,13 @@ impl Expr {
 						.collect(),
 				}),
 			},
-			Expr::Chain { init, chops } => program::Expr::Chain {
+			Expr::Chain { init, chops } => program::Expr::Chain(program::Chain {
 				init_expr: Box::new(init.content.to_machine_expr()),
 				chops: chops
 					.iter()
 					.map(|chop_node| chop_node.content.to_machine_chop())
 					.collect(),
-			},
+			}),
 			Expr::Invalid => unreachable!(),
 		}
 	}

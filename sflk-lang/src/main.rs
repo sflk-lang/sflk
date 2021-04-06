@@ -1,6 +1,7 @@
 mod ast;
 mod log;
 mod machine;
+mod machine2;
 mod object;
 mod parser;
 mod program;

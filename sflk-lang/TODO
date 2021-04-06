@@ -1,11 +1,13 @@
 
-BEFORE EVERYTHING ELSE
-- clean up everything !!!!
-- put the file execution in the machine as it was the case before the changes
-
 COMMENTS
-- comments may start and end with the same number of consecutive hashes
-- any other number of consecutive hashes in the comment doesn't end it
+- comments should be handled perfectly by the parser, none should be discarded
+
+CHAINS AND CHOPS REVISIONS
+- chains should be seen as group statements
+- chops should be seen as chop statements
+- this is not different from the old way of seeing things,
+	juts easier to name things since it will ne longer be necessary to handle
+	the chain case that really looks like a group statement
 
 INDENTED LOG
 - should be able to be "live", ie to be printed while being generated
@@ -37,6 +39,7 @@ STRING TREE STYLES REVISION
 	with the named node style being choosble from a list of styles
 	and with empty nodes being able to be disabled
 	and named nodes being able to be disabled
+- some boolean options should say if we want to see loc and comments
 
 AST REVISION
 - attach a warning list to nodes
@@ -59,12 +62,12 @@ REFACTOR THE CALL STACK
 	- there are no contexts
 	- when reading a variable, if the variable is not defined, then
 		a reading signal traves down the exec tree until
-			it finds the variable or it encounters a read-blocking
-	- a read-blocking is something (not well defined for now) that says to
+			it finds the variable or it encounters a read-blocker
+	- a read-blocker is something (not well defined for now) that says to
 		the reading signal "hey don't try reading beyond this point"
-	- a do here statement will not set up a read-blocking
+	- a do here statement will not set up a read-blocker
 		but a do statement will
-	- read-blockings should actually be more subtle than that, and may check
+	- read-blockers should actually be more subtle than that, and may check
 		the reading signal to see if it wants to read a white-listed variable
 		or something (that could emulate global variables, but in a way that
 		can be controlled with a lot more precision than usual global
