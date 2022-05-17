@@ -37,7 +37,7 @@ impl Settings {
 	fn from_args() -> Settings {
 		let mut args = std::env::args();
 		let mut settings = Settings {
-			path: args.next().unwrap_or_else(|| String::from("sflk")),
+			path: args.next().unwrap_or_else(|| "sflk".to_string()),
 			root_filename: None,
 			debug_mode: false,
 			wants_help: false,

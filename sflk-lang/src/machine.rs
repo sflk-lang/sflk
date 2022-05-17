@@ -163,14 +163,14 @@ impl Mem {
 		if let Some(debug_mem) = &mut self.debug_mem_opt {
 			debug_mem
 				.log
-				.log_line(String::from("Program tree"), styles::NEGATIVE);
+				.log_line("Program tree".to_string(), styles::NEGATIVE);
 			crate::stringtree::StringTree::from(&ast).print(&mut debug_mem.log);
 		}
 		let block_program = ast.unwrap_ref().to_machine_block();
 
-		self.log_line(String::from("Program execution"), styles::NEGATIVE);
+		self.log_line("Program execution".to_string(), styles::NEGATIVE);
 		self.exec_block_here(&block_program);
-		self.log_line(String::from("Program end"), styles::NEGATIVE);
+		self.log_line("Program end".to_string(), styles::NEGATIVE);
 	}
 
 	fn exec_stmts_here(&mut self, stmts: &[Stmt]) {
@@ -189,9 +189,9 @@ impl Mem {
 				Flow::Next => *self.excx_mut(0).i.last_mut().unwrap() += 1,
 				Flow::Restart => {
 					*self.excx_mut(0).i.last_mut().unwrap() = 0;
-					self.log_line(String::from("restart"), styles::NORMAL);
+					self.log_line("restart".to_string(), styles::NORMAL);
 				},
-				Flow::End => self.log_line(String::from("end"), styles::NORMAL),
+				Flow::End => self.log_line("end".to_string(), styles::NORMAL),
 			}
 		}
 		self.excx_mut(0).i.pop().expect("bug");
@@ -215,11 +215,11 @@ impl Mem {
 	fn exec_stmt(&mut self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Nop => {
-				self.log_indent(String::from("nop"), false, styles::NORMAL);
+				self.log_indent("nop".to_string(), false, styles::NORMAL);
 				self.log_deindent();
 			},
 			Stmt::Print { expr } => {
-				self.log_indent(String::from("print"), false, styles::NORMAL);
+				self.log_indent("print".to_string(), false, styles::NORMAL);
 				let val = self.eval_expr(expr);
 				if self.debug_mem_opt.is_some() {
 					self.log_line(format!("output {}", val), styles::NORMAL);
@@ -233,16 +233,16 @@ impl Mem {
 				self.log_deindent();
 			},
 			Stmt::Newline => {
-				self.log_indent(String::from("newline"), false, styles::NORMAL);
+				self.log_indent("newline".to_string(), false, styles::NORMAL);
 				if self.debug_mem_opt.is_some() {
-					self.log_line(String::from("output newline"), styles::NORMAL);
+					self.log_line("output newline".to_string(), styles::NORMAL);
 				} else {
 					println!();
 				}
 				self.log_deindent();
 			},
 			Stmt::Assign { varname, expr } => {
-				self.log_indent(String::from("assign"), false, styles::NORMAL);
+				self.log_indent("assign".to_string(), false, styles::NORMAL);
 				self.log_line(format!("to variable {}", varname), styles::NORMAL);
 				let val = self.eval_expr(expr);
 				self.varset(varname, val);
@@ -253,7 +253,7 @@ impl Mem {
 				self.log_deindent();
 			},
 			Stmt::Do { expr } => {
-				self.log_indent(String::from("do"), true, styles::BOLD_LIGHT_RED);
+				self.log_indent("do".to_string(), true, styles::BOLD_LIGHT_RED);
 				match self.eval_expr(expr) {
 					Obj::Block(block) => self.exec_block(&block),
 					obj => panic!("can't do {} for now", obj),
@@ -261,7 +261,7 @@ impl Mem {
 				self.log_deindent();
 			},
 			Stmt::DoHere { expr } => {
-				self.log_indent(String::from("do here"), false, styles::YELLOW);
+				self.log_indent("do here".to_string(), false, styles::YELLOW);
 				match self.eval_expr(expr) {
 					Obj::Block(block) => self.exec_block_here(&block),
 					obj => panic!("can't do here {} for now", obj),
@@ -269,7 +269,7 @@ impl Mem {
 				self.log_deindent();
 			},
 			Stmt::DoFileHere { expr } => {
-				self.log_indent(String::from("do file here"), false, styles::YELLOW);
+				self.log_indent("do file here".to_string(), false, styles::YELLOW);
 				match self.eval_expr(expr) {
 					Obj::String(filename) => self.exec_file_here(filename),
 					obj => panic!("can't do file here {} for now", obj),
@@ -277,24 +277,24 @@ impl Mem {
 				self.log_deindent();
 			},
 			Stmt::Evaluate { expr } => {
-				self.log_indent(String::from("evaluate"), false, styles::NORMAL);
+				self.log_indent("evaluate".to_string(), false, styles::NORMAL);
 				self.eval_expr(expr);
 				self.log_deindent();
 			},
 			Stmt::If { cond_expr, th_stmt, el_stmt } => {
-				self.log_indent(String::from("if"), false, styles::NORMAL);
+				self.log_indent("if".to_string(), false, styles::NORMAL);
 				if self.eval_expr(cond_expr).as_cond() {
 					if let Some(stmt) = th_stmt {
-						self.log_line(String::from("then branch"), styles::NORMAL);
+						self.log_line("then branch".to_string(), styles::NORMAL);
 						self.exec_stmt(stmt);
 					} else {
-						self.log_line(String::from("no then branch"), styles::NORMAL);
+						self.log_line("no then branch".to_string(), styles::NORMAL);
 					}
 				} else if let Some(stmt) = el_stmt {
-					self.log_line(String::from("else branch"), styles::NORMAL);
+					self.log_line("else branch".to_string(), styles::NORMAL);
 					self.exec_stmt(stmt);
 				} else {
-					self.log_line(String::from("no else branch"), styles::NORMAL);
+					self.log_line("no else branch".to_string(), styles::NORMAL);
 				}
 				self.log_deindent();
 			},
@@ -305,7 +305,7 @@ impl Mem {
 	fn eval_expr(&mut self, expr: &Expr) -> Obj {
 		match expr {
 			Expr::Var { varname } => {
-				self.log_indent(String::from("read"), false, styles::NORMAL);
+				self.log_indent("read".to_string(), false, styles::NORMAL);
 				self.log_line(format!("variable {}", varname), styles::NORMAL);
 				let val = self.varget(varname).clone();
 				self.log_line(format!("value is {}", val), styles::NORMAL);
@@ -313,14 +313,14 @@ impl Mem {
 				val
 			},
 			Expr::Const { val } => {
-				self.log_indent(String::from("constant"), false, styles::NORMAL);
+				self.log_indent("constant".to_string(), false, styles::NORMAL);
 				let val = val.clone();
 				self.log_line(format!("value is {}", val), styles::NORMAL);
 				self.log_deindent();
 				val
 			},
 			Expr::Chain(Chain { init_expr, chops }) => {
-				self.log_indent(String::from("chain"), false, styles::BLUE);
+				self.log_indent("chain".to_string(), false, styles::BLUE);
 				let mut val = self.eval_expr(init_expr);
 				self.log_line(format!("initial value is {}", val), styles::NORMAL);
 				for chop in chops {
@@ -336,35 +336,35 @@ impl Mem {
 	fn apply_chop(&mut self, val: &mut Obj, chop: &Chop) {
 		match chop {
 			Chop::Plus(expr) => {
-				self.log_indent(String::from("chop plus"), false, styles::NORMAL);
+				self.log_indent("chop plus".to_string(), false, styles::NORMAL);
 				let right = self.eval_expr(expr);
 				self.log_line(format!("value {}", right), styles::NORMAL);
 				val.apply_plus(right);
 				self.log_deindent();
 			},
 			Chop::Minus(expr) => {
-				self.log_indent(String::from("chop minus"), false, styles::NORMAL);
+				self.log_indent("chop minus".to_string(), false, styles::NORMAL);
 				let right = self.eval_expr(expr);
 				self.log_line(format!("value {}", right), styles::NORMAL);
 				val.apply_minus(right);
 				self.log_deindent();
 			},
 			Chop::Star(expr) => {
-				self.log_indent(String::from("chop star"), false, styles::NORMAL);
+				self.log_indent("chop star".to_string(), false, styles::NORMAL);
 				let right = self.eval_expr(expr);
 				self.log_line(format!("value {}", right), styles::NORMAL);
 				val.apply_star(right);
 				self.log_deindent();
 			},
 			Chop::Slash(expr) => {
-				self.log_indent(String::from("chop slash"), false, styles::NORMAL);
+				self.log_indent("chop slash".to_string(), false, styles::NORMAL);
 				let right = self.eval_expr(expr);
 				self.log_line(format!("value {}", right), styles::NORMAL);
 				val.apply_slash(right);
 				self.log_deindent();
 			},
 			Chop::ToRight(expr) => {
-				self.log_indent(String::from("chop to right"), true, styles::BOLD_LIGHT_RED);
+				self.log_indent("chop to right".to_string(), true, styles::BOLD_LIGHT_RED);
 				let right = self.eval_expr(expr);
 				match right {
 					Obj::Block(block) => {

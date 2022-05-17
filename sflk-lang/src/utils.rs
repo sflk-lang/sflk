@@ -26,18 +26,18 @@ fn escape_character(ch: char) -> Option<String> {
 	match ch {
 		// ASCII range escapes
 		'\"' => Some(String::from("\\\"")),
-		'\\' => Some(String::from("\\\\")),
-		'\n' => Some(String::from("\\n")),
-		'\t' => Some(String::from("\\t")),
-		'\x1b' => Some(String::from("\\e")),
-		'\x07' => Some(String::from("\\a")),
-		'\x08' => Some(String::from("\\b")),
-		'\x0b' => Some(String::from("\\v")),
-		'\x0c' => Some(String::from("\\f")),
-		'\r' => Some(String::from("\\r")),
+		'\\' => Some("\\\\".to_string()),
+		'\n' => Some("\\n".to_string()),
+		'\t' => Some("\\t".to_string()),
+		'\x1b' => Some("\\e".to_string()),
+		'\x07' => Some("\\a".to_string()),
+		'\x08' => Some("\\b".to_string()),
+		'\x0b' => Some("\\v".to_string()),
+		'\x0c' => Some("\\f".to_string()),
+		'\r' => Some("\\r".to_string()),
 		ch if (ch as u32) < (' ' as u32) => Some(format!("\\x{:02x}", ch as u32)),
 		// Non-ASCII range espaces
-		'�' => Some(String::from("\\?")),
+		'�' => Some("\\?".to_string()),
 		// Not to be escaped
 		_ => None,
 	}

@@ -73,35 +73,35 @@ pub enum Stmt {
 impl From<&Stmt> for StringTree {
 	fn from(stmt: &Stmt) -> StringTree {
 		match stmt {
-			Stmt::Nop => StringTree::new_leaf(String::from("nop"), styles::NORMAL),
+			Stmt::Nop => StringTree::new_leaf("nop".to_string(), styles::NORMAL),
 			Stmt::Print { expr } => StringTree::new_node(
-				String::from("print"),
+				"print".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::Newline => StringTree::new_leaf(String::from("newline"), styles::NORMAL),
+			Stmt::Newline => StringTree::new_leaf("newline".to_string(), styles::NORMAL),
 			Stmt::Assign { varname, expr } => StringTree::new_node(
 				format!("assign to variable {}", varname),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Stmt::Do { expr } => StringTree::new_node(
-				String::from("do"),
+				"do".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Stmt::DoHere { expr } => StringTree::new_node(
-				String::from("do here"),
+				"do here".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Stmt::DoFileHere { expr } => StringTree::new_node(
-				String::from("do file here"),
+				"do file here".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Stmt::Evaluate { expr } => StringTree::new_node(
-				String::from("evaluate"),
+				"evaluate".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
@@ -109,7 +109,7 @@ impl From<&Stmt> for StringTree {
 				cond_expr,
 				th_stmt,
 				el_stmt,
-			} => StringTree::new_node(String::from("if"), styles::NORMAL, {
+			} => StringTree::new_node("if".to_string(), styles::NORMAL, {
 				let mut vec: Vec<StringTree> = Vec::with_capacity(3);
 				vec.push(StringTree::from(cond_expr));
 				if let Some(stmt) = th_stmt {
