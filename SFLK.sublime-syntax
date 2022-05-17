@@ -53,6 +53,8 @@ contexts:
       scope: keyword.operator.sflk
     - match: '\b(if|th|el)\b'
       scope: keyword.control.conditional.if.sflk
+    - match: '\b(lp|wh|bd|sp)\b'
+      scope: keyword.control.loop.sflk
     - match: '\b(fh)\b'
       scope: keyword.import.sflk
     - match: '\b(np|pr|nl|do|dh|ev|redo|end|imp|exp)\b'

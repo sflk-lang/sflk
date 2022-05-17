@@ -200,6 +200,31 @@ impl Parser {
 						full_loc,
 					))
 				},
+				Kw::Lp => {
+					let kw_loc = first_loc.clone();
+					tb.disc();
+					let sh_expr_node = self.maybe_parse_stmt_extension_expr(tb, Kw::Wh);
+					let bd_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::Bd);
+					let sp_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::Sp);
+					let mut full_loc = kw_loc;
+					if let Some(expr_node) = &sh_expr_node {
+						full_loc += expr_node.loc();
+					}
+					if let Some(stmt_node) = &bd_stmt_node {
+						full_loc += stmt_node.loc();
+					}
+					if let Some(stmt_node) = &sp_stmt_node {
+						full_loc += stmt_node.loc();
+					}
+					Some(Node::from(
+						Stmt::Loop {
+							wh_expr: sh_expr_node,
+							bd_stmt: bd_stmt_node.map(Box::new),
+							sp_stmt: sp_stmt_node.map(Box::new),
+						},
+						full_loc,
+					))
+				},
 				_ => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
@@ -208,6 +233,21 @@ impl Parser {
 			}
 		} else {
 			self.maybe_parse_assign_stmt(tb)
+		}
+	}
+
+	fn maybe_parse_stmt_extension_expr(
+		&mut self,
+		tb: &mut TokBuffer,
+		kw: Kw,
+	) -> Option<Node<Expr>> {
+		let (tok, _) = tb.peek(0);
+		match tok {
+			Tok::Kw(tok_kw) if *tok_kw == kw => {
+				tb.disc();
+				Some(self.parse_expr(tb))
+			},
+			_ => None,
 		}
 	}
 

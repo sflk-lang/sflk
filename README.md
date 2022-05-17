@@ -180,6 +180,29 @@ x < 8
 uwu < "owo"
 ```
 
+### Loop
+
+The *loop* statement consists of the `lp` keyword followed by
+the optional following extensions *while*, *body* and *separator* in any order:
+The *while* extension consists of the `wh` keyword followed by an expression,
+The *body* extension consists of the `bd` keyword followed by a statement and
+the *separator* extension consists of the `sp` keyword followed by a statement.
+
+The loop is executed in successive iterations.
+Before each iteration, if the while condition (if any) is falsy then the loop halts.
+The loop body (if any) is executed at each iteration.
+The loop separator (if any) is executed in between each execution of the loop body.
+
+
+Example:
+
+```sflk
+lp
+wh x
+bd dh {pr x x < x-1}
+sp pr ", "
+```
+
 ## Binary operators
 
 ### Plus `+`

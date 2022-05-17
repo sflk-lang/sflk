@@ -1,0 +1,7 @@
+
+x < 8
+lp
+wh x
+bd dh {pr x x < x-1}
+sp pr ", "
+nl

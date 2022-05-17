@@ -12,11 +12,7 @@ impl From<&Block> for StringTree {
 		StringTree::new_node(
 			"block".to_owned(),
 			styles::CYAN,
-			block
-				.stmts
-				.iter()
-				.map(StringTree::from)
-				.collect(),
+			block.stmts.iter().map(StringTree::from).collect(),
 		)
 	}
 }
@@ -67,6 +63,11 @@ pub enum Stmt {
 		th_stmt: Option<Box<Stmt>>,
 		el_stmt: Option<Box<Stmt>>,
 	},
+	Loop {
+		wh_expr: Option<Expr>,
+		bd_stmt: Option<Box<Stmt>>,
+		sp_stmt: Option<Box<Stmt>>,
+	},
 	Invalid, // TODO
 }
 
@@ -105,21 +106,34 @@ impl From<&Stmt> for StringTree {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::If {
-				cond_expr,
-				th_stmt,
-				el_stmt,
-			} => StringTree::new_node("if".to_string(), styles::NORMAL, {
-				let mut vec: Vec<StringTree> = Vec::with_capacity(3);
-				vec.push(StringTree::from(cond_expr));
-				if let Some(stmt) = th_stmt {
-					vec.push(StringTree::from(&**stmt));
-				}
-				if let Some(stmt) = el_stmt {
-					vec.push(StringTree::from(&**stmt));
-				}
-				vec
-			}),
+			Stmt::If { cond_expr, th_stmt, el_stmt } => {
+				StringTree::new_node("if".to_string(), styles::NORMAL, {
+					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
+					vec.push(StringTree::from(cond_expr));
+					if let Some(stmt) = th_stmt {
+						vec.push(StringTree::from(&**stmt));
+					}
+					if let Some(stmt) = el_stmt {
+						vec.push(StringTree::from(&**stmt));
+					}
+					vec
+				})
+			},
+			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => {
+				StringTree::new_node("loop".to_string(), styles::NORMAL, {
+					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
+					if let Some(expr) = wh_expr {
+						vec.push(StringTree::from(expr));
+					}
+					if let Some(stmt) = bd_stmt {
+						vec.push(StringTree::from(&**stmt));
+					}
+					if let Some(stmt) = sp_stmt {
+						vec.push(StringTree::from(&**stmt));
+					}
+					vec
+				})
+			},
 			Stmt::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
@@ -143,7 +157,7 @@ impl From<&Expr> for StringTree {
 		match expr {
 			Expr::Var { varname } => {
 				StringTree::new_leaf(format!("variable {}", varname), styles::NORMAL)
-			}
+			},
 			Expr::Const { val } => StringTree::from(val),
 			Expr::Chain(Chain { init_expr, chops }) => StringTree::new_node(
 				"chain".to_string(),

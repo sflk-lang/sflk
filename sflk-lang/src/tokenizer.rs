@@ -107,6 +107,10 @@ pub enum Kw {
 	If,
 	Th,
 	El,
+	Lp,
+	Wh,
+	Bd,
+	Sp,
 }
 
 #[derive(Debug, Clone)]
@@ -236,6 +240,10 @@ impl Tokenizer {
 			"if" => Tok::Kw(Kw::If),
 			"th" => Tok::Kw(Kw::Th),
 			"el" => Tok::Kw(Kw::El),
+			"lp" => Tok::Kw(Kw::Lp),
+			"wh" => Tok::Kw(Kw::Wh),
+			"bd" => Tok::Kw(Kw::Bd),
+			"sp" => Tok::Kw(Kw::Sp),
 			_ => {
 				let len = word.len();
 				Tok::Name {

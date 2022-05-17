@@ -59,10 +59,7 @@ pub struct Comment {
 
 impl Comment {
 	pub fn new(content: String, delimitation_thickness: usize) -> Comment {
-		Comment {
-			content,
-			delimitation_thickness,
-		}
+		Comment { content, delimitation_thickness }
 	}
 }
 
@@ -137,6 +134,11 @@ pub enum Stmt {
 		th_stmt: Option<Box<Node<Stmt>>>,
 		el_stmt: Option<Box<Node<Stmt>>>,
 	},
+	Loop {
+		wh_expr: Option<Node<Expr>>,
+		bd_stmt: Option<Box<Node<Stmt>>>,
+		sp_stmt: Option<Box<Node<Stmt>>>,
+	},
 	Invalid, // TODO: Add error details
 }
 
@@ -150,10 +152,7 @@ pub enum Expr {
 	IntegerLiteral(String),
 	StringLiteral(String),
 	BlockLiteral(Vec<Node<Stmt>>),
-	Chain {
-		init: Box<Node<Expr>>,
-		chops: Vec<Node<Chop>>,
-	},
+	Chain { init: Box<Node<Expr>>, chops: Vec<Node<Chop>> },
 	Invalid, // TODO: Add error details
 }
 
@@ -217,10 +216,10 @@ impl Treeable for Expr {
 		match self {
 			Expr::VariableName(name) => {
 				StringTree::new_leaf(format!("variable {}", name), styles::NORMAL)
-			}
+			},
 			Expr::IntegerLiteral(integer) => {
 				StringTree::new_leaf(format!("integer {}", integer), styles::NORMAL)
-			}
+			},
 			Expr::StringLiteral(string) => StringTree::new_leaf(
 				format!("string \"{}\"", escape_string(string, &styles::UNDERLINE)),
 				styles::NORMAL,
@@ -228,10 +227,7 @@ impl Treeable for Expr {
 			Expr::BlockLiteral(stmts) => StringTree::new_node(
 				"block".to_string(),
 				styles::CYAN,
-				stmts
-					.iter()
-					.map(StringTree::from)
-					.collect(),
+				stmts.iter().map(StringTree::from).collect(),
 			),
 			Expr::Chain { init, chops } => StringTree::new_node(
 				"chain".to_string(),
@@ -250,8 +246,10 @@ impl Treeable for TargetExpr {
 		match self {
 			TargetExpr::VariableName(name) => {
 				StringTree::new_leaf(format!("target variable {}", name), styles::NORMAL)
-			}
-			TargetExpr::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
+			},
+			TargetExpr::Invalid => {
+				StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED)
+			}, // TODO
 		}
 	}
 }
@@ -276,9 +274,11 @@ impl Treeable for Stmt {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::Do { expr } => {
-				StringTree::new_node("do".to_string(), styles::NORMAL, vec![StringTree::from(expr)])
-			}
+			Stmt::Do { expr } => StringTree::new_node(
+				"do".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(expr)],
+			),
 			Stmt::DoHere { expr } => StringTree::new_node(
 				"do here".to_string(),
 				styles::NORMAL,
@@ -289,31 +289,53 @@ impl Treeable for Stmt {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::If {
-				cond_expr,
-				th_stmt,
-				el_stmt,
-			} => StringTree::new_node("if".to_string(), styles::NORMAL, {
-				let mut vec: Vec<StringTree> = Vec::with_capacity(3);
-				vec.push(StringTree::from(cond_expr));
-				if let Some(stmt) = th_stmt {
-					vec.push(StringTree::from(&**stmt));
-				} else {
-					vec.push(StringTree::new_leaf(
-						"no then branch".to_string(),
-						styles::NORMAL,
-					));
-				}
-				if let Some(stmt) = el_stmt {
-					vec.push(StringTree::from(&**stmt));
-				} else {
-					vec.push(StringTree::new_leaf(
-						"no else branch".to_string(),
-						styles::NORMAL,
-					));
-				}
-				vec
-			}),
+			Stmt::If { cond_expr, th_stmt, el_stmt } => {
+				StringTree::new_node("if".to_string(), styles::NORMAL, {
+					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
+					vec.push(StringTree::from(cond_expr));
+					if let Some(stmt) = th_stmt {
+						vec.push(StringTree::from(&**stmt));
+					} else {
+						vec.push(StringTree::new_leaf(
+							"no then branch".to_string(),
+							styles::NORMAL,
+						));
+					}
+					if let Some(stmt) = el_stmt {
+						vec.push(StringTree::from(&**stmt));
+					} else {
+						vec.push(StringTree::new_leaf(
+							"no else branch".to_string(),
+							styles::NORMAL,
+						));
+					}
+					vec
+				})
+			},
+			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => {
+				StringTree::new_node("loop".to_string(), styles::NORMAL, {
+					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
+					if let Some(expr) = wh_expr {
+						vec.push(StringTree::from(expr));
+					} else {
+						vec.push(StringTree::new_leaf(
+							"no while condition".to_string(),
+							styles::NORMAL,
+						));
+					}
+					if let Some(stmt) = bd_stmt {
+						vec.push(StringTree::from(&**stmt));
+					} else {
+						vec.push(StringTree::new_leaf("no body".to_string(), styles::NORMAL));
+					}
+					if let Some(stmt) = sp_stmt {
+						vec.push(StringTree::from(&**stmt));
+					} else {
+						vec.push(StringTree::new_leaf("no separator".to_string(), styles::NORMAL));
+					}
+					vec
+				})
+			},
 			Stmt::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
@@ -324,10 +346,7 @@ impl Treeable for Program {
 		StringTree::new_node(
 			"program".to_string(),
 			styles::CYAN,
-			self.stmts
-				.iter()
-				.map(StringTree::from)
-				.collect(),
+			self.stmts.iter().map(StringTree::from).collect(),
 		)
 	}
 }
@@ -352,7 +371,7 @@ impl Stmt {
 			Stmt::Newline => false,
 			Stmt::Assign { target, expr } => {
 				target.content.is_invalid() || expr.content.is_invalid()
-			}
+			},
 			Stmt::Evaluate { expr } => expr.content.is_invalid(),
 			Stmt::Do { expr } => expr.content.is_invalid(),
 			Stmt::DoHere { expr } => expr.content.is_invalid(),
@@ -363,15 +382,36 @@ impl Stmt {
 				th_stmt,
 				el_stmt,
 			} => {
-				cond_expr.content.is_invalid()
-					|| th_stmt
-						.as_ref()
-						.map(|stmt| (*stmt).content.is_invalid())
-						.unwrap_or(false)
-					|| el_stmt
-						.as_ref()
-						.map(|stmt| (*stmt).content.is_invalid())
-						.unwrap_or(false)
+				cond_expr
+					.content
+					.is_invalid()
+				|| th_stmt
+					.as_ref()
+					.map(|stmt| (*stmt).content.is_invalid())
+					.unwrap_or(false)
+				|| el_stmt
+					.as_ref()
+					.map(|stmt| (*stmt).content.is_invalid())
+					.unwrap_or(false)
+			},
+			#[rustfmt::skip]
+			Stmt::Loop {
+				wh_expr,
+				bd_stmt,
+				sp_stmt,
+			} => {
+				wh_expr
+					.as_ref()
+					.map(|expr| (*expr).content.is_invalid())
+					.unwrap_or(false)
+				|| bd_stmt
+					.as_ref()
+					.map(|stmt| (*stmt).content.is_invalid())
+					.unwrap_or(false)
+				|| sp_stmt
+					.as_ref()
+					.map(|stmt| (*stmt).content.is_invalid())
+					.unwrap_or(false)
 			},
 			Stmt::Invalid => true,
 		}
@@ -380,9 +420,7 @@ impl Stmt {
 	fn to_machine_stmt(&self) -> program::Stmt {
 		match self {
 			Stmt::Nop => program::Stmt::Nop,
-			Stmt::Print { expr } => program::Stmt::Print {
-				expr: expr.content.to_machine_expr(),
-			},
+			Stmt::Print { expr } => program::Stmt::Print { expr: expr.content.to_machine_expr() },
 			Stmt::Newline => program::Stmt::Newline,
 			Stmt::Assign { target, expr } => program::Stmt::Assign {
 				varname: match &target.content {
@@ -391,28 +429,31 @@ impl Stmt {
 				},
 				expr: expr.content.to_machine_expr(),
 			},
-			Stmt::Evaluate { expr } => program::Stmt::Evaluate {
-				expr: expr.content.to_machine_expr(),
+			Stmt::Evaluate { expr } => {
+				program::Stmt::Evaluate { expr: expr.content.to_machine_expr() }
 			},
-			Stmt::Do { expr } => program::Stmt::Do {
-				expr: expr.content.to_machine_expr(),
+			Stmt::Do { expr } => program::Stmt::Do { expr: expr.content.to_machine_expr() },
+			Stmt::DoHere { expr } => program::Stmt::DoHere { expr: expr.content.to_machine_expr() },
+			Stmt::DoFileHere { expr } => {
+				program::Stmt::DoFileHere { expr: expr.content.to_machine_expr() }
 			},
-			Stmt::DoHere { expr } => program::Stmt::DoHere {
-				expr: expr.content.to_machine_expr(),
-			},
-			Stmt::DoFileHere { expr } => program::Stmt::DoFileHere {
-				expr: expr.content.to_machine_expr(),
-			},
-			Stmt::If {
-				cond_expr,
-				th_stmt,
-				el_stmt,
-			} => program::Stmt::If {
+			Stmt::If { cond_expr, th_stmt, el_stmt } => program::Stmt::If {
 				cond_expr: cond_expr.content.to_machine_expr(),
 				th_stmt: th_stmt
 					.as_ref()
 					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
 				el_stmt: el_stmt
+					.as_ref()
+					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+			},
+			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => program::Stmt::Loop {
+				wh_expr: wh_expr
+					.as_ref()
+					.map(|expr| ((*expr).content.to_machine_expr())),
+				bd_stmt: bd_stmt
+					.as_ref()
+					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+				sp_stmt: sp_stmt
 					.as_ref()
 					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
 			},
@@ -440,21 +481,19 @@ impl Expr {
 			Expr::Chain { init, chops } => {
 				(*init).content.is_invalid()
 					|| chops.iter().any(|chop| (*chop).content.is_invalid())
-			}
+			},
 			Expr::Invalid => true,
 		}
 	}
 
 	fn to_machine_expr(&self) -> program::Expr {
 		match self {
-			Expr::VariableName(varname) => program::Expr::Var {
-				varname: varname.to_string(),
-			},
+			Expr::VariableName(varname) => program::Expr::Var { varname: varname.to_string() },
 			Expr::IntegerLiteral(integer_string) => program::Expr::Const {
 				val: Obj::Integer(str::parse(integer_string).expect("TODO: bigints")),
 			},
-			Expr::StringLiteral(string_string) => program::Expr::Const {
-				val: Obj::String(string_string.clone()),
+			Expr::StringLiteral(string_string) => {
+				program::Expr::Const { val: Obj::String(string_string.clone()) }
 			},
 			Expr::BlockLiteral(stmts) => program::Expr::Const {
 				val: Obj::Block(program::Block {

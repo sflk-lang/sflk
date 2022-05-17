@@ -298,6 +298,32 @@ impl Mem {
 				}
 				self.log_deindent();
 			},
+			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => {
+				self.log_indent("loop".to_string(), false, styles::NORMAL);
+				let mut is_first_iteration = true;
+				loop {
+					let keep_looping = if let Some(expr) = wh_expr {
+						self.eval_expr(expr).as_cond()
+					} else {
+						true
+					};
+					if !keep_looping {
+						break;
+					}
+					if !is_first_iteration {
+						if let Some(stmt) = sp_stmt {
+							self.log_line("loop separator".to_string(), styles::NORMAL);
+							self.exec_stmt(stmt);
+						}
+					}
+					if let Some(stmt) = bd_stmt {
+						self.log_line("loop body".to_string(), styles::NORMAL);
+						self.exec_stmt(stmt);
+					}
+					is_first_iteration = false;
+				}
+				self.log_deindent();
+			},
 			Stmt::Invalid => println!("TODO: invalid stmt"),
 		}
 	}
