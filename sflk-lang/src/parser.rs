@@ -137,47 +137,47 @@ impl Parser {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					Some(Node::from(Stmt::Nop, kw_loc))
-				}
+				},
 				Kw::Pr => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
 					Some(Node::from(Stmt::Print { expr: expr_node }, full_loc))
-				}
+				},
 				Kw::Nl => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					Some(Node::from(Stmt::Newline, kw_loc))
-				}
+				},
 				Kw::Ev => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
 					Some(Node::from(Stmt::Evaluate { expr: expr_node }, full_loc))
-				}
+				},
 				Kw::Do => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
 					Some(Node::from(Stmt::Do { expr: expr_node }, full_loc))
-				}
+				},
 				Kw::Dh => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
 					Some(Node::from(Stmt::DoHere { expr: expr_node }, full_loc))
-				}
+				},
 				Kw::Fh => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let expr_node = self.parse_expr(tb);
 					let full_loc = &kw_loc + expr_node.loc();
 					Some(Node::from(Stmt::DoFileHere { expr: expr_node }, full_loc))
-				}
+				},
 				Kw::If => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
@@ -199,17 +199,15 @@ impl Parser {
 						},
 						full_loc,
 					))
-				}
+				},
 				_ => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					Some(Node::from(Stmt::Invalid, kw_loc)) // TODO: do
-				}
+				},
 			}
-		} else if let Some(stmt) = self.maybe_parse_assign_stmt(tb) {
-			Some(stmt)
 		} else {
-			None
+			self.maybe_parse_assign_stmt(tb)
 		}
 	}
 
@@ -223,7 +221,7 @@ impl Parser {
 			Tok::Kw(tok_kw) if *tok_kw == kw => {
 				tb.disc();
 				Some(self.parse_stmt(tb))
-			}
+			},
 			_ => None,
 		}
 	}
@@ -242,13 +240,10 @@ impl Parser {
 				let expr_node = self.parse_expr(tb);
 				let total_loc = target_node.loc() + expr_node.loc();
 				Some(Node::from(
-					Stmt::Assign {
-						target: target_node,
-						expr: expr_node,
-					},
+					Stmt::Assign { target: target_node, expr: expr_node },
 					total_loc,
 				))
-			}
+			},
 			_ => None,
 		}
 	}
@@ -263,13 +258,7 @@ impl Parser {
 			expr_node
 		} else {
 			let loc = expr_node.loc() + chops.last().unwrap().loc();
-			Node::from(
-				Expr::Chain {
-					init: Box::new(expr_node),
-					chops,
-				},
-				loc,
-			)
+			Node::from(Expr::Chain { init: Box::new(expr_node), chops }, loc)
 		}
 	}
 
@@ -285,20 +274,20 @@ impl Parser {
 				match right_tok {
 					Tok::Right(Matched::Curly) => {
 						Node::from(Expr::BlockLiteral(stmts), left_loc + right_loc)
-					}
+					},
 					_ => panic!("TODO: generate an error here"),
 				}
-			}
+			},
 			Tok::Left(Matched::Paren) => {
 				let expr_node = self.parse_expr(tb);
 				let (right_tok, right_loc) = tb.pop();
 				match right_tok {
 					Tok::Right(Matched::Paren) => {
 						Node::from(expr_node.unwrap(), left_loc + right_loc)
-					}
+					},
 					_ => panic!("TODO: generate an error here"),
 				}
-			}
+			},
 			_ => Node::from(Expr::Invalid, left_loc), // TODO: do!
 		}
 	}

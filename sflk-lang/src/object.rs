@@ -15,9 +15,9 @@ impl From<&Obj> for StringTree {
 		match obj {
 			Obj::Integer(integer) => {
 				StringTree::new_leaf(format!("integer {}", integer), styles::NORMAL)
-			}
+			},
 			Obj::String(string) => StringTree::new_leaf(
-				format!("string \"{}\"", escape_string(&string, &styles::UNDERLINE)),
+				format!("string \"{}\"", escape_string(string, &styles::UNDERLINE)),
 				styles::NORMAL,
 			),
 			Obj::Block(block) => StringTree::from(block),
@@ -29,10 +29,10 @@ impl std::fmt::Display for Obj {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
 			Obj::Integer(integer) => write!(f, "{}", integer),
-			Obj::String(string) => write!(f, "\"{}\"", escape_string(&string, &styles::UNDERLINE)),
-			Obj::Block(_) => write!(f, "{}", "block"), // TODO: Change this
-			                                           //Obj::Cx(cx) => write!(f, "{:?}", cx), // Coming soon!
+			Obj::String(string) => write!(f, "\"{}\"", escape_string(string, &styles::UNDERLINE)),
+			Obj::Block(_) => write!(f, "block"), // TODO: Change this
 		}
+		//Obj::Cx(cx) => write!(f, "{:?}", cx), // Coming soon!
 	}
 }
 
@@ -76,7 +76,7 @@ impl Obj {
 			(Obj::Integer(val), Obj::Integer(right)) => *self = Obj::Integer(val / right),
 			(Obj::String(val), Obj::String(right)) => {
 				*self = Obj::Integer(val.matches(right.as_str()).count() as isize)
-			}
+			},
 			(obj_left, obj_right) => panic!(
 				"slash not yet supported between {} and {}",
 				obj_left, obj_right
@@ -89,7 +89,7 @@ impl Obj {
 	pub fn as_cond(&self) -> bool {
 		match self {
 			Obj::Integer(integer) => *integer != 0,
-			Obj::String(string) => string.len() != 0,
+			Obj::String(string) => !string.is_empty(),
 			Obj::Block(_) => true,
 			//Obj::Cx(cx) => !cx.varmap.is_empty(),  // Coming soon!
 		}

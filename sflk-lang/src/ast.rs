@@ -90,7 +90,7 @@ impl<T> Node<T> {
 		// Change the + impl for Loc so that this looks better
 		// like seriously wtf is even that
 		self.loc = &loc + &self.loc;
-		self.loc = self.loc + loc;
+		self.loc += loc;
 		self
 	}
 }
@@ -183,31 +183,31 @@ impl Treeable for Chop {
 	fn tree(&self, loc: &Loc) -> StringTree {
 		match self {
 			Chop::Plus(expr_node) => StringTree::new_node(
-				format!("chop plus"),
+				"chop plus".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
 			Chop::Minus(expr_node) => StringTree::new_node(
-				format!("chop minus"),
+				"chop minus".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
 			Chop::Star(expr_node) => StringTree::new_node(
-				format!("chop star"),
+				"chop star".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
 			Chop::Slash(expr_node) => StringTree::new_node(
-				format!("chop slash"),
+				"chop slash".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
 			Chop::ToRight(expr_node) => StringTree::new_node(
-				format!("chop to_right"),
+				"chop to_right".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
-			Chop::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
+			Chop::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -226,21 +226,21 @@ impl Treeable for Expr {
 				styles::NORMAL,
 			),
 			Expr::BlockLiteral(stmts) => StringTree::new_node(
-				format!("block"),
+				"block".to_string(),
 				styles::CYAN,
 				stmts
 					.iter()
-					.map(|stmt_node| StringTree::from(stmt_node))
+					.map(StringTree::from)
 					.collect(),
 			),
 			Expr::Chain { init, chops } => StringTree::new_node(
-				format!("chain"),
+				"chain".to_string(),
 				styles::BLUE,
 				std::iter::once(StringTree::from(&**init))
-					.chain(chops.iter().map(|chop_node| StringTree::from(chop_node)))
+					.chain(chops.iter().map(StringTree::from))
 					.collect(),
 			),
-			Expr::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
+			Expr::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -251,7 +251,7 @@ impl Treeable for TargetExpr {
 			TargetExpr::VariableName(name) => {
 				StringTree::new_leaf(format!("target variable {}", name), styles::NORMAL)
 			}
-			TargetExpr::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
+			TargetExpr::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -259,33 +259,33 @@ impl Treeable for TargetExpr {
 impl Treeable for Stmt {
 	fn tree(&self, loc: &Loc) -> StringTree {
 		match self {
-			Stmt::Nop => StringTree::new_leaf(format!("nop"), styles::NORMAL),
+			Stmt::Nop => StringTree::new_leaf("nop".to_string(), styles::NORMAL),
 			Stmt::Print { expr } => StringTree::new_node(
-				format!("print"),
+				"print".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::Newline => StringTree::new_leaf(format!("newline"), styles::NORMAL),
+			Stmt::Newline => StringTree::new_leaf("newline".to_string(), styles::NORMAL),
 			Stmt::Assign { target, expr } => StringTree::new_node(
-				format!("assign"),
+				"assign".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(target), StringTree::from(expr)],
 			),
 			Stmt::Evaluate { expr } => StringTree::new_node(
-				format!("evaluate"),
+				"evaluate".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Stmt::Do { expr } => {
-				StringTree::new_node(format!("do"), styles::NORMAL, vec![StringTree::from(expr)])
+				StringTree::new_node("do".to_string(), styles::NORMAL, vec![StringTree::from(expr)])
 			}
 			Stmt::DoHere { expr } => StringTree::new_node(
-				format!("do here"),
+				"do here".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Stmt::DoFileHere { expr } => StringTree::new_node(
-				format!("do file here"),
+				"do file here".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
@@ -293,14 +293,14 @@ impl Treeable for Stmt {
 				cond_expr,
 				th_stmt,
 				el_stmt,
-			} => StringTree::new_node(format!("if"), styles::NORMAL, {
+			} => StringTree::new_node("if".to_string(), styles::NORMAL, {
 				let mut vec: Vec<StringTree> = Vec::with_capacity(3);
 				vec.push(StringTree::from(cond_expr));
 				if let Some(stmt) = th_stmt {
 					vec.push(StringTree::from(&**stmt));
 				} else {
 					vec.push(StringTree::new_leaf(
-						format!("no then branch"),
+						"no then branch".to_string(),
 						styles::NORMAL,
 					));
 				}
@@ -308,13 +308,13 @@ impl Treeable for Stmt {
 					vec.push(StringTree::from(&**stmt));
 				} else {
 					vec.push(StringTree::new_leaf(
-						format!("no else branch"),
+						"no else branch".to_string(),
 						styles::NORMAL,
 					));
 				}
 				vec
 			}),
-			Stmt::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
+			Stmt::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -322,11 +322,11 @@ impl Treeable for Stmt {
 impl Treeable for Program {
 	fn tree(&self, loc: &Loc) -> StringTree {
 		StringTree::new_node(
-			format!("program"),
+			"program".to_string(),
 			styles::CYAN,
 			self.stmts
 				.iter()
-				.map(|stmt_node| StringTree::from(stmt_node))
+				.map(StringTree::from)
 				.collect(),
 		)
 	}
@@ -433,10 +433,10 @@ impl TargetExpr {
 impl Expr {
 	fn is_invalid(&self) -> bool {
 		match self {
-			Expr::VariableName(varname) => false,
-			Expr::IntegerLiteral(integer_string) => false,
-			Expr::StringLiteral(string_string) => false,
-			Expr::BlockLiteral(stmts) => false,
+			Expr::VariableName(_varname) => false,
+			Expr::IntegerLiteral(_integer_string) => false,
+			Expr::StringLiteral(_string_string) => false,
+			Expr::BlockLiteral(_stmts) => false,
 			Expr::Chain { init, chops } => {
 				(*init).content.is_invalid()
 					|| chops.iter().any(|chop| (*chop).content.is_invalid())
@@ -451,7 +451,7 @@ impl Expr {
 				varname: varname.to_string(),
 			},
 			Expr::IntegerLiteral(integer_string) => program::Expr::Const {
-				val: Obj::Integer(str::parse(&integer_string).expect("TODO: bigints")),
+				val: Obj::Integer(str::parse(integer_string).expect("TODO: bigints")),
 			},
 			Expr::StringLiteral(string_string) => program::Expr::Const {
 				val: Obj::String(string_string.clone()),

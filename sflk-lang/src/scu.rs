@@ -11,7 +11,7 @@ pub struct SourceCodeUnit {
 impl SourceCodeUnit {
 	pub fn from_filename(filename: &str) -> SourceCodeUnit {
 		let src = std::fs::read_to_string(filename)
-			.expect(&format!("source file `{}` couldn't be read", filename));
+			.unwrap_or_else(|_| panic!("source file `{}` couldn't be read", filename));
 		SourceCodeUnit::from_str(&src, filename.to_string())
 	}
 

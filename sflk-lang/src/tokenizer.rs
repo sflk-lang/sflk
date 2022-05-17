@@ -26,9 +26,8 @@ impl CharReadingHead {
 	fn disc(&mut self) {
 		if let Some(ch) = self.peek() {
 			self.raw_index += ch.len_utf8();
-			match ch {
-				'\n' => self.line += 1,
-				_ => (),
+			if ch == '\n' {
+				self.line += 1;
 			}
 		}
 	}
@@ -220,7 +219,7 @@ impl Tokenizer {
 			word_string.push(ch);
 			crh.disc();
 		}
-		std::assert!(word_string.len() >= 1);
+		std::assert!(!word_string.is_empty());
 		loc.raw_length = word_string.bytes().len();
 		(word_string, loc)
 	}
@@ -257,7 +256,7 @@ impl Tokenizer {
 			integer_string.push(ch);
 			crh.disc();
 		}
-		std::assert!(integer_string.len() >= 1);
+		std::assert!(!integer_string.is_empty());
 		loc.raw_length = integer_string.bytes().len();
 		(integer_string, loc)
 	}

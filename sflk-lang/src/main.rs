@@ -37,7 +37,7 @@ impl Settings {
 	fn from_args() -> Settings {
 		let mut args = std::env::args();
 		let mut settings = Settings {
-			path: args.next().unwrap_or(String::from("sflk")),
+			path: args.next().unwrap_or_else(|| String::from("sflk")),
 			root_filename: None,
 			debug_mode: false,
 			wants_help: false,
@@ -50,12 +50,10 @@ impl Settings {
 				settings.wants_help = true;
 			} else if arg == "-v" || arg == "--version" {
 				settings.wants_version = true;
+			} else if settings.root_filename.is_none() {
+				settings.root_filename = Some(arg);
 			} else {
-				if settings.root_filename.is_none() {
-					settings.root_filename = Some(arg);
-				} else {
-					panic!("unknown command line argument `{}`", arg);
-				}
+				panic!("unknown command line argument `{}`", arg);
 			}
 		}
 		settings
@@ -67,9 +65,10 @@ fn main() {
 
 	let mut did_something = false;
 	if settings.wants_version {
+		let version_name = "indev";
 		println!(
 			"SFLK reference interpreter, version {}.{}.{} ({})",
-			0, 1, 0, "indev"
+			0, 1, 0, version_name
 		);
 		println!("{}", NO_WARRANTY_NOTE);
 		did_something = true;

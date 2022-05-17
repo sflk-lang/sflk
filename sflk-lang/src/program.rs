@@ -15,7 +15,7 @@ impl From<&Block> for StringTree {
 			block
 				.stmts
 				.iter()
-				.map(|stmt| StringTree::from(stmt))
+				.map(StringTree::from)
 				.collect(),
 		)
 	}
@@ -120,7 +120,7 @@ impl From<&Stmt> for StringTree {
 				}
 				vec
 			}),
-			Stmt::Invalid => StringTree::new_leaf(format!("invalid"), styles::BOLD_LIGHT_RED), // TODO
+			Stmt::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -149,7 +149,7 @@ impl From<&Expr> for StringTree {
 				"chain".to_string(),
 				styles::BLUE,
 				std::iter::once(StringTree::from(&**init_expr))
-					.chain(chops.iter().map(|chop| StringTree::from(chop)))
+					.chain(chops.iter().map(StringTree::from))
 					.collect(),
 			),
 		}
@@ -169,27 +169,27 @@ impl From<&Chop> for StringTree {
 	fn from(chop: &Chop) -> StringTree {
 		match chop {
 			Chop::Plus(expr) => StringTree::new_node(
-				format!("chop plus"),
+				"chop plus".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Chop::Minus(expr) => StringTree::new_node(
-				format!("chop minus"),
+				"chop minus".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Chop::Star(expr) => StringTree::new_node(
-				format!("chop star"),
+				"chop star".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Chop::Slash(expr) => StringTree::new_node(
-				format!("chop slash"),
+				"chop slash".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
 			Chop::ToRight(expr) => StringTree::new_node(
-				format!("chop to right"),
+				"chop to right".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),

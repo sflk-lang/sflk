@@ -14,7 +14,7 @@ impl IndentedLog {
 	}
 
 	pub fn indent(&mut self, string: String, is_context: bool, style: Style) {
-		assert!(!string.contains("\n"));
+		assert!(!string.contains('\n'));
 		self.push(Item::IndentAdd {
 			string,
 			indent: Indent { is_context, style },
@@ -26,7 +26,7 @@ impl IndentedLog {
 	}
 
 	pub fn log_line(&mut self, string: String, style: Style) {
-		assert!(!string.contains("\n"));
+		assert!(!string.contains('\n'));
 		self.push(Item::String {
 			string,
 			is_line: true,
@@ -112,8 +112,8 @@ impl IndentedLog {
 					is_line: false,
 					style,
 				} => {
-					let formatted_string = format!("{}", string);
-					let fragments: Vec<&str> = formatted_string.split("\n").collect();
+					let formatted_string = string.to_string();
+					let fragments: Vec<&str> = formatted_string.split('\n').collect();
 					if let Some((end, lines)) = fragments.split_last() {
 						for line in lines {
 							if is_newline {
@@ -122,7 +122,7 @@ impl IndentedLog {
 							writeln!(writer, "{}{}{}", style.0, line, style.1).expect("TODO");
 							is_newline = true;
 						}
-						if *end != "" {
+						if !end.is_empty() {
 							if is_newline {
 								print_indents(writer, &indents, None);
 							}
@@ -138,7 +138,7 @@ impl IndentedLog {
 
 fn print_indents(
 	writer: &mut impl std::fmt::Write,
-	indents: &Vec<Indent>,
+	indents: &[Indent],
 	add_start: Option<&Indent>,
 ) {
 	let last_cx_index = match add_start {

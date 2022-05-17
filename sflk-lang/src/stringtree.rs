@@ -105,7 +105,7 @@ impl StringTree {
 
 fn print_indents(
 	writer: &mut impl std::fmt::Write,
-	indent_styles: &Vec<(Style, Tube)>,
+	indent_styles: &[(Style, Tube)],
 	right_override: RightTube,
 ) {
 	if let Some(((right_style, _), indents_left)) = indent_styles.split_last() {
