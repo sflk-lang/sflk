@@ -193,7 +193,6 @@ Before each iteration, if the while condition (if any) is falsy then the loop ha
 The loop body (if any) is executed at each iteration.
 The loop separator (if any) is executed in between each execution of the loop body.
 
-
 Example:
 
 ```sflk
