@@ -1,4 +1,8 @@
 
+README
+- rewrite the README.md with more examples, more shit and less formal documentation
+- maybe move the documentation elsewhere
+
 COMMENTS
 - comments should be handled perfectly by the parser, none should be discarded
 
