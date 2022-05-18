@@ -5,3 +5,18 @@ wh x
 bd dh {pr x x < x-1}
 sp pr ", "
 nl
+
+#
+x < 2
+do {
+	do {
+		pr x'' +1
+	}
+}
+#
+
+do({pr"u"}+{pr"w"}>{v<v+{pr"u"}}+{nl})
+
+block < {v < 8}
+x < 0>block
+pr x nl
