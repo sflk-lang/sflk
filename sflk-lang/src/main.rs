@@ -1,4 +1,5 @@
 mod ast;
+mod bytecode;
 mod log;
 mod machine;
 mod machine2;
