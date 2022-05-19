@@ -2,7 +2,6 @@ mod ast;
 mod bytecode;
 mod log;
 mod machine;
-mod machine2;
 mod object;
 mod parser;
 mod program;
@@ -85,9 +84,14 @@ fn main() {
 		);
 	}
 
+	/*
 	let mut mem = machine::Mem::new(settings.debug_mode);
 	mem.exec_file(settings.root_filename.unwrap());
 	if let Some(debug_mem) = mem.debug_mem_opt {
 		debug_mem.log.print_to_stdout();
 	}
+	*/
+
+	let bc_block = bytecode::BcBlock::debug_new();
+	bytecode::exec_bc_block(bc_block);
 }
