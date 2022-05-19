@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Program, Stmt, TargetExpr};
+use crate::ast::{Chop, Expr, Program, Stmt, TargetExpr};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -176,6 +176,26 @@ impl Ip {
 				self.stack.last_mut().unwrap().stack.push(value);
 				self.stack.last_mut().unwrap().pos += 1;
 			},
+			BcInstr::BinOp { bin_op } => {
+				match bin_op {
+					BinaryOperator::Plus => {
+						let right = self.stack.last_mut().unwrap().stack.pop().unwrap();
+						let left = self.stack.last_mut().unwrap().stack.pop().unwrap();
+						match (left, right) {
+							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+								self.stack
+									.last_mut()
+									.unwrap()
+									.stack
+									.push(Obj::Integer(left_value + right_value));
+							},
+							_ => unimplemented!(),
+						}
+					},
+					_ => unimplemented!(),
+				}
+				self.stack.last_mut().unwrap().pos += 1;
+			},
 			_ => unimplemented!(),
 		}
 		if self.stack.last().unwrap().is_done() {
@@ -201,6 +221,10 @@ pub fn program_to_bc_block(program: &Program) -> BcBlock {
 		match stmt {
 			Stmt::Nop => {
 				bc_instrs.push(BcInstr::Nop);
+			},
+			Stmt::Newline => {
+				// Placeholder for debugging.
+				bc_instrs.push(BcInstr::Bruh);
 			},
 			Stmt::Evaluate { expr } => {
 				expr_to_bc_instrs(expr.unwrap_ref(), &mut bc_instrs);
@@ -228,6 +252,18 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 		}),
 		Expr::VariableName(var_name) => {
 			bc_instrs.push(BcInstr::VarToPush { var_name: var_name.clone() })
+		},
+		Expr::Chain { init, chops } => {
+			expr_to_bc_instrs(init.unwrap_ref(), bc_instrs);
+			for chop in chops {
+				match chop.unwrap_ref() {
+					Chop::Plus(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Plus });
+					},
+					_ => unimplemented!(),
+				}
+			}
 		},
 		_ => unimplemented!(),
 	}
