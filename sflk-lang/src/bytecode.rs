@@ -2,6 +2,11 @@ use crate::ast::{Chop, Expr, Program, Stmt, TargetExpr};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
+enum UnaryOperator {
+	LogicalNot,
+}
+
+#[derive(Debug, Clone)]
 enum BinaryOperator {
 	Plus,
 	Minus,
@@ -31,6 +36,7 @@ enum BcInstr {
 	RelativeJumpCond { offset: isize }, // (cond -- )
 
 	// Other operations
+	UnOp { un_op: UnaryOperator },    // (a -- (op a))
 	BinOp { bin_op: BinaryOperator }, // (a b -- (a op b))
 	Sig,                              // (sig -- res)
 	Do,                               // (block -- )
@@ -108,6 +114,14 @@ impl Cx {
 	fn new() -> Cx {
 		Cx { vars: HashMap::new() }
 	}
+
+	fn set_var(&mut self, var_name: String, value: Obj) {
+		self.vars.insert(var_name, value);
+	}
+
+	fn get_var(&self, var_name: &str) -> &Obj {
+		&self.vars[var_name]
+	}
 }
 
 #[derive(Debug)]
@@ -145,56 +159,101 @@ impl Vm {
 }
 
 impl Ip {
+	fn push_value(&mut self, value: Obj) {
+		self.stack.last_mut().unwrap().stack.push(value);
+	}
+
+	fn pop_value(&mut self) -> Obj {
+		self.stack.last_mut().unwrap().stack.pop().unwrap()
+	}
+
+	fn advance_pos(&mut self) {
+		self.stack.last_mut().unwrap().pos += 1;
+	}
+
+	fn get_cx_id(&self) -> CxId {
+		self.stack.last().unwrap().cx_id
+	}
+
 	fn perform_one_step(&mut self, cxs: &mut HashMap<CxId, Cx>) {
 		let frame = self.stack.last().expect("bug?");
 		let bc_instr = frame.bc_block.instrs[frame.pos].clone();
+		//dbg!(&bc_instr);
 		match bc_instr {
 			BcInstr::Nop => {
-				self.stack.last_mut().unwrap().pos += 1;
+				self.advance_pos();
 			},
 			BcInstr::Bruh => {
 				println!("bruh");
-				self.stack.last_mut().unwrap().pos += 1;
+				self.advance_pos();
 			},
 			BcInstr::PushConst { value } => {
-				self.stack.last_mut().unwrap().stack.push(value);
-				self.stack.last_mut().unwrap().pos += 1;
+				self.push_value(value);
+				self.advance_pos();
 			},
 			BcInstr::Drop => {
-				self.stack.last_mut().unwrap().stack.pop();
-				self.stack.last_mut().unwrap().pos += 1;
+				self.pop_value();
+				self.advance_pos();
 			},
 			BcInstr::PopToVar { var_name } => {
-				let value = self.stack.last_mut().unwrap().stack.pop().unwrap();
-				let cx_id = self.stack.last().unwrap().cx_id;
-				cxs.get_mut(&cx_id).unwrap().vars.insert(var_name, value);
-				self.stack.last_mut().unwrap().pos += 1;
+				let value = self.pop_value();
+				let cx_id = self.get_cx_id();
+				cxs.get_mut(&cx_id).unwrap().set_var(var_name, value);
+				self.advance_pos();
 			},
 			BcInstr::VarToPush { var_name } => {
-				let cx_id = self.stack.last().unwrap().cx_id;
-				let value = cxs[&cx_id].vars[&var_name].clone();
-				self.stack.last_mut().unwrap().stack.push(value);
-				self.stack.last_mut().unwrap().pos += 1;
+				let cx_id = self.get_cx_id();
+				let value = cxs.get(&cx_id).unwrap().get_var(&var_name).clone();
+				self.push_value(value);
+				self.advance_pos();
+			},
+			BcInstr::RelativeJump { offset } => {
+				let pos = self.stack.last().unwrap().pos as isize;
+				self.stack.last_mut().unwrap().pos = (pos + offset) as usize;
+			},
+			BcInstr::RelativeJumpCond { offset } => {
+				let cond = self.pop_value();
+				let do_the_jump = match cond {
+					Obj::Integer(value) if value != 0 => {
+						true
+					},
+					_ => false,
+				};
+				self.advance_pos();
+				if do_the_jump {
+					let pos = self.stack.last().unwrap().pos as isize;
+					self.stack.last_mut().unwrap().pos = (pos + offset) as usize;
+				}
+			},
+			BcInstr::UnOp { un_op } => {
+				match un_op {
+					UnaryOperator::LogicalNot => {
+						let right = self.pop_value();
+						match right {
+							Obj::Integer(value) => {
+								self.push_value(Obj::Integer(if value == 0 { 1 } else { 0 }));
+							},
+							_ => unimplemented!(),
+						}
+					},
+				}
+				self.advance_pos();
 			},
 			BcInstr::BinOp { bin_op } => {
 				match bin_op {
 					BinaryOperator::Plus => {
-						let right = self.stack.last_mut().unwrap().stack.pop().unwrap();
-						let left = self.stack.last_mut().unwrap().stack.pop().unwrap();
+						let right = self.pop_value();
+						let left = self.pop_value();
 						match (left, right) {
 							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
-								self.stack
-									.last_mut()
-									.unwrap()
-									.stack
-									.push(Obj::Integer(left_value + right_value));
+								self.push_value(Obj::Integer(left_value + right_value));
 							},
 							_ => unimplemented!(),
 						}
 					},
 					_ => unimplemented!(),
 				}
-				self.stack.last_mut().unwrap().pos += 1;
+				self.advance_pos();
 			},
 			_ => unimplemented!(),
 		}
@@ -217,32 +276,52 @@ pub fn exec_bc_block(bc_block: BcBlock) {
 
 pub fn program_to_bc_block(program: &Program) -> BcBlock {
 	let mut bc_instrs = Vec::new();
-	for stmt in program.stmts.iter().map(|stmt_node| stmt_node.unwrap_ref()) {
-		match stmt {
-			Stmt::Nop => {
-				bc_instrs.push(BcInstr::Nop);
-			},
-			Stmt::Newline => {
-				// Placeholder for debugging.
-				bc_instrs.push(BcInstr::Bruh);
-			},
-			Stmt::Evaluate { expr } => {
-				expr_to_bc_instrs(expr.unwrap_ref(), &mut bc_instrs);
-				bc_instrs.push(BcInstr::Drop);
-			},
-			Stmt::Assign { target, expr } => {
-				expr_to_bc_instrs(expr.unwrap_ref(), &mut bc_instrs);
-				match target.unwrap_ref() {
-					TargetExpr::VariableName(var_name) => {
-						bc_instrs.push(BcInstr::PopToVar { var_name: var_name.clone() })
-					},
-					_ => unimplemented!(),
-				}
-			},
-			_ => unimplemented!(),
-		}
+	for stmt in program.stmts.iter() {
+		stmt_to_bc_instrs(stmt.unwrap_ref(), &mut bc_instrs);
 	}
 	BcBlock { instrs: bc_instrs }
+}
+
+fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
+	match stmt {
+		Stmt::Nop => {
+			bc_instrs.push(BcInstr::Nop);
+		},
+		Stmt::Newline => {
+			// Placeholder for debugging.
+			bc_instrs.push(BcInstr::Bruh);
+		},
+		Stmt::Evaluate { expr } => {
+			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+			bc_instrs.push(BcInstr::Drop);
+		},
+		Stmt::Assign { target, expr } => {
+			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+			match target.unwrap_ref() {
+				TargetExpr::VariableName(var_name) => {
+					bc_instrs.push(BcInstr::PopToVar { var_name: var_name.clone() });
+				},
+				_ => unimplemented!(),
+			}
+		},
+		Stmt::If { cond_expr, th_stmt, el_stmt } => {
+			expr_to_bc_instrs(cond_expr.unwrap_ref(), bc_instrs);
+			bc_instrs.push(BcInstr::UnOp { un_op: UnaryOperator::LogicalNot });
+			let mut th_bc = Vec::new();
+			if let Some(stmt) = th_stmt {
+				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut th_bc);
+			}
+			bc_instrs.push(BcInstr::RelativeJumpCond { offset: th_bc.len() as isize });
+			bc_instrs.extend(th_bc);
+			let mut el_bc = Vec::new();
+			if let Some(stmt) = el_stmt {
+				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut el_bc);
+			}
+			bc_instrs.push(BcInstr::RelativeJump { offset: el_bc.len() as isize });
+			bc_instrs.extend(el_bc);
+		},
+		_ => unimplemented!(),
+	}
 }
 
 fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {

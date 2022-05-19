@@ -2,4 +2,7 @@
 np
 x < 8 + 2
 ev x
-nl
+np
+if x
+th nl
+el np
