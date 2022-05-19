@@ -92,6 +92,13 @@ fn main() {
 	}
 	*/
 
-	let bc_block = bytecode::BcBlock::debug_new();
+	let scu = std::rc::Rc::new(crate::scu::SourceCodeUnit::from_filename(
+		&settings.root_filename.unwrap(),
+	));
+	let mut tfr = crate::parser::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
+	let mut parser = crate::parser::Parser::new();
+	let ast = parser.parse_program(&mut tfr);
+	let bc_block = bytecode::program_to_bc_block(ast.unwrap_ref());
+	dbg!(&bc_block);
 	bytecode::exec_bc_block(bc_block);
 }
