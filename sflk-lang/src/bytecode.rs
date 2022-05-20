@@ -251,6 +251,36 @@ impl Ip {
 							_ => unimplemented!(),
 						}
 					},
+					BinaryOperator::Minus => {
+						let right = self.pop_value();
+						let left = self.pop_value();
+						match (left, right) {
+							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+								self.push_value(Obj::Integer(left_value - right_value));
+							},
+							_ => unimplemented!(),
+						}
+					},
+					BinaryOperator::Star => {
+						let right = self.pop_value();
+						let left = self.pop_value();
+						match (left, right) {
+							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+								self.push_value(Obj::Integer(left_value * right_value));
+							},
+							_ => unimplemented!(),
+						}
+					},
+					BinaryOperator::Slash => {
+						let right = self.pop_value();
+						let left = self.pop_value();
+						match (left, right) {
+							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+								self.push_value(Obj::Integer(left_value / right_value));
+							},
+							_ => unimplemented!(),
+						}
+					},
 					_ => unimplemented!(),
 				}
 				self.advance_pos();
@@ -339,6 +369,18 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 					Chop::Plus(right) => {
 						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
 						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Plus });
+					},
+					Chop::Minus(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Minus });
+					},
+					Chop::Star(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Star });
+					},
+					Chop::Slash(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Slash });
 					},
 					_ => unimplemented!(),
 				}
