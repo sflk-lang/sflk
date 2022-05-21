@@ -20,3 +20,4 @@ do {
 if x-2 el dh {pr "h" nl}
 uwu < "owo"
 pr uwu nl
+pr 4 > {v < v + 4} nl

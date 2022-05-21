@@ -60,11 +60,18 @@ struct Frame {
 	pos: usize,
 	stack: Vec<Obj>,
 	cx_id: CxId,
+	push_v: bool,
 }
 
 impl Frame {
 	fn for_bc_block(bc_block: BcBlock, cx_id: CxId) -> Frame {
-		Frame { bc_block, pos: 0, stack: Vec::new(), cx_id }
+		Frame {
+			bc_block,
+			pos: 0,
+			stack: Vec::new(),
+			cx_id,
+			push_v: false,
+		}
 	}
 
 	fn is_done(&self) -> bool {
@@ -188,7 +195,16 @@ impl Ip {
 
 	fn perform_one_step(&mut self, cxs: &mut Cxs) {
 		if self.stack.last().unwrap().is_done() {
-			self.stack.pop();
+			let popped_frame = self.stack.pop().unwrap();
+			if popped_frame.push_v {
+				let v_value = cxs
+					.cx_table
+					.get(&popped_frame.cx_id)
+					.unwrap()
+					.get_var("v")
+					.clone();
+				self.push_value(v_value);
+			}
 			return;
 		}
 		let frame = self.stack.last().expect("bug?");
@@ -263,55 +279,73 @@ impl Ip {
 							},
 							_ => unimplemented!(),
 						}
+						self.advance_pos();
 					},
 				}
-				self.advance_pos();
 			},
-			BcInstr::BinOp { bin_op } => {
-				match bin_op {
-					BinaryOperator::Plus => {
-						let right = self.pop_value();
-						let left = self.pop_value();
-						match (left, right) {
-							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
-								self.push_value(Obj::Integer(left_value + right_value));
-							},
-							_ => unimplemented!(),
-						}
-					},
-					BinaryOperator::Minus => {
-						let right = self.pop_value();
-						let left = self.pop_value();
-						match (left, right) {
-							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
-								self.push_value(Obj::Integer(left_value - right_value));
-							},
-							_ => unimplemented!(),
-						}
-					},
-					BinaryOperator::Star => {
-						let right = self.pop_value();
-						let left = self.pop_value();
-						match (left, right) {
-							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
-								self.push_value(Obj::Integer(left_value * right_value));
-							},
-							_ => unimplemented!(),
-						}
-					},
-					BinaryOperator::Slash => {
-						let right = self.pop_value();
-						let left = self.pop_value();
-						match (left, right) {
-							(Obj::Integer(left_value), Obj::Integer(right_value)) => {
-								self.push_value(Obj::Integer(left_value / right_value));
-							},
-							_ => unimplemented!(),
-						}
-					},
-					_ => unimplemented!(),
-				}
-				self.advance_pos();
+			BcInstr::BinOp { bin_op } => match bin_op {
+				BinaryOperator::Plus => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					match (left, right) {
+						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+							self.push_value(Obj::Integer(left_value + right_value));
+						},
+						_ => unimplemented!(),
+					}
+					self.advance_pos();
+				},
+				BinaryOperator::Minus => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					match (left, right) {
+						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+							self.push_value(Obj::Integer(left_value - right_value));
+						},
+						_ => unimplemented!(),
+					}
+					self.advance_pos();
+				},
+				BinaryOperator::Star => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					match (left, right) {
+						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+							self.push_value(Obj::Integer(left_value * right_value));
+						},
+						_ => unimplemented!(),
+					}
+					self.advance_pos();
+				},
+				BinaryOperator::Slash => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					match (left, right) {
+						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
+							self.push_value(Obj::Integer(left_value / right_value));
+						},
+						_ => unimplemented!(),
+					}
+					self.advance_pos();
+				},
+				BinaryOperator::ToRight => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					match right {
+						Obj::Block(block) => {
+							let sub_cx = cxs.create_cx(Some(self.get_cx_id()));
+							cxs.cx_table
+								.get_mut(&sub_cx)
+								.unwrap()
+								.set_var("v".to_string(), left);
+							let mut sub_frame = Frame::for_bc_block(block.bc, sub_cx);
+							sub_frame.push_v = true; // Will push v.
+							self.advance_pos();
+							self.stack.push(sub_frame);
+						},
+						_ => unimplemented!(),
+					}
+				},
 			},
 			BcInstr::DoHere => {
 				let obj = self.pop_value();
@@ -369,10 +403,7 @@ impl Ip {
 								},
 								Some(block) => {
 									// TODO?
-									self.stack.push(Frame::for_bc_block(
-										block.bc,
-										parent_cx,
-									));
+									self.stack.push(Frame::for_bc_block(block.bc, parent_cx));
 								},
 							}
 						},
@@ -387,7 +418,7 @@ impl Ip {
 			BcInstr::NewlineSig => {
 				self.push_value(Obj::Sig(Box::from(Sig::Newline)));
 				self.advance_pos();
-			}
+			},
 			_ => unimplemented!(),
 		}
 	}
@@ -560,6 +591,10 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 					Chop::Slash(right) => {
 						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
 						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Slash });
+					},
+					Chop::ToRight(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::ToRight });
 					},
 					_ => unimplemented!(),
 				}
