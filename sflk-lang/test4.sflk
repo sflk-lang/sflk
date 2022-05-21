@@ -4,17 +4,19 @@ x < 8 +2 /2 *3 -(2*3+1)
 ev x
 np np
 if x
-th nl
+th dh {pr "h" nl}
 el np
-dh {if x th nl}
-x < x -6 # now x is 2 #
+dh {if x th dh {pr "h" nl}}
 lp
 wh x
-bd dh {nl x < x-1}
-sp nl
+bd dh {pr x x < x-1}
+sp pr ", "
+nl
 x < 2
 do {
 	x < 3
-	if x-3 el nl
+	if x-3 el dh {pr "h" nl}
 }
-if x-2 el nl
+if x-2 el dh {pr "h" nl}
+uwu < "owo"
+pr uwu nl

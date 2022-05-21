@@ -36,10 +36,14 @@ enum BcInstr {
 	RelativeJump { offset: isize },     // ( -- )
 	RelativeJumpCond { offset: isize }, // (cond -- )
 
+	// Signals operations
+	Sig,          // (sig -- res)
+	IntoPrintSig, // (value -- sig)
+	NewlineSig,   // ( -- sig)
+
 	// Other operations
 	UnOp { un_op: UnaryOperator },    // (a -- (op a))
 	BinOp { bin_op: BinaryOperator }, // (a b -- (a op b))
-	Sig,                              // (sig -- res)
 	Do,                               // (block -- )
 	DoHere,                           // (block -- )
 	DoFileHere,                       // (filepath -- )
@@ -48,12 +52,6 @@ enum BcInstr {
 #[derive(Debug, Clone)]
 pub struct BcBlock {
 	instrs: Vec<BcInstr>,
-}
-
-impl BcBlock {
-	pub fn debug_new() -> BcBlock {
-		BcBlock { instrs: vec![BcInstr::Bruh, BcInstr::Bruh] }
-	}
 }
 
 #[derive(Debug)]
@@ -104,16 +102,22 @@ enum Obj {
 	Sig(Box<Sig>),
 }
 
-type CxId = usize;
+type CxId = u32;
 
 #[derive(Debug)]
 struct Cx {
 	vars: HashMap<String, Obj>,
+	parent_cx: Option<CxId>,
+	sig_interceptor: Option<Block>,
 }
 
 impl Cx {
-	fn new() -> Cx {
-		Cx { vars: HashMap::new() }
+	fn child_of(parent_cx: Option<CxId>) -> Cx {
+		Cx {
+			vars: HashMap::new(),
+			parent_cx,
+			sig_interceptor: None,
+		}
 	}
 
 	fn set_var(&mut self, var_name: String, value: Obj) {
@@ -132,10 +136,10 @@ struct Cxs {
 }
 
 impl Cxs {
-	fn create_cx(&mut self) -> CxId {
+	fn create_cx(&mut self, parent_cx: Option<CxId>) -> CxId {
 		let new_cx_id = self.next_cx_id;
 		self.next_cx_id += 1;
-		let new_cx = Cx::new();
+		let new_cx = Cx::child_of(parent_cx);
 		self.cx_table.insert(new_cx_id, new_cx);
 		new_cx_id
 	}
@@ -325,12 +329,65 @@ impl Ip {
 				match obj {
 					Obj::Block(block) => {
 						self.advance_pos();
-						self.stack
-							.push(Frame::for_bc_block(block.bc, cxs.create_cx()));
+						self.stack.push(Frame::for_bc_block(
+							block.bc,
+							cxs.create_cx(Some(self.get_cx_id())),
+						));
 					},
 					_ => unimplemented!(),
 				}
 			},
+			BcInstr::Sig => {
+				let sig = self.pop_value();
+				let mut cx_id = self.get_cx_id();
+				loop {
+					let parent_cx = cxs.cx_table.get(&cx_id).unwrap().parent_cx;
+					match parent_cx {
+						None => {
+							match &sig {
+								Obj::Sig(sig) => match &**sig {
+									Sig::Print(Obj::Integer(value)) => print!("{}", value),
+									Sig::Print(Obj::String(string)) => print!("{}", string),
+									Sig::Newline => println!(),
+									_ => unimplemented!(),
+								},
+								_ => unimplemented!(),
+							}
+							self.advance_pos();
+							break;
+						},
+						Some(parent_cx) => {
+							let sig_interceptor = cxs
+								.cx_table
+								.get(&parent_cx)
+								.unwrap()
+								.sig_interceptor
+								.clone();
+							match sig_interceptor {
+								None => {
+									cx_id = parent_cx;
+								},
+								Some(block) => {
+									// TODO?
+									self.stack.push(Frame::for_bc_block(
+										block.bc,
+										parent_cx,
+									));
+								},
+							}
+						},
+					}
+				}
+			},
+			BcInstr::IntoPrintSig => {
+				let obj = self.pop_value();
+				self.push_value(Obj::Sig(Box::from(Sig::Print(obj))));
+				self.advance_pos();
+			},
+			BcInstr::NewlineSig => {
+				self.push_value(Obj::Sig(Box::from(Sig::Newline)));
+				self.advance_pos();
+			}
 			_ => unimplemented!(),
 		}
 	}
@@ -338,7 +395,7 @@ impl Ip {
 
 pub fn exec_bc_block(bc_block: BcBlock) {
 	let mut vm = Vm::new();
-	let root_cx_id = vm.cxs.create_cx();
+	let root_cx_id = vm.cxs.create_cx(None);
 	let root_frame = Frame::for_bc_block(bc_block, root_cx_id);
 	let mut ip = Ip::new();
 	ip.stack.push(root_frame);
@@ -359,10 +416,6 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 	match stmt {
 		Stmt::Nop => {
 			bc_instrs.push(BcInstr::Nop);
-		},
-		Stmt::Newline => {
-			// Placeholder for debugging.
-			bc_instrs.push(BcInstr::Bruh);
 		},
 		Stmt::Evaluate { expr } => {
 			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
@@ -455,6 +508,15 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
 			bc_instrs.push(BcInstr::Do);
 		},
+		Stmt::Newline => {
+			bc_instrs.push(BcInstr::NewlineSig);
+			bc_instrs.push(BcInstr::Sig);
+		},
+		Stmt::Print { expr } => {
+			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+			bc_instrs.push(BcInstr::IntoPrintSig);
+			bc_instrs.push(BcInstr::Sig);
+		},
 		_ => unimplemented!(),
 	}
 }
@@ -464,6 +526,9 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 		Expr::IntegerLiteral(integer_string) => bc_instrs.push(BcInstr::PushConst {
 			value: Obj::Integer(str::parse(integer_string).expect("TODO: bigints")),
 		}),
+		Expr::StringLiteral(string_string) => {
+			bc_instrs.push(BcInstr::PushConst { value: Obj::String(string_string.clone()) })
+		},
 		Expr::VariableName(var_name) => {
 			bc_instrs.push(BcInstr::VarToPush { var_name: var_name.clone() });
 		},
