@@ -12,3 +12,9 @@ lp
 wh x
 bd dh {nl x < x-1}
 sp nl
+x < 2
+do {
+	x < 3
+	if x-3 el nl
+}
+if x-2 el nl

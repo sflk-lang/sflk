@@ -126,27 +126,33 @@ impl Cx {
 }
 
 #[derive(Debug)]
-struct Vm {
-	cxs: HashMap<CxId, Cx>,
+struct Cxs {
+	cx_table: HashMap<CxId, Cx>,
 	next_cx_id: CxId,
+}
+
+impl Cxs {
+	fn create_cx(&mut self) -> CxId {
+		let new_cx_id = self.next_cx_id;
+		self.next_cx_id += 1;
+		let new_cx = Cx::new();
+		self.cx_table.insert(new_cx_id, new_cx);
+		new_cx_id
+	}
+}
+
+#[derive(Debug)]
+struct Vm {
+	cxs: Cxs,
 	ips: Vec<Ip>,
 }
 
 impl Vm {
 	fn new() -> Vm {
 		Vm {
-			cxs: HashMap::new(),
-			next_cx_id: 0,
+			cxs: Cxs { cx_table: HashMap::new(), next_cx_id: 0 },
 			ips: Vec::new(),
 		}
-	}
-
-	fn create_cx(&mut self) -> CxId {
-		let new_cx_id = self.next_cx_id;
-		self.next_cx_id += 1;
-		let new_cx = Cx::new();
-		self.cxs.insert(new_cx_id, new_cx);
-		new_cx_id
 	}
 
 	fn run(&mut self) {
@@ -176,7 +182,7 @@ impl Ip {
 		self.stack.last().unwrap().cx_id
 	}
 
-	fn perform_one_step(&mut self, cxs: &mut HashMap<CxId, Cx>) {
+	fn perform_one_step(&mut self, cxs: &mut Cxs) {
 		if self.stack.last().unwrap().is_done() {
 			self.stack.pop();
 			return;
@@ -217,12 +223,15 @@ impl Ip {
 			BcInstr::PopToVar { var_name } => {
 				let value = self.pop_value();
 				let cx_id = self.get_cx_id();
-				cxs.get_mut(&cx_id).unwrap().set_var(var_name, value);
+				cxs.cx_table
+					.get_mut(&cx_id)
+					.unwrap()
+					.set_var(var_name, value);
 				self.advance_pos();
 			},
 			BcInstr::VarToPush { var_name } => {
 				let cx_id = self.get_cx_id();
-				let value = cxs.get(&cx_id).unwrap().get_var(&var_name).clone();
+				let value = cxs.cx_table.get(&cx_id).unwrap().get_var(&var_name).clone();
 				self.push_value(value);
 				self.advance_pos();
 			},
@@ -311,6 +320,17 @@ impl Ip {
 					_ => unimplemented!(),
 				}
 			},
+			BcInstr::Do => {
+				let obj = self.pop_value();
+				match obj {
+					Obj::Block(block) => {
+						self.advance_pos();
+						self.stack
+							.push(Frame::for_bc_block(block.bc, cxs.create_cx()));
+					},
+					_ => unimplemented!(),
+				}
+			},
 			_ => unimplemented!(),
 		}
 	}
@@ -318,7 +338,7 @@ impl Ip {
 
 pub fn exec_bc_block(bc_block: BcBlock) {
 	let mut vm = Vm::new();
-	let root_cx_id = vm.create_cx();
+	let root_cx_id = vm.cxs.create_cx();
 	let root_frame = Frame::for_bc_block(bc_block, root_cx_id);
 	let mut ip = Ip::new();
 	ip.stack.push(root_frame);
@@ -364,7 +384,10 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 			if let Some(stmt) = th_stmt {
 				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut th_bc);
 			}
-			bc_instrs.push(BcInstr::RelativeJumpCond { offset: th_bc.len() as isize + 1 });
+			let el_jump_bc_len = 1;
+			bc_instrs.push(BcInstr::RelativeJumpCond {
+				offset: th_bc.len() as isize + el_jump_bc_len + 1,
+			});
 			bc_instrs.extend(th_bc);
 			let mut el_bc = Vec::new();
 			if let Some(stmt) = el_stmt {
@@ -427,6 +450,10 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 		Stmt::DoHere { expr } => {
 			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
 			bc_instrs.push(BcInstr::DoHere);
+		},
+		Stmt::Do { expr } => {
+			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+			bc_instrs.push(BcInstr::Do);
 		},
 		_ => unimplemented!(),
 	}
