@@ -176,6 +176,10 @@ impl Ip {
 	}
 
 	fn perform_one_step(&mut self, cxs: &mut HashMap<CxId, Cx>) {
+		if self.stack.last().unwrap().is_done() {
+			self.stack.pop();
+			return;
+		}
 		let frame = self.stack.last().expect("bug?");
 		let bc_instr = frame.bc_block.instrs[frame.pos].clone();
 		//dbg!(&bc_instr);
@@ -213,12 +217,7 @@ impl Ip {
 			},
 			BcInstr::RelativeJumpCond { offset } => {
 				let cond = self.pop_value();
-				let do_the_jump = match cond {
-					Obj::Integer(value) if value != 0 => {
-						true
-					},
-					_ => false,
-				};
+				let do_the_jump = matches!(cond, Obj::Integer(value) if value != 0);
 				self.advance_pos();
 				if do_the_jump {
 					let pos = self.stack.last().unwrap().pos as isize;
@@ -285,10 +284,18 @@ impl Ip {
 				}
 				self.advance_pos();
 			},
+			BcInstr::DoHere => {
+				let obj = self.pop_value();
+				match obj {
+					Obj::Block(block) => {
+						self.advance_pos();
+						self.stack
+							.push(Frame::for_bc_block(block.bc, self.get_cx_id()));
+					},
+					_ => unimplemented!(),
+				}
+			},
 			_ => unimplemented!(),
-		}
-		if self.stack.last().unwrap().is_done() {
-			self.stack.pop();
 		}
 	}
 }
@@ -341,14 +348,18 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 			if let Some(stmt) = th_stmt {
 				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut th_bc);
 			}
-			bc_instrs.push(BcInstr::RelativeJumpCond { offset: th_bc.len() as isize });
+			bc_instrs.push(BcInstr::RelativeJumpCond { offset: th_bc.len() as isize + 1});
 			bc_instrs.extend(th_bc);
 			let mut el_bc = Vec::new();
 			if let Some(stmt) = el_stmt {
 				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut el_bc);
 			}
-			bc_instrs.push(BcInstr::RelativeJump { offset: el_bc.len() as isize });
+			bc_instrs.push(BcInstr::RelativeJump { offset: el_bc.len() as isize + 1});
 			bc_instrs.extend(el_bc);
+		},
+		Stmt::DoHere { expr } => {
+			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+			bc_instrs.push(BcInstr::DoHere);
 		},
 		_ => unimplemented!(),
 	}
@@ -360,7 +371,16 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 			value: Obj::Integer(str::parse(integer_string).expect("TODO: bigints")),
 		}),
 		Expr::VariableName(var_name) => {
-			bc_instrs.push(BcInstr::VarToPush { var_name: var_name.clone() })
+			bc_instrs.push(BcInstr::VarToPush { var_name: var_name.clone() });
+		},
+		Expr::BlockLiteral(stmts) => {
+			let mut sub_bc_instrs = Vec::new();
+			for stmt in stmts.iter() {
+				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut sub_bc_instrs);
+			}
+			bc_instrs.push(BcInstr::PushConst {
+				value: Obj::Block(Block { bc: BcBlock { instrs: sub_bc_instrs } }),
+			});
 		},
 		Expr::Chain { init, chops } => {
 			expr_to_bc_instrs(init.unwrap_ref(), bc_instrs);
