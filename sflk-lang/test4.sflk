@@ -7,3 +7,8 @@ if x
 th nl
 el np
 dh {if x th nl}
+x < x -6 # now x is 2 #
+lp
+wh x
+bd dh {nl x < x-1}
+sp nl

@@ -24,6 +24,7 @@ enum BcInstr {
 
 	// Stack operations
 	Swap, // (a b -- b a)
+	Over, // (a b -- a b a)
 	Dup,  // (a -- a a)
 	Drop, // (a -- )
 
@@ -199,6 +200,20 @@ impl Ip {
 				self.pop_value();
 				self.advance_pos();
 			},
+			BcInstr::Dup => {
+				let a = self.pop_value();
+				self.push_value(a.clone());
+				self.push_value(a);
+				self.advance_pos();
+			},
+			BcInstr::Over => {
+				let b = self.pop_value();
+				let a = self.pop_value();
+				self.push_value(a.clone());
+				self.push_value(b);
+				self.push_value(a);
+				self.advance_pos();
+			},
 			BcInstr::PopToVar { var_name } => {
 				let value = self.pop_value();
 				let cx_id = self.get_cx_id();
@@ -218,10 +233,11 @@ impl Ip {
 			BcInstr::RelativeJumpCond { offset } => {
 				let cond = self.pop_value();
 				let do_the_jump = matches!(cond, Obj::Integer(value) if value != 0);
-				self.advance_pos();
 				if do_the_jump {
 					let pos = self.stack.last().unwrap().pos as isize;
 					self.stack.last_mut().unwrap().pos = (pos + offset) as usize;
+				} else {
+					self.advance_pos();
 				}
 			},
 			BcInstr::UnOp { un_op } => {
@@ -348,14 +364,65 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 			if let Some(stmt) = th_stmt {
 				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut th_bc);
 			}
-			bc_instrs.push(BcInstr::RelativeJumpCond { offset: th_bc.len() as isize + 1});
+			bc_instrs.push(BcInstr::RelativeJumpCond { offset: th_bc.len() as isize + 1 });
 			bc_instrs.extend(th_bc);
 			let mut el_bc = Vec::new();
 			if let Some(stmt) = el_stmt {
 				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut el_bc);
 			}
-			bc_instrs.push(BcInstr::RelativeJump { offset: el_bc.len() as isize + 1});
+			bc_instrs.push(BcInstr::RelativeJump { offset: el_bc.len() as isize + 1 });
 			bc_instrs.extend(el_bc);
+		},
+		Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => {
+			// TODO: Make this more readable and less error-prone by introducing
+			// labels and gotos that get resolved into bytecode here.
+			// Maybe do it by introducing BcInstrUnresolved or something
+			// (it ould have the variants: non-jump BcInstr, Label,
+			// and the conditiona jumps to labels).
+			if sp_stmt.is_some() {
+				// Loop counter for the separator.
+				bc_instrs.push(BcInstr::PushConst { value: Obj::Integer(0) });
+			}
+			let mut sp_bc = Vec::new();
+			if let Some(stmt) = sp_stmt {
+				let mut sub_sp_bc = Vec::new();
+				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut sub_sp_bc);
+				// We skip the separation if the loop counter is 0.
+				sp_bc.push(BcInstr::Dup);
+				sp_bc.push(BcInstr::UnOp { un_op: UnaryOperator::LogicalNot });
+				sp_bc.push(BcInstr::RelativeJumpCond { offset: sub_sp_bc.len() as isize + 1 });
+				sp_bc.extend(sub_sp_bc);
+			}
+			let mut bd_bc = Vec::new();
+			if let Some(stmt) = bd_stmt {
+				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut bd_bc);
+				if sp_stmt.is_some() {
+					// Increment the loop counter.
+					bd_bc.push(BcInstr::PushConst { value: Obj::Integer(1) });
+					bd_bc.push(BcInstr::BinOp { bin_op: BinaryOperator::Plus });
+				}
+			}
+			let loop_back_bc_len = 1;
+			let mut wh_bc = Vec::new();
+			if let Some(expr) = wh_expr {
+				expr_to_bc_instrs(expr.unwrap_ref(), &mut wh_bc);
+				wh_bc.push(BcInstr::UnOp { un_op: UnaryOperator::LogicalNot });
+				wh_bc.push(BcInstr::RelativeJumpCond {
+					offset: sp_bc.len() as isize + bd_bc.len() as isize + loop_back_bc_len + 1,
+				});
+			}
+			let loop_back_bc = vec![BcInstr::RelativeJump {
+				offset: -(wh_bc.len() as isize + sp_bc.len() as isize + bd_bc.len() as isize),
+			}];
+			debug_assert_eq!(loop_back_bc_len, loop_back_bc.len() as isize);
+			bc_instrs.extend(wh_bc);
+			bc_instrs.extend(sp_bc);
+			bc_instrs.extend(bd_bc);
+			bc_instrs.extend(loop_back_bc);
+			if sp_stmt.is_some() {
+				// Didn't forget the loop counter.
+				bc_instrs.push(BcInstr::Drop);
+			}
 		},
 		Stmt::DoHere { expr } => {
 			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
