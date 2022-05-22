@@ -57,7 +57,7 @@ contexts:
       scope: keyword.control.loop.sflk
     - match: '\b(fh)\b'
       scope: keyword.import.sflk
-    - match: '\b(np|pr|nl|do|dh|ev|redo|end|imp|exp)\b'
+    - match: '\b(np|pr|nl|do|dh|ev|ri)\b'
       scope: keyword.other.sflk
     - match: '\b(v)\b'
       scope: variable.parameter.sflk

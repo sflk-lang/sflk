@@ -225,6 +225,16 @@ impl Parser {
 						full_loc,
 					))
 				},
+				Kw::Ri => {
+					let kw_loc = first_loc.clone();
+					tb.disc();
+					let expr_node = self.parse_expr(tb);
+					let full_loc = &kw_loc + expr_node.loc();
+					Some(Node::from(
+						Stmt::RegisterInterceptor { expr: expr_node },
+						full_loc,
+					))
+				},
 				_ => {
 					let kw_loc = first_loc.clone();
 					tb.disc();

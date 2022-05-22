@@ -139,6 +139,9 @@ pub enum Stmt {
 		bd_stmt: Option<Box<Node<Stmt>>>,
 		sp_stmt: Option<Box<Node<Stmt>>>,
 	},
+	RegisterInterceptor {
+		expr: Node<Expr>,
+	},
 	Invalid, // TODO: Add error details
 }
 
@@ -331,11 +334,19 @@ impl Treeable for Stmt {
 					if let Some(stmt) = sp_stmt {
 						vec.push(StringTree::from(&**stmt));
 					} else {
-						vec.push(StringTree::new_leaf("no separator".to_string(), styles::NORMAL));
+						vec.push(StringTree::new_leaf(
+							"no separator".to_string(),
+							styles::NORMAL,
+						));
 					}
 					vec
 				})
 			},
+			Stmt::RegisterInterceptor { expr } => StringTree::new_node(
+				"register interceptor".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(expr)],
+			),
 			Stmt::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
@@ -413,6 +424,7 @@ impl Stmt {
 					.map(|stmt| (*stmt).content.is_invalid())
 					.unwrap_or(false)
 			},
+			Stmt::RegisterInterceptor { expr } => expr.content.is_invalid(),
 			Stmt::Invalid => true,
 		}
 	}
@@ -457,6 +469,7 @@ impl Stmt {
 					.as_ref()
 					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
 			},
+			Stmt::RegisterInterceptor { expr: _ } => unimplemented!(),
 			Stmt::Invalid => program::Stmt::Invalid,
 		}
 	}

@@ -21,3 +21,9 @@ if x-2 el dh {pr "h" nl}
 uwu < "owo"
 pr uwu nl
 pr 4 > {v < v + 4} nl
+ri {v < 0}
+pr "yes" nl
+do {pr "no" nl}
+replace < "jej"
+ri {pr replace nl}
+do {pr "not jej"}

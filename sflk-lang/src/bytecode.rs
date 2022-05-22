@@ -37,9 +37,10 @@ enum BcInstr {
 	RelativeJumpCond { offset: isize }, // (cond -- )
 
 	// Signals operations
-	Sig,          // (sig -- res)
-	IntoPrintSig, // (value -- sig)
-	NewlineSig,   // ( -- sig)
+	RegisterInterceptor, // (block -- )
+	Sig,                 // (sig -- res)
+	IntoPrintSig,        // (value -- sig)
+	NewlineSig,          // ( -- sig)
 
 	// Other operations
 	UnOp { un_op: UnaryOperator },    // (a -- (op a))
@@ -269,19 +270,17 @@ impl Ip {
 					self.advance_pos();
 				}
 			},
-			BcInstr::UnOp { un_op } => {
-				match un_op {
-					UnaryOperator::LogicalNot => {
-						let right = self.pop_value();
-						match right {
-							Obj::Integer(value) => {
-								self.push_value(Obj::Integer(if value == 0 { 1 } else { 0 }));
-							},
-							_ => unimplemented!(),
-						}
-						self.advance_pos();
-					},
-				}
+			BcInstr::UnOp { un_op } => match un_op {
+				UnaryOperator::LogicalNot => {
+					let right = self.pop_value();
+					match right {
+						Obj::Integer(value) => {
+							self.push_value(Obj::Integer(if value == 0 { 1 } else { 0 }));
+						},
+						_ => unimplemented!(),
+					}
+					self.advance_pos();
+				},
 			},
 			BcInstr::BinOp { bin_op } => match bin_op {
 				BinaryOperator::Plus => {
@@ -371,6 +370,19 @@ impl Ip {
 					_ => unimplemented!(),
 				}
 			},
+			BcInstr::RegisterInterceptor => {
+				let obj = self.pop_value();
+				match obj {
+					Obj::Block(block) => {
+						cxs.cx_table
+							.get_mut(&self.get_cx_id())
+							.unwrap()
+							.sig_interceptor = Some(block);
+					},
+					_ => unimplemented!(),
+				}
+				self.advance_pos();
+			},
 			BcInstr::Sig => {
 				let sig = self.pop_value();
 				let mut cx_id = self.get_cx_id();
@@ -403,7 +415,9 @@ impl Ip {
 								},
 								Some(block) => {
 									// TODO?
+									self.advance_pos();
 									self.stack.push(Frame::for_bc_block(block.bc, parent_cx));
+									break;
 								},
 							}
 						},
@@ -547,6 +561,10 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
 			bc_instrs.push(BcInstr::IntoPrintSig);
 			bc_instrs.push(BcInstr::Sig);
+		},
+		Stmt::RegisterInterceptor { expr } => {
+			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+			bc_instrs.push(BcInstr::RegisterInterceptor);
 		},
 		_ => unimplemented!(),
 	}
