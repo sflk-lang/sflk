@@ -101,19 +101,12 @@ struct Block {
 }
 
 #[derive(Debug, Clone)]
-enum SigType {
-	Print,
-	Newline,
-}
-
-#[derive(Debug, Clone)]
 enum Obj {
 	Nothing,
 	Integer(i64),
 	String(String),
 	Block(Block),
 	List(Vec<Obj>),
-	Sig { sig_type: SigType, obj: Box<Obj> }, // TODO: Replace by List.
 }
 
 type CxId = u32;
@@ -296,6 +289,9 @@ impl Ip {
 						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
 							self.push_value(Obj::Integer(left_value + right_value));
 						},
+						(Obj::String(left_string), Obj::String(right_string)) => {
+							self.push_value(Obj::String(left_string + &right_string));
+						},
 						_ => unimplemented!(),
 					}
 					self.advance_pos();
@@ -306,6 +302,10 @@ impl Ip {
 					match (left, right) {
 						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
 							self.push_value(Obj::Integer(left_value - right_value));
+						},
+						(Obj::String(left_string), Obj::String(right_string)) => {
+							let value = if left_string == right_string { 0 } else { 1 };
+							self.push_value(Obj::Integer(value));
 						},
 						_ => unimplemented!(),
 					}
@@ -423,10 +423,20 @@ impl Ip {
 					match parent_cx {
 						None => {
 							match &sig {
-								Obj::Sig { sig_type, obj } => match (sig_type, &**obj) {
-									(SigType::Print, Obj::Integer(value)) => print!("{}", value),
-									(SigType::Print, Obj::String(string)) => print!("{}", string),
-									(SigType::Newline, _) => println!(),
+								Obj::List(vec) => match (vec.get(0), vec.get(1)) {
+									(Some(Obj::String(sig_name)), Some(Obj::Integer(value)))
+										if sig_name == "print" =>
+									{
+										print!("{}", value);
+									},
+									(Some(Obj::String(sig_name)), Some(Obj::String(string)))
+										if sig_name == "print" =>
+									{
+										print!("{}", string);
+									},
+									(Some(Obj::String(sig_name)), _) if sig_name == "newline" => {
+										println!();
+									},
 									_ => unimplemented!(),
 								},
 								_ => unimplemented!(),
@@ -459,14 +469,11 @@ impl Ip {
 			},
 			BcInstr::IntoPrintSig => {
 				let obj = self.pop_value();
-				self.push_value(Obj::Sig { sig_type: SigType::Print, obj: Box::from(obj) });
+				self.push_value(Obj::List(vec![Obj::String("print".to_string()), obj]));
 				self.advance_pos();
 			},
 			BcInstr::NewlineSig => {
-				self.push_value(Obj::Sig {
-					sig_type: SigType::Newline,
-					obj: Box::from(Obj::Nothing),
-				});
+				self.push_value(Obj::List(vec![Obj::String("newline".to_string())]));
 				self.advance_pos();
 			},
 			_ => unimplemented!(),
@@ -482,7 +489,7 @@ pub fn exec_bc_block(bc_block: BcBlock) {
 	ip.stack.push(root_frame);
 	vm.ips.push(ip);
 	vm.run();
-	dbg!(vm);
+	//dbg!(vm);
 }
 
 pub fn program_to_bc_block(program: &Program) -> BcBlock {

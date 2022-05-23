@@ -29,3 +29,5 @@ ri {pr replace nl}
 do {pr "not jej"}
 uwu < () ,"a" ,"b" ,"c"
 x < 0 lp wh x -3 bd dh {pr uwu .x x < x +1} sp pr ", " nl
+pr "o" + "k" nl
+if "hh" - "hh" th pr "no" el pr "yes" nl
