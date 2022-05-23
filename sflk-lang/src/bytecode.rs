@@ -201,13 +201,17 @@ impl Ip {
 		if self.stack.last().unwrap().is_done() {
 			let popped_frame = self.stack.pop().unwrap();
 			if popped_frame.push_v {
-				let v_value = cxs
-					.cx_table
-					.get(&popped_frame.cx_id)
-					.unwrap()
-					.get_var("v")
-					.clone();
-				self.push_value(v_value);
+				if cxs.cx_table.get(&popped_frame.cx_id).unwrap().has_var("v") {
+					let v_value = cxs
+						.cx_table
+						.get(&popped_frame.cx_id)
+						.unwrap()
+						.get_var("v")
+						.clone();
+					self.push_value(v_value);
+				} else {
+					self.push_value(Obj::Nothing);
+				}
 			}
 			return;
 		}
@@ -253,31 +257,32 @@ impl Ip {
 				self.advance_pos();
 			},
 			BcInstr::VarToPush { var_name } => {
-				//let value = cxs.cx_table.get(&cx_id).unwrap().get_var(&var_name).clone();
-				//let sig = if var_name == "v" {
-				//	let frame = self.stack.last_mut().unwrap();
-				//	frame.sig.
-				//};
 				let value = if var_name == "v"
 					&& cxs.cx_table.get(&self.get_cx_id()).unwrap().has_var("v")
 				{
-					let frame = self.stack.last_mut().unwrap();
-					if let Some(sig) = &frame.sig {
-						sig.clone()
-					} else {
-						cxs.cx_table
-							.get(&self.get_cx_id())
-							.unwrap()
-							.get_var(&var_name)
-							.clone()
+					let mut frame_index = self.stack.len() - 1;
+					loop {
+						if let Some(frame) = self.stack.get(frame_index) {
+							if frame.cx_id != self.get_cx_id() {
+								break None;
+							} else if let Some(sig) = &frame.sig {
+								break Some(sig.clone());
+							}
+							frame_index -= 1;
+						} else {
+							break None;
+						}
 					}
 				} else {
+					None
+				};
+				let value = value.unwrap_or_else(|| {
 					cxs.cx_table
 						.get(&self.get_cx_id())
 						.unwrap()
 						.get_var(&var_name)
 						.clone()
-				};
+				});
 				self.push_value(value);
 				self.advance_pos();
 			},
@@ -460,14 +465,17 @@ impl Ip {
 										if sig_name == "print" =>
 									{
 										print!("{}", value);
+										self.push_value(Obj::Nothing);
 									},
 									(Some(Obj::String(sig_name)), Some(Obj::String(string)))
 										if sig_name == "print" =>
 									{
 										print!("{}", string);
+										self.push_value(Obj::Nothing);
 									},
 									(Some(Obj::String(sig_name)), _) if sig_name == "newline" => {
 										println!();
+										self.push_value(Obj::Nothing);
 									},
 									_ => unimplemented!(),
 								},
@@ -491,6 +499,7 @@ impl Ip {
 									self.advance_pos();
 									let mut sub_frame = Frame::for_bc_block(block.bc, parent_cx);
 									sub_frame.sig = Some(sig);
+									sub_frame.push_v = true; // Will push the result of the signal.
 									self.stack.push(sub_frame);
 									break;
 								},
@@ -631,15 +640,31 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 		Stmt::Newline => {
 			bc_instrs.push(BcInstr::NewlineSig);
 			bc_instrs.push(BcInstr::Sig);
+			bc_instrs.push(BcInstr::Drop);
 		},
 		Stmt::Print { expr } => {
 			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
 			bc_instrs.push(BcInstr::IntoPrintSig);
 			bc_instrs.push(BcInstr::Sig);
+			bc_instrs.push(BcInstr::Drop);
 		},
 		Stmt::RegisterInterceptor { expr } => {
 			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
 			bc_instrs.push(BcInstr::RegisterInterceptor);
+		},
+		Stmt::Emit { expr, target } => {
+			expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+			bc_instrs.push(BcInstr::Sig);
+			if let Some(target_expr) = target {
+				match target_expr.unwrap_ref() {
+					TargetExpr::VariableName(var_name) => {
+						bc_instrs.push(BcInstr::PopToVar { var_name: var_name.clone() });
+					},
+					_ => unimplemented!(),
+				}
+			} else {
+				bc_instrs.push(BcInstr::Drop);
+			}
 		},
 		_ => unimplemented!(),
 	}

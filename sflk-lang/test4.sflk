@@ -33,3 +33,23 @@ pr "o" + "k" nl
 if "hh" - "hh" th pr "no" el pr "yes" nl
 ri {pr "\e[33m" pr v.1 pr "\e[39m" nl} do {pr "h"}
 ri () do {pr "normal" nl}
+not < {if v th v < 0 el v < 1}
+pr 3 >not pr ", " pr 0 >not nl
+streq < {v < v.0 - (v.1) >{v<1-v}}
+pr (), "heh", "heh" >streq pr ", " pr (), "heh", "xxx" >streq nl
+ri {
+	streq < {v < v.0 - (v.1) >{v<1-v}}
+	if (), (v.0), "print" >streq
+	th em (), (v.0), ("\e[33m" + (v.1) + "\e[39m") in v
+	el em v in v
+}
+do {pr "h" nl}
+semicolons < {
+	streq < {v < v.0 - (v.1) >{v<1-v}}
+	if (), (v.0), "newline" >streq
+	th dh {pr ";" em v in v}
+	el em v in v
+}
+ri semicolons
+do {pr "int x" nl}
+ri ()

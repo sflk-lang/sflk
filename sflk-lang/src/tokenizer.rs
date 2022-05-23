@@ -108,6 +108,8 @@ pub enum Kw {
 	Bd,
 	Sp,
 	Ri,
+	Em,
+	In,
 }
 
 #[derive(Debug, Clone)]
@@ -252,6 +254,8 @@ impl Tokenizer {
 			"bd" => Tok::Kw(Kw::Bd),
 			"sp" => Tok::Kw(Kw::Sp),
 			"ri" => Tok::Kw(Kw::Ri),
+			"em" => Tok::Kw(Kw::Em),
+			"in" => Tok::Kw(Kw::In),
 			_ => {
 				let len = word.len();
 				Tok::Name { string: word, unstable_warning: len == 2 }

@@ -142,6 +142,10 @@ pub enum Stmt {
 	RegisterInterceptor {
 		expr: Node<Expr>,
 	},
+	Emit {
+		expr: Node<Expr>,
+		target: Option<Node<TargetExpr>>,
+	},
 	Invalid, // TODO: Add error details
 }
 
@@ -233,9 +237,7 @@ impl Treeable for Expr {
 			Expr::VariableName(name) => {
 				StringTree::new_leaf(format!("variable {}", name), styles::NORMAL)
 			},
-			Expr::NothingLiteral => {
-				StringTree::new_leaf("nothing".to_string(), styles::NORMAL)
-			},
+			Expr::NothingLiteral => StringTree::new_leaf("nothing".to_string(), styles::NORMAL),
 			Expr::IntegerLiteral(integer) => {
 				StringTree::new_leaf(format!("integer {}", integer), styles::NORMAL)
 			},
@@ -363,6 +365,21 @@ impl Treeable for Stmt {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
+			Stmt::Emit { expr, target } => {
+				StringTree::new_node("if".to_string(), styles::NORMAL, {
+					let mut vec: Vec<StringTree> = Vec::with_capacity(2);
+					vec.push(StringTree::from(expr));
+					if let Some(target_expr) = target {
+						vec.push(StringTree::from(target_expr));
+					} else {
+						vec.push(StringTree::new_leaf(
+							"no target".to_string(),
+							styles::NORMAL,
+						));
+					}
+					vec
+				})
+			},
 			Stmt::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
@@ -441,6 +458,16 @@ impl Stmt {
 					.unwrap_or(false)
 			},
 			Stmt::RegisterInterceptor { expr } => expr.content.is_invalid(),
+			#[rustfmt::skip]
+			Stmt::Emit { expr, target } => {
+				expr
+					.content
+					.is_invalid()
+				|| target
+					.as_ref()
+					.map(|target_expr| (*target_expr).content.is_invalid())
+					.unwrap_or(false)
+			},
 			Stmt::Invalid => true,
 		}
 	}
@@ -485,7 +512,8 @@ impl Stmt {
 					.as_ref()
 					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
 			},
-			Stmt::RegisterInterceptor { expr: _ } => unimplemented!(),
+			Stmt::RegisterInterceptor { .. } => unimplemented!(),
+			Stmt::Emit { .. } => unimplemented!(),
 			Stmt::Invalid => program::Stmt::Invalid,
 		}
 	}

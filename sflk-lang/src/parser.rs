@@ -235,6 +235,33 @@ impl Parser {
 						full_loc,
 					))
 				},
+				Kw::Em => {
+					let kw_loc = first_loc.clone();
+					tb.disc();
+					let expr_node = self.parse_expr(tb);
+					let (tok, _) = tb.peek(0);
+					let target_node = match tok {
+						Tok::Kw(tok_kw) if *tok_kw == Kw::In => {
+							tb.disc();
+							let (name_tok, loc) = tb.pop();
+							match name_tok {
+								Tok::Name { string, .. } => {
+									Some(Node::from(TargetExpr::VariableName(string), loc))
+								},
+								_ => Some(Node::from(TargetExpr::Invalid, loc)),
+							}
+						},
+						_ => None,
+					};
+					let mut full_loc = &kw_loc + expr_node.loc();
+					if let Some(node) = &target_node {
+						full_loc += node.loc();
+					}
+					Some(Node::from(
+						Stmt::Emit { expr: expr_node, target: target_node },
+						full_loc,
+					))
+				},
 				_ => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
