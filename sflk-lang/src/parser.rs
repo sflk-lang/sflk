@@ -22,20 +22,29 @@ impl TokBuffer {
 		}
 	}
 
+	fn tokenizer_pop_tok_no_comments(&mut self) -> (Tok, Loc) {
+		loop {
+			let (tok, loc) = self.tokenizer.pop_tok(&mut self.crh);
+			if !matches!(tok, Tok::Comment { .. }) {
+				break (tok, loc);
+			}
+		}
+	}
+
 	fn prepare_max_index(&mut self, n: usize) {
 		if self.toks_ahead.len() < n + 1 {
 			self.toks_ahead.reserve(n - self.toks_ahead.len());
 		}
 		while self.toks_ahead.len() < n + 1 {
-			self.toks_ahead
-				.push_back(self.tokenizer.pop_tok(&mut self.crh));
+			let (tok, loc) = self.tokenizer_pop_tok_no_comments();
+			self.toks_ahead.push_back((tok, loc));
 		}
 	}
 
 	fn prepare_all(&mut self) {
 		loop {
-			self.toks_ahead
-				.push_back(self.tokenizer.pop_tok(&mut self.crh));
+			let (tok, loc) = self.tokenizer_pop_tok_no_comments();
+			self.toks_ahead.push_back((tok, loc));
 			if matches!(self.toks_ahead.back().map(|t| &t.0), Some(Tok::Eof)) {
 				break;
 			}

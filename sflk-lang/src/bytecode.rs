@@ -148,6 +148,10 @@ impl Cx {
 	fn has_var(&self, var_name: &str) -> bool {
 		self.vars.contains_key(var_name)
 	}
+
+	fn undef_var(&mut self, var_name: &str) {
+		self.vars.remove(var_name);
+	}
 }
 
 #[derive(Debug)]
@@ -218,6 +222,10 @@ impl Ip {
 						.unwrap()
 						.get_var("v")
 						.clone();
+					cxs.cx_table
+						.get_mut(&popped_frame.cx_id)
+						.unwrap()
+						.undef_var("v");
 					self.push_value(v_value);
 				} else {
 					self.push_value(Obj::Nothing);
@@ -268,7 +276,7 @@ impl Ip {
 			},
 			BcInstr::VarToPush { var_name } => {
 				let value = if var_name == "v"
-					&& cxs.cx_table.get(&self.get_cx_id()).unwrap().has_var("v")
+					&& !cxs.cx_table.get(&self.get_cx_id()).unwrap().has_var("v")
 				{
 					let mut frame_index = self.stack.len() - 1;
 					loop {
