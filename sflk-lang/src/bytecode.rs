@@ -62,6 +62,7 @@ struct Frame {
 	stack: Vec<Obj>,
 	cx_id: CxId,
 	push_v: bool,
+	sig: Option<Obj>,
 }
 
 impl Frame {
@@ -72,6 +73,7 @@ impl Frame {
 			stack: Vec::new(),
 			cx_id,
 			push_v: false,
+			sig: None,
 		}
 	}
 
@@ -97,17 +99,18 @@ struct Block {
 }
 
 #[derive(Debug, Clone)]
-enum Sig {
-	Print(Obj),
+enum SigType {
+	Print,
 	Newline,
 }
 
 #[derive(Debug, Clone)]
 enum Obj {
+	Nothing,
 	Integer(i64),
 	String(String),
 	Block(Block),
-	Sig(Box<Sig>),
+	Sig { sig_type: SigType, obj: Box<Obj> },
 }
 
 type CxId = u32;
@@ -391,10 +394,10 @@ impl Ip {
 					match parent_cx {
 						None => {
 							match &sig {
-								Obj::Sig(sig) => match &**sig {
-									Sig::Print(Obj::Integer(value)) => print!("{}", value),
-									Sig::Print(Obj::String(string)) => print!("{}", string),
-									Sig::Newline => println!(),
+								Obj::Sig { sig_type, obj } => match (sig_type, &**obj) {
+									(SigType::Print, Obj::Integer(value)) => print!("{}", value),
+									(SigType::Print, Obj::String(string)) => print!("{}", string),
+									(SigType::Newline, _) => println!(),
 									_ => unimplemented!(),
 								},
 								_ => unimplemented!(),
@@ -414,9 +417,10 @@ impl Ip {
 									cx_id = parent_cx;
 								},
 								Some(block) => {
-									// TODO?
 									self.advance_pos();
-									self.stack.push(Frame::for_bc_block(block.bc, parent_cx));
+									let mut sub_frame = Frame::for_bc_block(block.bc, parent_cx);
+									sub_frame.sig = Some(sig);
+									self.stack.push(sub_frame);
 									break;
 								},
 							}
@@ -426,11 +430,14 @@ impl Ip {
 			},
 			BcInstr::IntoPrintSig => {
 				let obj = self.pop_value();
-				self.push_value(Obj::Sig(Box::from(Sig::Print(obj))));
+				self.push_value(Obj::Sig { sig_type: SigType::Print, obj: Box::from(obj) });
 				self.advance_pos();
 			},
 			BcInstr::NewlineSig => {
-				self.push_value(Obj::Sig(Box::from(Sig::Newline)));
+				self.push_value(Obj::Sig {
+					sig_type: SigType::Newline,
+					obj: Box::from(Obj::Nothing),
+				});
 				self.advance_pos();
 			},
 			_ => unimplemented!(),
