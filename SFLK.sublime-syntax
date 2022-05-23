@@ -22,6 +22,8 @@ contexts:
     - match: '#'
       scope: punctuation.definition.comment.begin.sflk
       push: comment_1
+    - match: '\(\s*\)'
+      scope: constant.language.null.sflk
     - match: '\('
       scope: punctuation.section.parens.begin.sflk
       push: paren
@@ -49,6 +51,8 @@ contexts:
       captures:
         1: keyword.other.sflk
         2: variable.function.sflk
+    - match: '\,|\.'
+      scope: keyword.operator.sflk
     - match: '>'
       scope: keyword.operator.sflk
     - match: '\b(if|th|el)\b'

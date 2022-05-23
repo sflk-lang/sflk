@@ -152,6 +152,7 @@ pub enum TargetExpr {
 
 pub enum Expr {
 	VariableName(String),
+	NothingLiteral,
 	IntegerLiteral(String),
 	StringLiteral(String),
 	BlockLiteral(Vec<Node<Stmt>>),
@@ -164,6 +165,8 @@ pub enum Chop {
 	Minus(Node<Expr>),
 	Star(Node<Expr>),
 	Slash(Node<Expr>),
+	Comma(Node<Expr>),
+	Dot(Node<Expr>),
 	ToRight(Node<Expr>),
 	Invalid, // TODO: Add error details
 }
@@ -209,6 +212,16 @@ impl Treeable for Chop {
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
+			Chop::Comma(expr_node) => StringTree::new_node(
+				"chop comma".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(expr_node)],
+			),
+			Chop::Dot(expr_node) => StringTree::new_node(
+				"chop dot".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(expr_node)],
+			),
 			Chop::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
@@ -219,6 +232,9 @@ impl Treeable for Expr {
 		match self {
 			Expr::VariableName(name) => {
 				StringTree::new_leaf(format!("variable {}", name), styles::NORMAL)
+			},
+			Expr::NothingLiteral => {
+				StringTree::new_leaf("nothing".to_string(), styles::NORMAL)
 			},
 			Expr::IntegerLiteral(integer) => {
 				StringTree::new_leaf(format!("integer {}", integer), styles::NORMAL)
@@ -488,6 +504,7 @@ impl Expr {
 	fn is_invalid(&self) -> bool {
 		match self {
 			Expr::VariableName(_varname) => false,
+			Expr::NothingLiteral => false,
 			Expr::IntegerLiteral(_integer_string) => false,
 			Expr::StringLiteral(_string_string) => false,
 			Expr::BlockLiteral(_stmts) => false,
@@ -502,6 +519,7 @@ impl Expr {
 	fn to_machine_expr(&self) -> program::Expr {
 		match self {
 			Expr::VariableName(varname) => program::Expr::Var { varname: varname.to_string() },
+			Expr::NothingLiteral => unimplemented!(),
 			Expr::IntegerLiteral(integer_string) => program::Expr::Const {
 				val: Obj::Integer(str::parse(integer_string).expect("TODO: bigints")),
 			},
@@ -536,6 +554,8 @@ impl Chop {
 			Chop::Star(expr) => expr.content.is_invalid(),
 			Chop::Slash(expr) => expr.content.is_invalid(),
 			Chop::ToRight(expr) => expr.content.is_invalid(),
+			Chop::Comma(expr) => expr.content.is_invalid(),
+			Chop::Dot(expr) => expr.content.is_invalid(),
 			Chop::Invalid => true,
 		}
 	}
@@ -547,6 +567,8 @@ impl Chop {
 			Chop::Star(expr) => program::Chop::Star(expr.content.to_machine_expr()),
 			Chop::Slash(expr) => program::Chop::Slash(expr.content.to_machine_expr()),
 			Chop::ToRight(expr) => program::Chop::ToRight(expr.content.to_machine_expr()),
+			Chop::Comma(expr) => unimplemented!(),
+			Chop::Dot(expr) => unimplemented!(),
 			Chop::Invalid => unreachable!(),
 		}
 	}

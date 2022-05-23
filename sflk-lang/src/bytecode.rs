@@ -12,6 +12,8 @@ enum BinaryOperator {
 	Minus,
 	Star,
 	Slash,
+	Comma,
+	Dot,
 	ToRight,
 }
 
@@ -110,7 +112,8 @@ enum Obj {
 	Integer(i64),
 	String(String),
 	Block(Block),
-	Sig { sig_type: SigType, obj: Box<Obj> },
+	List(Vec<Obj>),
+	Sig { sig_type: SigType, obj: Box<Obj> }, // TODO: Replace by List.
 }
 
 type CxId = u32;
@@ -325,6 +328,32 @@ impl Ip {
 					match (left, right) {
 						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
 							self.push_value(Obj::Integer(left_value / right_value));
+						},
+						_ => unimplemented!(),
+					}
+					self.advance_pos();
+				},
+				BinaryOperator::Comma => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					match (left, right) {
+						(Obj::Nothing, right) => {
+							self.push_value(Obj::List(vec![right]));
+						},
+						(Obj::List(mut vec), right) => {
+							vec.push(right);
+							self.push_value(Obj::List(vec));
+						},
+						_ => unimplemented!(),
+					}
+					self.advance_pos();
+				},
+				BinaryOperator::Dot => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					match (left, right) {
+						(Obj::List(vec), Obj::Integer(index)) => {
+							self.push_value(vec.get(index as usize).unwrap().clone());
 						},
 						_ => unimplemented!(),
 					}
@@ -579,14 +608,15 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 
 fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 	match expr {
+		Expr::VariableName(var_name) => {
+			bc_instrs.push(BcInstr::VarToPush { var_name: var_name.clone() });
+		},
+		Expr::NothingLiteral => bc_instrs.push(BcInstr::PushConst { value: Obj::Nothing }),
 		Expr::IntegerLiteral(integer_string) => bc_instrs.push(BcInstr::PushConst {
 			value: Obj::Integer(str::parse(integer_string).expect("TODO: bigints")),
 		}),
 		Expr::StringLiteral(string_string) => {
 			bc_instrs.push(BcInstr::PushConst { value: Obj::String(string_string.clone()) })
-		},
-		Expr::VariableName(var_name) => {
-			bc_instrs.push(BcInstr::VarToPush { var_name: var_name.clone() });
 		},
 		Expr::BlockLiteral(stmts) => {
 			let mut sub_bc_instrs = Vec::new();
@@ -616,6 +646,14 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 					Chop::Slash(right) => {
 						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
 						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Slash });
+					},
+					Chop::Comma(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Comma });
+					},
+					Chop::Dot(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Dot });
 					},
 					Chop::ToRight(right) => {
 						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);

@@ -116,6 +116,8 @@ pub enum BinOp {
 	Minus,
 	Star,
 	Slash,
+	Comma,
+	Dot,
 	ToRight,
 }
 
@@ -168,6 +170,14 @@ impl Tokenizer {
 			Some('/') => {
 				crh.disc();
 				(Tok::BinOp(BinOp::Slash), loc)
+			},
+			Some(',') => {
+				crh.disc();
+				(Tok::BinOp(BinOp::Comma), loc)
+			},
+			Some('.') => {
+				crh.disc();
+				(Tok::BinOp(BinOp::Dot), loc)
 			},
 			Some('>') => {
 				crh.disc();

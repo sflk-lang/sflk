@@ -27,3 +27,5 @@ do {pr "no" nl}
 replace < "jej"
 ri {pr replace nl}
 do {pr "not jej"}
+uwu < () ,"a" ,"b" ,"c"
+x < 0 lp wh x -3 bd dh {pr uwu .x x < x +1} sp pr ", " nl

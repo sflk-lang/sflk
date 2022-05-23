@@ -329,13 +329,18 @@ impl Parser {
 				}
 			},
 			Tok::Left(Matched::Paren) => {
-				let expr_node = self.parse_expr(tb);
-				let (right_tok, right_loc) = tb.pop();
-				match right_tok {
-					Tok::Right(Matched::Paren) => {
-						Node::from(expr_node.unwrap(), left_loc + right_loc)
-					},
-					_ => panic!("TODO: generate an error here"),
+				if matches!(tb.peek(0).0, Tok::Right(Matched::Paren)) {
+					let (_, right_loc) = tb.pop();
+					Node::from(Expr::NothingLiteral, left_loc + right_loc)
+				} else {
+					let expr_node = self.parse_expr(tb);
+					let (right_tok, right_loc) = tb.pop();
+					match right_tok {
+						Tok::Right(Matched::Paren) => {
+							Node::from(expr_node.unwrap(), left_loc + right_loc)
+						},
+						_ => panic!("TODO: generate an error here"),
+					}
 				}
 			},
 			_ => Node::from(Expr::Invalid, left_loc), // TODO: do!
@@ -353,6 +358,8 @@ impl Parser {
 				BinOp::Minus => Some(Node::from(Chop::Minus(expr_node), full_loc)),
 				BinOp::Star => Some(Node::from(Chop::Star(expr_node), full_loc)),
 				BinOp::Slash => Some(Node::from(Chop::Slash(expr_node), full_loc)),
+				BinOp::Comma => Some(Node::from(Chop::Comma(expr_node), full_loc)),
+				BinOp::Dot => Some(Node::from(Chop::Dot(expr_node), full_loc)),
 				BinOp::ToRight => Some(Node::from(Chop::ToRight(expr_node), full_loc)),
 			}
 		} else {
