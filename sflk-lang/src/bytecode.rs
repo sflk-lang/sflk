@@ -134,6 +134,10 @@ impl Cx {
 	fn get_var(&self, var_name: &str) -> &Obj {
 		&self.vars[var_name]
 	}
+
+	fn has_var(&self, var_name: &str) -> bool {
+		self.vars.contains_key(var_name)
+	}
 }
 
 #[derive(Debug)]
@@ -207,7 +211,7 @@ impl Ip {
 			}
 			return;
 		}
-		let frame = self.stack.last().expect("bug?");
+		let frame = self.stack.last().unwrap();
 		let bc_instr = frame.bc_block.instrs[frame.pos].clone();
 		//dbg!(&bc_instr);
 		match bc_instr {
@@ -242,16 +246,38 @@ impl Ip {
 			},
 			BcInstr::PopToVar { var_name } => {
 				let value = self.pop_value();
-				let cx_id = self.get_cx_id();
 				cxs.cx_table
-					.get_mut(&cx_id)
+					.get_mut(&self.get_cx_id())
 					.unwrap()
 					.set_var(var_name, value);
 				self.advance_pos();
 			},
 			BcInstr::VarToPush { var_name } => {
-				let cx_id = self.get_cx_id();
-				let value = cxs.cx_table.get(&cx_id).unwrap().get_var(&var_name).clone();
+				//let value = cxs.cx_table.get(&cx_id).unwrap().get_var(&var_name).clone();
+				//let sig = if var_name == "v" {
+				//	let frame = self.stack.last_mut().unwrap();
+				//	frame.sig.
+				//};
+				let value = if var_name == "v"
+					&& cxs.cx_table.get(&self.get_cx_id()).unwrap().has_var("v")
+				{
+					let frame = self.stack.last_mut().unwrap();
+					if let Some(sig) = &frame.sig {
+						sig.clone()
+					} else {
+						cxs.cx_table
+							.get(&self.get_cx_id())
+							.unwrap()
+							.get_var(&var_name)
+							.clone()
+					}
+				} else {
+					cxs.cx_table
+						.get(&self.get_cx_id())
+						.unwrap()
+						.get_var(&var_name)
+						.clone()
+				};
 				self.push_value(value);
 				self.advance_pos();
 			},

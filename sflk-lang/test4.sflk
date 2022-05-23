@@ -31,3 +31,4 @@ uwu < () ,"a" ,"b" ,"c"
 x < 0 lp wh x -3 bd dh {pr uwu .x x < x +1} sp pr ", " nl
 pr "o" + "k" nl
 if "hh" - "hh" th pr "no" el pr "yes" nl
+ri {pr "\e[33m" pr v.1 pr "\e[39m" nl} do {pr "h"}
