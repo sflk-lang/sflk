@@ -437,6 +437,12 @@ impl Ip {
 							.unwrap()
 							.sig_interceptor = Some(block);
 					},
+					Obj::Nothing => {
+						cxs.cx_table
+							.get_mut(&self.get_cx_id())
+							.unwrap()
+							.sig_interceptor = None;
+					},
 					_ => unimplemented!(),
 				}
 				self.advance_pos();
