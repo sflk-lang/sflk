@@ -100,6 +100,16 @@ struct Block {
 	bc: BcBlock,
 }
 
+impl Block {
+	fn concat(self, right: Block) -> Block {
+		Block {
+			bc: BcBlock {
+				instrs: self.bc.instrs.into_iter().chain(right.bc.instrs).collect(),
+			},
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 enum Obj {
 	Nothing,
@@ -323,6 +333,9 @@ impl Ip {
 						(Obj::String(left_string), Obj::String(right_string)) => {
 							self.push_value(Obj::String(left_string + &right_string));
 						},
+						(Obj::Block(left_block), Obj::Block(right_block)) => {
+							self.push_value(Obj::Block(left_block.concat(right_block)))
+						},
 						_ => unimplemented!(),
 					}
 					self.advance_pos();
@@ -349,6 +362,16 @@ impl Ip {
 						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
 							self.push_value(Obj::Integer(left_value * right_value));
 						},
+						(Obj::String(left_string), Obj::Integer(right_value)) => {
+							self.push_value(Obj::String(left_string.repeat(right_value as usize)));
+						},
+						(Obj::Block(left_block), Obj::Integer(right_value)) => {
+							let mut block = left_block.clone();
+							for _ in 0..right_value {
+								block = block.concat(left_block.clone());
+							}
+							self.push_value(Obj::Block(block));
+						},
 						_ => unimplemented!(),
 					}
 					self.advance_pos();
@@ -359,6 +382,11 @@ impl Ip {
 					match (left, right) {
 						(Obj::Integer(left_value), Obj::Integer(right_value)) => {
 							self.push_value(Obj::Integer(left_value / right_value));
+						},
+						(Obj::String(left_string), Obj::String(right_string)) => {
+							self.push_value(Obj::Integer(
+								left_string.matches(right_string.as_str()).count() as i64,
+							));
 						},
 						_ => unimplemented!(),
 					}

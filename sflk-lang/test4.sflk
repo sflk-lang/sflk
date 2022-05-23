@@ -53,3 +53,13 @@ semicolons < {
 ri semicolons
 do {pr "int x" nl}
 ri ()
+double < {v < v + v}
+pr 4 > double pr ", " pr "h" > double nl
+quad < double > double
+pr 4 > quad pr ", " pr "h" > quad nl
+triple < {v < v * 3}
+pr 4 > triple pr ", " pr "h" > triple nl
+neuf < triple > double
+pr 4 > neuf pr ", " pr "h" > neuf nl
+pr "hhh" / "h" nl
+pr "hah" / "h" nl
