@@ -10,11 +10,7 @@ pub struct CharReadingHead {
 
 impl CharReadingHead {
 	pub fn from_scu(scu: Rc<SourceCodeUnit>) -> CharReadingHead {
-		CharReadingHead {
-			scu,
-			raw_index: 0,
-			line: 1,
-		}
+		CharReadingHead { scu, raw_index: 0, line: 1 }
 	}
 }
 
@@ -151,65 +147,65 @@ impl Tokenizer {
 			Some(ch) if ch.is_ascii_alphabetic() => {
 				let (word_string, word_loc) = self.pop_word(crh);
 				(self.word_to_tok(word_string), word_loc)
-			}
+			},
 			Some(ch) if ch.is_ascii_digit() => {
 				let (integer_string, word_loc) = self.pop_integer(crh);
 				(Tok::Integer(integer_string), word_loc)
-			}
+			},
 			Some('\"') => self.pop_string_tok(crh),
 			Some('+') => {
 				crh.disc();
 				(Tok::BinOp(BinOp::Plus), loc)
-			}
+			},
 			Some('-') => {
 				crh.disc();
 				(Tok::BinOp(BinOp::Minus), loc)
-			}
+			},
 			Some('*') => {
 				crh.disc();
 				(Tok::BinOp(BinOp::Star), loc)
-			}
+			},
 			Some('/') => {
 				crh.disc();
 				(Tok::BinOp(BinOp::Slash), loc)
-			}
+			},
 			Some('>') => {
 				crh.disc();
 				(Tok::BinOp(BinOp::ToRight), loc)
-			}
+			},
 			Some('(') => {
 				crh.disc();
 				(Tok::Left(Matched::Paren), loc)
-			}
+			},
 			Some('[') => {
 				crh.disc();
 				(Tok::Left(Matched::Bracket), loc)
-			}
+			},
 			Some('{') => {
 				crh.disc();
 				(Tok::Left(Matched::Curly), loc)
-			}
+			},
 			Some(')') => {
 				crh.disc();
 				(Tok::Right(Matched::Paren), loc)
-			}
+			},
 			Some(']') => {
 				crh.disc();
 				(Tok::Right(Matched::Bracket), loc)
-			}
+			},
 			Some('}') => {
 				crh.disc();
 				(Tok::Right(Matched::Curly), loc)
-			}
+			},
 			Some('<') => {
 				crh.disc();
 				(Tok::StmtBinOp(StmtBinOp::ToLeft), loc)
-			}
+			},
 			Some('#') => self.pop_comment_tok(crh),
 			Some(ch) => {
 				crh.disc();
 				(Tok::InvalidCharacter(ch), loc)
-			}
+			},
 			None => (Tok::Eof, loc),
 		}
 	}
@@ -248,11 +244,8 @@ impl Tokenizer {
 			"ri" => Tok::Kw(Kw::Ri),
 			_ => {
 				let len = word.len();
-				Tok::Name {
-					string: word,
-					unstable_warning: len == 2,
-				}
-			}
+				Tok::Name { string: word, unstable_warning: len == 2 }
+			},
 		}
 	}
 
@@ -284,32 +277,32 @@ impl Tokenizer {
 				None => {
 					no_end_quote_warning = true;
 					break;
-				}
+				},
 				Some('\"') => {
 					loc += crh.loc();
 					crh.disc();
 					break;
-				}
+				},
 				Some('\\') => {
 					let (escaped, len, escaped_loc) = self.pop_escaped(crh);
 					loc += escaped_loc;
 					match escaped {
 						Ok(escaped_string) => {
 							content += &escaped_string;
-						}
+						},
 						Err(error) => {
 							content += "�";
 							invalid_escape_sequence_errors.push((error, offset));
-						}
+						},
 					}
 					offset += len;
-				}
+				},
 				Some(ch) => {
 					loc += crh.loc();
 					offset += 1;
 					crh.disc();
 					content.push(ch);
-				}
+				},
 			}
 		}
 		(
@@ -334,66 +327,66 @@ impl Tokenizer {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('\\') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\\".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('\"') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\"".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('?') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("�".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('n') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\n".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('t') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\t".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('e') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\x1b".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('a') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\x07".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('b') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\x08".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('v') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\x0b".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('f') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\x0c".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('r') => {
 				let loc_end = crh.loc();
 				crh.disc();
 				(Ok("\r".to_string()), 2, loc_beg + loc_end)
-			}
+			},
 			Some('x') | Some('d') => {
 				let (escaped, len, loc_end) = self.pop_hex_escaped(crh);
 				(escaped, len + 1, loc_beg + loc_end)
-			}
+			},
 			Some(ch) => (
 				Err(EscapeSequenceError::InvalidFirstCharacter(ch)),
 				1,
@@ -414,11 +407,11 @@ impl Tokenizer {
 				Some('x') => {
 					crh.disc();
 					16
-				}
+				},
 				Some('d') => {
 					crh.disc();
 					10
-				}
+				},
 				_ => unreachable!(),
 			}
 		};
@@ -435,20 +428,20 @@ impl Tokenizer {
 							len += 1;
 							crh.disc();
 							character_code = character_code * base + digit;
-						}
+						},
 						None if ch == ')' => {
 							loc += crh.loc();
 							len += 1;
 							crh.disc();
 							break;
-						}
+						},
 						None => {
 							return (
 								Err(EscapeSequenceError::InvalidDigitCharacter(ch)),
 								len,
 								loc,
 							)
-						}
+						},
 					}
 				} else {
 					return (Err(EscapeSequenceError::UnexpectedEof), len, loc);
@@ -463,14 +456,14 @@ impl Tokenizer {
 							len += 1;
 							crh.disc();
 							character_code = character_code * base + digit;
-						}
+						},
 						None => {
 							return (
 								Err(EscapeSequenceError::InvalidDigitCharacter(ch)),
 								len,
 								loc,
 							)
-						}
+						},
 					}
 				} else {
 					return (Err(EscapeSequenceError::UnexpectedEof), len, loc);
