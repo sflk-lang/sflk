@@ -40,15 +40,15 @@ pr (), "heh", "heh" >streq pr ", " pr (), "heh", "xxx" >streq nl
 ri {
 	streq < {v < v.0 - (v.1) >{v<1-v}}
 	if (), (v.0), "print" >streq
-	th em (), (v.0), ("\e[33m" + (v.1) + "\e[39m") in v
-	el em v in v
+	th em (), (v.0), ("\e[33m" + (v.1) + "\e[39m") rs v
+	el em v rs v
 }
 do {pr "h" nl}
 semicolons < {
 	streq < {v < v.0 - (v.1) >{v<1-v}}
 	if (), (v.0), "newline" >streq
-	th dh {pr ";" em v in v}
-	el em v in v
+	th dh {pr ";" em v rs v}
+	el em v rs v
 }
 ri semicolons
 do {pr "int x" nl}

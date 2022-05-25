@@ -302,7 +302,7 @@ impl Parser {
 					let expr_node = self.parse_expr(tb);
 					let (tok, _) = tb.peek(0);
 					let target_node = match tok {
-						Tok::Kw(tok_kw) if *tok_kw == Kw::In => {
+						Tok::Kw(tok_kw) if *tok_kw == Kw::Rs => {
 							tb.disc();
 							let (name_tok, loc) = tb.pop();
 							match name_tok {

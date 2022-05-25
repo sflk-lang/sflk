@@ -10,7 +10,7 @@ interceptoryellow < {
 			pr "\e[33m" pr value pr "\e[39m" # print it but yellow #
 		}
 	el # we did not intercept a print signal #
-		em v in v # re-emit the signal and transmit its result #
+		em v rs v # re-emit the signal and transmit its result #
 }
 
 ri interceptoryellow
@@ -26,4 +26,4 @@ pr "uwu" nl # not intercepted #
 do {pr "owo" nl} # printed normally (signal not intercepted) #
 
 # `ri interceptoryellow` but golfed #
-ri{if v.0-"print"th em v in v el dh{pr"\e[33m"pr v.1 pr"\e[39m"}}
+ri{if v.0-"print"el dh{pr"\e[33m"pr v.1 pr"\e[39m"}th em v rs v}
