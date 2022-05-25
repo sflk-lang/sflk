@@ -131,8 +131,8 @@ pub enum Stmt {
 	},
 	If {
 		cond_expr: Node<Expr>,
-		th_stmt: Option<Box<Node<Stmt>>>,
-		el_stmt: Option<Box<Node<Stmt>>>,
+		th_stmts: Vec<Node<Stmt>>,
+		el_stmts: Vec<Node<Stmt>>,
 	},
 	Loop {
 		wh_expr: Option<Node<Expr>>,
@@ -310,7 +310,8 @@ impl Treeable for Stmt {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::If { cond_expr, th_stmt, el_stmt } => {
+			Stmt::If { .. } => {
+				/*
 				StringTree::new_node("if".to_string(), styles::NORMAL, {
 					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
 					vec.push(StringTree::from(cond_expr));
@@ -332,6 +333,8 @@ impl Treeable for Stmt {
 					}
 					vec
 				})
+				*/
+				unimplemented!()
 			},
 			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => {
 				StringTree::new_node("loop".to_string(), styles::NORMAL, {
@@ -420,23 +423,14 @@ impl Stmt {
 			Stmt::Do { expr } => expr.content.is_invalid(),
 			Stmt::DoHere { expr } => expr.content.is_invalid(),
 			Stmt::DoFileHere { expr } => expr.content.is_invalid(),
-			#[rustfmt::skip]
-			Stmt::If {
-				cond_expr,
-				th_stmt,
-				el_stmt,
-			} => {
-				cond_expr
-					.content
-					.is_invalid()
-				|| th_stmt
-					.as_ref()
-					.map(|stmt| (*stmt).content.is_invalid())
-					.unwrap_or(false)
-				|| el_stmt
-					.as_ref()
-					.map(|stmt| (*stmt).content.is_invalid())
-					.unwrap_or(false)
+			Stmt::If { cond_expr, th_stmts, el_stmts } => {
+				cond_expr.content.is_invalid()
+					|| th_stmts
+						.iter()
+						.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+					|| el_stmts
+						.iter()
+						.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
 			},
 			#[rustfmt::skip]
 			Stmt::Loop {
@@ -492,7 +486,7 @@ impl Stmt {
 			Stmt::DoFileHere { expr } => {
 				program::Stmt::DoFileHere { expr: expr.content.to_machine_expr() }
 			},
-			Stmt::If { cond_expr, th_stmt, el_stmt } => program::Stmt::If {
+			Stmt::If { .. } => unimplemented!(), /* program::Stmt::If {
 				cond_expr: cond_expr.content.to_machine_expr(),
 				th_stmt: th_stmt
 					.as_ref()
@@ -500,7 +494,7 @@ impl Stmt {
 				el_stmt: el_stmt
 					.as_ref()
 					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-			},
+			}, */
 			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => program::Stmt::Loop {
 				wh_expr: wh_expr
 					.as_ref()

@@ -595,11 +595,11 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 				_ => unimplemented!(),
 			}
 		},
-		Stmt::If { cond_expr, th_stmt, el_stmt } => {
+		Stmt::If { cond_expr, th_stmts, el_stmts } => {
 			expr_to_bc_instrs(cond_expr.unwrap_ref(), bc_instrs);
 			bc_instrs.push(BcInstr::UnOp { un_op: UnaryOperator::LogicalNot });
 			let mut th_bc = Vec::new();
-			if let Some(stmt) = th_stmt {
+			for stmt in th_stmts {
 				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut th_bc);
 			}
 			let el_jump_bc_len = 1;
@@ -608,7 +608,7 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 			});
 			bc_instrs.extend(th_bc);
 			let mut el_bc = Vec::new();
-			if let Some(stmt) = el_stmt {
+			for stmt in el_stmts {
 				stmt_to_bc_instrs(stmt.unwrap_ref(), &mut el_bc);
 			}
 			bc_instrs.push(BcInstr::RelativeJump { offset: el_bc.len() as isize + 1 });

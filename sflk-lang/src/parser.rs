@@ -1,6 +1,7 @@
 use crate::ast::{Chop, Comment, Expr, Node, Program, Stmt, TargetExpr};
 use crate::scu::{Loc, SourceCodeUnit};
 use crate::tokenizer::{BinOp, CharReadingHead, Kw, Matched, StmtBinOp, Tok, Tokenizer};
+use std::collections::HashMap;
 use std::{collections::VecDeque, rc::Rc};
 
 pub struct ParsingWarning {
@@ -90,6 +91,27 @@ impl Parser {
 		Parser {}
 	}
 }
+
+enum ExtType {
+	Stmt,
+	Expr,
+}
+
+struct StmtExtDescr {
+	content_type: ExtType,
+	optional: bool,
+	/// Can this extention be present multiple times in the same statement?
+	can_stack: bool,
+}
+
+type StmtExtPackDescr = HashMap<Kw, StmtExtDescr>;
+
+enum SingleContent {
+	Stmt(Node<Stmt>),
+	Expr(Node<Expr>),
+}
+
+type StmtExtPackContent = HashMap<Kw, Vec<SingleContent>>;
 
 impl Parser {
 	pub fn parse_program(&mut self, tb: &mut TokBuffer) -> Node<Program> {
@@ -191,21 +213,51 @@ impl Parser {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let cond_expr_node = self.parse_expr(tb);
-					let th_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::Th);
-					let el_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::El);
+					let mut descr_pack = HashMap::new();
+					descr_pack.insert(
+						Kw::Th,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					descr_pack.insert(
+						Kw::El,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					let mut content_pack = self.parse_stmt_extensions(tb, &descr_pack);
+					let th_stmts: Vec<_> = content_pack
+						.remove(&Kw::Th)
+						.unwrap()
+						.into_iter()
+						.map(|single| match single {
+							SingleContent::Stmt(stmt) => stmt,
+							_ => panic!("bug"),
+						})
+						.collect();
+					let el_stmts: Vec<_> = content_pack
+						.remove(&Kw::El)
+						.unwrap()
+						.into_iter()
+						.map(|single| match single {
+							SingleContent::Stmt(stmt) => stmt,
+							_ => panic!("bug"),
+						})
+						.collect();
 					let mut full_loc = kw_loc;
-					if let Some(stmt_node) = &th_stmt_node {
+					if let Some(stmt_node) = th_stmts.last() {
 						full_loc += stmt_node.loc();
 					}
-					if let Some(stmt_node) = &el_stmt_node {
+					if let Some(stmt_node) = el_stmts.last() {
 						full_loc += stmt_node.loc();
 					}
 					Some(Node::from(
-						Stmt::If {
-							cond_expr: cond_expr_node,
-							th_stmt: th_stmt_node.map(Box::new),
-							el_stmt: el_stmt_node.map(Box::new),
-						},
+						Stmt::If { cond_expr: cond_expr_node, th_stmts, el_stmts },
 						full_loc,
 					))
 				},
@@ -280,6 +332,50 @@ impl Parser {
 		} else {
 			self.maybe_parse_assign_stmt(tb)
 		}
+	}
+
+	fn parse_stmt_extensions(
+		&mut self,
+		tb: &mut TokBuffer,
+		descr_pack: &StmtExtPackDescr,
+	) -> StmtExtPackContent {
+		let mut content_pack = HashMap::new();
+		for kw in descr_pack.keys() {
+			content_pack.insert(*kw, Vec::new());
+		}
+		loop {
+			let (tok, _) = tb.peek(0);
+			match tok {
+				Tok::Kw(kw) => {
+					if let Some(descr) = descr_pack.get(kw) {
+						if !descr.can_stack && !content_pack.get(kw).unwrap().is_empty() {
+							panic!("no");
+						}
+						let kw = *kw;
+						tb.disc();
+						match descr.content_type {
+							ExtType::Stmt => content_pack
+								.get_mut(&kw)
+								.unwrap()
+								.push(SingleContent::Stmt(self.parse_stmt(tb))),
+							ExtType::Expr => content_pack
+								.get_mut(&kw)
+								.unwrap()
+								.push(SingleContent::Expr(self.parse_expr(tb))),
+						}
+					} else {
+						break;
+					}
+				},
+				_ => break,
+			}
+		}
+		for (kw, descr) in descr_pack {
+			if !descr.optional && content_pack.get(kw).unwrap().is_empty() {
+				panic!("no");
+			}
+		}
+		content_pack
 	}
 
 	fn maybe_parse_stmt_extension_expr(
