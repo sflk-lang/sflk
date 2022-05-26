@@ -39,7 +39,7 @@ contexts:
       push: string_litteral
     - match: '[0-9]+'
       scope: constant.numeric.integer.decimal.sflk
-    - match: '(<~|<)'
+    - match: '(<)'
       scope: keyword.operator.assignment.flk
     - match: '\+|\-|\*|/'
       scope: keyword.operator.arithmetic.sflk
@@ -47,11 +47,11 @@ contexts:
       captures:
         1: keyword.operator.sflk
         2: variable.function.sflk
-    - match: '\b(do|dh)\b\s*([a-zA-Z]+)'
+    - match: '\b(do|dh|ri)\b\s*([a-zA-Z]+)'
       captures:
         1: keyword.other.sflk
         2: variable.function.sflk
-    - match: '\,|\.'
+    - match: '\,\,|\,|\.'
       scope: keyword.operator.sflk
     - match: '>'
       scope: keyword.operator.sflk

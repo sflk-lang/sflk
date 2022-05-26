@@ -13,6 +13,7 @@ enum BinaryOperator {
 	Star,
 	Slash,
 	Comma,
+	DoubleComma,
 	Dot,
 	ToRight,
 }
@@ -415,6 +416,12 @@ impl Ip {
 					}
 					self.advance_pos();
 				},
+				BinaryOperator::DoubleComma => {
+					let right = self.pop_value();
+					let left = self.pop_value();
+					self.push_value(Obj::List(vec![left, right]));
+					self.advance_pos();
+				},
 				BinaryOperator::Dot => {
 					let right = self.pop_value();
 					let left = self.pop_value();
@@ -750,6 +757,10 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 					Chop::Comma(right) => {
 						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
 						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::Comma });
+					},
+					Chop::DoubleComma(right) => {
+						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);
+						bc_instrs.push(BcInstr::BinOp { bin_op: BinaryOperator::DoubleComma });
 					},
 					Chop::Dot(right) => {
 						expr_to_bc_instrs(right.unwrap_ref(), bc_instrs);

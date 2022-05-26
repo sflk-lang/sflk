@@ -3,7 +3,7 @@ streq < {v < 1 -(v .0 -(v .1))}
 
 interceptoryellow < {
 	type < v .0 # signal type #
-	if () ,type ,"print" >streq
+	if type ,,"print" >streq
 	th # we intercepted a print signal #
 		dh {
 			value < v .1

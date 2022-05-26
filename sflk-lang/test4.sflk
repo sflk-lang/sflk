@@ -64,3 +64,4 @@ pr 4 > neuf pr ", " pr "h" > neuf nl
 pr "hhh" / "h" nl
 pr "hah" / "h" nl
 if 0 el pr "h" th pr "no" el pr "ey" el nl th nl
+em "print",, "hey\n"

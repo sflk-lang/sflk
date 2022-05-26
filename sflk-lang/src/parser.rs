@@ -491,6 +491,7 @@ impl Parser {
 				BinOp::Star => Some(Node::from(Chop::Star(expr_node), full_loc)),
 				BinOp::Slash => Some(Node::from(Chop::Slash(expr_node), full_loc)),
 				BinOp::Comma => Some(Node::from(Chop::Comma(expr_node), full_loc)),
+				BinOp::DoubleComma => Some(Node::from(Chop::DoubleComma(expr_node), full_loc)),
 				BinOp::Dot => Some(Node::from(Chop::Dot(expr_node), full_loc)),
 				BinOp::ToRight => Some(Node::from(Chop::ToRight(expr_node), full_loc)),
 			}
