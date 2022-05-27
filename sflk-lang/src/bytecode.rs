@@ -571,6 +571,8 @@ impl Ip {
 										self.push_value(Obj::Nothing);
 									},
 									(Some(Obj::String(sig_name)), _) if sig_name == "input" => {
+										use std::io::Write;
+										std::io::stdout().flush().ok();
 										let mut input = String::new();
 										std::io::stdin().read_line(&mut input).expect("h");
 										self.push_value(Obj::String(input));

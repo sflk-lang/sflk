@@ -121,7 +121,7 @@ contexts:
   string_litteral:
     - meta_scope: string.quoted.double.sflk
     - match: '\\$'
-      scope: source.sflk
+      scope: constant.character.escape.sflk
     - match: '\\x\([0-9a-fA-F]*\)'
       scope: constant.character.escape.sflk
     - match: '\\d\([0-9]*\)'

@@ -1,0 +1,20 @@
+
+pr "\
+         *** SFLK REPL TEST ***
+
+Please note that this is not a true REPL yet
+and is quite shitty for now. It will get
+better with time aha..
+
+Each input line should be a statement.
+To print stuff, enter `pr stuff`.
+To exit, enter erroneous garbage.
+
+"
+
+lp bd dh {
+	pr "$ "
+	line < in
+	dh line
+	nl
+}
