@@ -10,6 +10,7 @@ use crate::utils::{escape_string, styles};
 // - delete Located
 // - parser->program must become parser->ast->program
 
+#[derive(Debug)]
 pub struct Node<T> {
 	content: T,
 	loc: Loc,
@@ -52,6 +53,7 @@ impl<T> Node<T> {
 	}
 }
 
+#[derive(Debug)]
 pub struct Comment {
 	content: String,
 	delimitation_thickness: usize,
@@ -63,6 +65,7 @@ impl Comment {
 	}
 }
 
+#[derive(Debug)]
 struct Comments {
 	left_comments: Vec<Comment>,
 	internal_comments: Vec<Comment>,
@@ -107,6 +110,7 @@ pub struct Program {
 	pub stmts: Vec<Node<Stmt>>,
 }
 
+#[derive(Debug)]
 pub enum Stmt {
 	Nop,
 	Print {
@@ -149,21 +153,30 @@ pub enum Stmt {
 	Invalid, // TODO: Add error details
 }
 
+#[derive(Debug)]
 pub enum TargetExpr {
 	VariableName(String),
 	Invalid, // TODO: Add error details
 }
 
+#[derive(Debug)]
 pub enum Expr {
 	VariableName(String),
 	NothingLiteral,
 	IntegerLiteral(String),
 	StringLiteral(String),
 	BlockLiteral(Vec<Node<Stmt>>),
+	Unop(Unop),
 	Chain { init: Box<Node<Expr>>, chops: Vec<Node<Chop>> },
 	Invalid, // TODO: Add error details
 }
 
+#[derive(Debug)]
+pub enum Unop {
+	ReadFile(Box<Node<Expr>>),
+}
+
+#[derive(Debug)]
 pub enum Chop {
 	Plus(Node<Expr>),
 	Minus(Node<Expr>),
@@ -256,6 +269,7 @@ impl Treeable for Expr {
 				styles::CYAN,
 				stmts.iter().map(StringTree::from).collect(),
 			),
+			Expr::Unop(unop) => unimplemented!(),
 			Expr::Chain { init, chops } => StringTree::new_node(
 				"chain".to_string(),
 				styles::BLUE,
@@ -536,6 +550,7 @@ impl Expr {
 			Expr::IntegerLiteral(_integer_string) => false,
 			Expr::StringLiteral(_string_string) => false,
 			Expr::BlockLiteral(_stmts) => false,
+			Expr::Unop(_stmts) => false,
 			Expr::Chain { init, chops } => {
 				(*init).content.is_invalid()
 					|| chops.iter().any(|chop| (*chop).content.is_invalid())
@@ -562,6 +577,7 @@ impl Expr {
 						.collect(),
 				}),
 			},
+			Expr::Unop(_) => unimplemented!(),
 			Expr::Chain { init, chops } => program::Expr::Chain(program::Chain {
 				init_expr: Box::new(init.content.to_machine_expr()),
 				chops: chops

@@ -1,9 +1,10 @@
-use crate::ast::{Chop, Comment, Expr, Node, Program, Stmt, TargetExpr};
+use crate::ast::{Chop, Comment, Expr, Node, Program, Stmt, TargetExpr, Unop};
 use crate::scu::{Loc, SourceCodeUnit};
 use crate::tokenizer::{BinOp, CharReadingHead, Kw, Matched, StmtBinOp, Tok, Tokenizer};
 use std::collections::HashMap;
 use std::{collections::VecDeque, rc::Rc};
 
+#[derive(Debug)]
 pub struct ParsingWarning {
 	// TODO
 }
@@ -450,6 +451,14 @@ impl Parser {
 			Tok::Name { string, .. } => Node::from(Expr::VariableName(string), left_loc),
 			Tok::Integer(integer) => Node::from(Expr::IntegerLiteral(integer), left_loc),
 			Tok::String { content, .. } => Node::from(Expr::StringLiteral(content), left_loc),
+			Tok::Kw(Kw::Fi) => {
+				let expr_node = self.parse_expr(tb);
+				let loc_right = expr_node.loc().clone();
+				Node::from(
+					Expr::Unop(Unop::ReadFile(Box::from(expr_node))),
+					left_loc + loc_right,
+				)
+			},
 			Tok::Left(Matched::Curly) => {
 				let stmts = self.parse_stmts(tb);
 				let (right_tok, right_loc) = tb.pop();

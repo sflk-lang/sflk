@@ -1,5 +1,5 @@
 use crate::{
-	ast::{Chop, Expr, Program, Stmt, TargetExpr},
+	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
 	parser::{Parser, TokBuffer},
 	scu::SourceCodeUnit,
 	tokenizer::CharReadingHead,
@@ -49,6 +49,7 @@ enum BcInstr {
 	Sig,                 // (sig -- res)
 	IntoPrintSig,        // (value -- sig)
 	NewlineSig,          // ( -- sig)
+	IntoReadFileSig,     // (value -- sig)
 
 	// Other operations
 	UnOp { un_op: UnaryOperator },    // (a -- (op a))
@@ -568,6 +569,13 @@ impl Ip {
 										println!();
 										self.push_value(Obj::Nothing);
 									},
+									(Some(Obj::String(sig_name)), Some(Obj::String(filename)))
+										if sig_name == "readfile" =>
+									{
+										self.push_value(Obj::String(
+											std::fs::read_to_string(filename).unwrap(),
+										));
+									},
 									_ => unimplemented!(),
 								},
 								_ => unimplemented!(),
@@ -606,6 +614,11 @@ impl Ip {
 			},
 			BcInstr::NewlineSig => {
 				self.push_value(Obj::List(vec![Obj::String("newline".to_string())]));
+				self.advance_pos();
+			},
+			BcInstr::IntoReadFileSig => {
+				let obj = self.pop_value();
+				self.push_value(Obj::List(vec![Obj::String("readfile".to_string()), obj]));
 				self.advance_pos();
 			},
 			_ => unimplemented!(),
@@ -757,7 +770,7 @@ fn stmt_to_bc_instrs(stmt: &Stmt, bc_instrs: &mut Vec<BcInstr>) {
 				bc_instrs.push(BcInstr::Drop);
 			}
 		},
-		_ => unimplemented!(),
+		h => unimplemented!("{:?}", h),
 	}
 }
 
@@ -781,6 +794,13 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 			bc_instrs.push(BcInstr::PushConst {
 				value: Obj::Block(Block { bc: BcBlock { instrs: sub_bc_instrs } }),
 			});
+		},
+		Expr::Unop(unop) => match unop {
+			Unop::ReadFile(expr) => {
+				expr_to_bc_instrs(expr.unwrap_ref(), bc_instrs);
+				bc_instrs.push(BcInstr::IntoReadFileSig);
+				bc_instrs.push(BcInstr::Sig);
+			},
 		},
 		Expr::Chain { init, chops } => {
 			expr_to_bc_instrs(init.unwrap_ref(), bc_instrs);

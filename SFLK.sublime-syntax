@@ -4,6 +4,9 @@ name: SFLK
 file_extensions: [sflk, Sflk, SFLK]
 scope: source.sflk
 
+variables:
+  name: '\b([a-zA-Z]|([a-zA-Z]{3,}))\b'
+
 contexts:
 
   main:
@@ -43,11 +46,11 @@ contexts:
       scope: keyword.operator.assignment.flk
     - match: '\+|\-|\*|/'
       scope: keyword.operator.arithmetic.sflk
-    - match: '(>)\s*([a-zA-Z]+)'
+    - match: '(>)\s*({{name}})'
       captures:
         1: keyword.operator.sflk
         2: variable.function.sflk
-    - match: '\b(do|dh|ri)\b\s*([a-zA-Z]+)'
+    - match: '\b(do|dh|ri)\b\s*({{name}})'
       captures:
         1: keyword.other.sflk
         2: variable.function.sflk
@@ -61,11 +64,11 @@ contexts:
       scope: keyword.control.loop.sflk
     - match: '\b(fh)\b'
       scope: keyword.import.sflk
-    - match: '\b(np|pr|nl|do|dh|ev|ri|em|rs)\b'
+    - match: '\b(np|pr|nl|do|dh|ev|ri|em|rs|fi)\b'
       scope: keyword.other.sflk
     - match: '\b(v)\b'
       scope: variable.parameter.sflk
-    - match: '[a-zA-Z]+'
+    - match: '{{name}}'
       scope: variable.sflk
 
   comment_1:
