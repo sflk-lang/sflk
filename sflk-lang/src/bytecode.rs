@@ -1,5 +1,10 @@
-use crate::ast::{Chop, Expr, Program, Stmt, TargetExpr};
-use std::collections::HashMap;
+use crate::{
+	ast::{Chop, Expr, Program, Stmt, TargetExpr},
+	parser::{Parser, TokBuffer},
+	scu::SourceCodeUnit,
+	tokenizer::CharReadingHead,
+};
+use std::{collections::HashMap, rc::Rc};
 
 #[derive(Debug, Clone)]
 enum UnaryOperator {
@@ -193,6 +198,15 @@ impl Vm {
 			self.ips.retain(|ip| !ip.stack.is_empty());
 		}
 	}
+}
+
+fn string_to_code(s: &str, name: String) -> BcBlock {
+	let scu = Rc::new(SourceCodeUnit::from_str(s, name));
+	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
+	let mut parser = Parser::new();
+	let ast = parser.parse_program(&mut tfr);
+	let bc_block = program_to_bc_block(ast.unwrap_ref());
+	bc_block
 }
 
 impl Ip {
@@ -448,6 +462,18 @@ impl Ip {
 							self.advance_pos();
 							self.stack.push(sub_frame);
 						},
+						Obj::String(string) => {
+							let sub_cx = cxs.create_cx(Some(self.get_cx_id()));
+							cxs.cx_table
+								.get_mut(&sub_cx)
+								.unwrap()
+								.set_var("v".to_string(), left);
+							let bc_block = string_to_code(&string, "some string".to_string());
+							let mut sub_frame = Frame::for_bc_block(bc_block, sub_cx);
+							sub_frame.push_v = true; // Will push v.
+							self.advance_pos();
+							self.stack.push(sub_frame);
+						},
 						_ => unimplemented!(),
 					}
 				},
@@ -459,6 +485,12 @@ impl Ip {
 						self.advance_pos();
 						self.stack
 							.push(Frame::for_bc_block(block.bc, self.get_cx_id()));
+					},
+					Obj::String(string) => {
+						self.advance_pos();
+						let bc_block = string_to_code(&string, "some string".to_string());
+						self.stack
+							.push(Frame::for_bc_block(bc_block, self.get_cx_id()));
 					},
 					_ => unimplemented!(),
 				}
@@ -473,6 +505,14 @@ impl Ip {
 							cxs.create_cx(Some(self.get_cx_id())),
 						));
 					},
+					Obj::String(string) => {
+						self.advance_pos();
+						let bc_block = string_to_code(&string, "some string".to_string());
+						self.stack.push(Frame::for_bc_block(
+							bc_block,
+							cxs.create_cx(Some(self.get_cx_id())),
+						));
+					},
 					_ => unimplemented!(),
 				}
 			},
@@ -480,6 +520,14 @@ impl Ip {
 				let obj = self.pop_value();
 				match obj {
 					Obj::Block(block) => {
+						cxs.cx_table
+							.get_mut(&self.get_cx_id())
+							.unwrap()
+							.sig_interceptor = Some(block);
+					},
+					Obj::String(string) => {
+						let bc_block = string_to_code(&string, "some string".to_string());
+						let block = Block { bc: bc_block };
 						cxs.cx_table
 							.get_mut(&self.get_cx_id())
 							.unwrap()

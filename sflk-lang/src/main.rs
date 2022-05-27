@@ -10,6 +10,11 @@ mod stringtree;
 mod tokenizer;
 mod utils;
 
+use crate::parser::{Parser, TokBuffer};
+use crate::scu::SourceCodeUnit;
+use crate::tokenizer::CharReadingHead;
+use std::rc::Rc;
+
 const HELP_MESSAGE: &str = "\
 	Usage:\n\
 	\tsflk <filename.sflk> [options]\n\
@@ -92,11 +97,11 @@ fn main() {
 	}
 	*/
 
-	let scu = std::rc::Rc::new(crate::scu::SourceCodeUnit::from_filename(
+	let scu = Rc::new(SourceCodeUnit::from_filename(
 		&settings.root_filename.unwrap(),
 	));
-	let mut tfr = crate::parser::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
-	let mut parser = crate::parser::Parser::new();
+	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
+	let mut parser = Parser::new();
 	let ast = parser.parse_program(&mut tfr);
 	let bc_block = bytecode::program_to_bc_block(ast.unwrap_ref());
 	dbg!(&bc_block);

@@ -65,3 +65,7 @@ pr "hhh" / "h" nl
 pr "hah" / "h" nl
 if 0 el pr "h" th pr "no" el pr "ey" el nl th nl
 em "print",, "hey\n"
+dh "pr \"owo\" nl"
+ri semicolons do "pr \"int y\" nl" ri ()
+fun < "v < \"v < \\\"np\\\" \" + v"
+lp wh fun>{pr v nl}-"np" bd fun < fun > fun
