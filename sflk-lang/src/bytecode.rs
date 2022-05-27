@@ -27,12 +27,9 @@ enum BinaryOperator {
 enum BcInstr {
 	// Essentials
 	Nop,                      // ( -- )
-	Bruh,                     // ( -- )
 	PushConst { value: Obj }, // ( -- value)
 
 	// Stack operations
-	Swap, // (a b -- b a)
-	Over, // (a b -- a b a)
 	Dup,  // (a -- a a)
 	Drop, // (a -- )
 
@@ -57,7 +54,6 @@ enum BcInstr {
 	BinOp { bin_op: BinaryOperator }, // (a b -- (a op b))
 	Do,                               // (block -- )
 	DoHere,                           // (block -- )
-	DoFileHere,                       // (filepath -- )
 }
 
 #[derive(Debug, Clone)]
@@ -257,10 +253,6 @@ impl Ip {
 			BcInstr::Nop => {
 				self.advance_pos();
 			},
-			BcInstr::Bruh => {
-				println!("bruh");
-				self.advance_pos();
-			},
 			BcInstr::PushConst { value } => {
 				self.push_value(value);
 				self.advance_pos();
@@ -272,14 +264,6 @@ impl Ip {
 			BcInstr::Dup => {
 				let a = self.pop_value();
 				self.push_value(a.clone());
-				self.push_value(a);
-				self.advance_pos();
-			},
-			BcInstr::Over => {
-				let b = self.pop_value();
-				let a = self.pop_value();
-				self.push_value(a.clone());
-				self.push_value(b);
 				self.push_value(a);
 				self.advance_pos();
 			},
@@ -633,7 +617,6 @@ impl Ip {
 				self.push_value(Obj::List(vec![Obj::String("readfile".to_string()), obj]));
 				self.advance_pos();
 			},
-			_ => unimplemented!(),
 		}
 	}
 }
