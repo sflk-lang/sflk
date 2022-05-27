@@ -72,3 +72,15 @@ lp wh fun>{pr v nl}-"np" bd fun < fun > fun
 pr ((8)) nl
 dh fi "sflk-lang/std.sflk"
 ev "jej" >prnl
+ri {
+	type < v .0
+	if type -"readfile" el dh {
+		v < "fun < {v < v +3}"
+	} th dh {
+		em v rs v
+	}
+}
+do {
+	dh fi "some_file.sflk"
+	pr 5 >fun nl
+}
