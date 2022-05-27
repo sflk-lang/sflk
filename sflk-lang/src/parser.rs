@@ -459,6 +459,7 @@ impl Parser {
 					left_loc + loc_right,
 				)
 			},
+			Tok::Kw(Kw::In) => Node::from(Expr::Input, left_loc),
 			Tok::Left(Matched::Curly) => {
 				let stmts = self.parse_stmts(tb);
 				let (right_tok, right_loc) = tb.pop();

@@ -49,6 +49,7 @@ enum BcInstr {
 	Sig,                 // (sig -- res)
 	IntoPrintSig,        // (value -- sig)
 	NewlineSig,          // ( -- sig)
+	InputSig,            // ( -- sig)
 	IntoReadFileSig,     // (value -- sig)
 
 	// Other operations
@@ -569,6 +570,11 @@ impl Ip {
 										println!();
 										self.push_value(Obj::Nothing);
 									},
+									(Some(Obj::String(sig_name)), _) if sig_name == "input" => {
+										let mut input = String::new();
+										std::io::stdin().read_line(&mut input).expect("h");
+										self.push_value(Obj::String(input));
+									},
 									(Some(Obj::String(sig_name)), Some(Obj::String(filename)))
 										if sig_name == "readfile" =>
 									{
@@ -614,6 +620,10 @@ impl Ip {
 			},
 			BcInstr::NewlineSig => {
 				self.push_value(Obj::List(vec![Obj::String("newline".to_string())]));
+				self.advance_pos();
+			},
+			BcInstr::InputSig => {
+				self.push_value(Obj::List(vec![Obj::String("input".to_string())]));
 				self.advance_pos();
 			},
 			BcInstr::IntoReadFileSig => {
@@ -794,6 +804,10 @@ fn expr_to_bc_instrs(expr: &Expr, bc_instrs: &mut Vec<BcInstr>) {
 			bc_instrs.push(BcInstr::PushConst {
 				value: Obj::Block(Block { bc: BcBlock { instrs: sub_bc_instrs } }),
 			});
+		},
+		Expr::Input => {
+			bc_instrs.push(BcInstr::InputSig);
+			bc_instrs.push(BcInstr::Sig);
 		},
 		Expr::Unop(unop) => match unop {
 			Unop::ReadFile(expr) => {

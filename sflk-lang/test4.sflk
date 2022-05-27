@@ -84,3 +84,6 @@ do {
 	dh fi "some_file.sflk"
 	pr 5 >fun nl
 }
+x < "<uncomment the line below to have to type stuff>\n"
+# x < in #
+pr "u typed: " pr x

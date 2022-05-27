@@ -166,6 +166,7 @@ pub enum Expr {
 	IntegerLiteral(String),
 	StringLiteral(String),
 	BlockLiteral(Vec<Node<Stmt>>),
+	Input,
 	Unop(Unop),
 	Chain { init: Box<Node<Expr>>, chops: Vec<Node<Chop>> },
 	Invalid, // TODO: Add error details
@@ -269,6 +270,7 @@ impl Treeable for Expr {
 				styles::CYAN,
 				stmts.iter().map(StringTree::from).collect(),
 			),
+			Expr::Input => unimplemented!(),
 			Expr::Unop(unop) => unimplemented!(),
 			Expr::Chain { init, chops } => StringTree::new_node(
 				"chain".to_string(),
@@ -550,6 +552,7 @@ impl Expr {
 			Expr::IntegerLiteral(_integer_string) => false,
 			Expr::StringLiteral(_string_string) => false,
 			Expr::BlockLiteral(_stmts) => false,
+			Expr::Input => false,
 			Expr::Unop(_stmts) => false,
 			Expr::Chain { init, chops } => {
 				(*init).content.is_invalid()
@@ -577,6 +580,7 @@ impl Expr {
 						.collect(),
 				}),
 			},
+			Expr::Input => unimplemented!(),
 			Expr::Unop(_) => unimplemented!(),
 			Expr::Chain { init, chops } => program::Expr::Chain(program::Chain {
 				init_expr: Box::new(init.content.to_machine_expr()),
