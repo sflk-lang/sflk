@@ -1,5 +1,5 @@
 mod ast;
-mod bytecode;
+mod sir;
 mod log;
 mod machine;
 mod object;
@@ -103,7 +103,7 @@ fn main() {
 	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 	let mut parser = Parser::new();
 	let ast = parser.parse_program(&mut tfr);
-	let bc_block = bytecode::program_to_bc_block(ast.unwrap_ref());
-	dbg!(&bc_block);
-	bytecode::exec_bc_block(bc_block);
+	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());
+	dbg!(&sir_block);
+	sir::exec_sir_block(sir_block);
 }

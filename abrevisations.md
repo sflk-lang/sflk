@@ -8,4 +8,5 @@ Abreviation | Meaning
 `loc`       | location
 `mem`       | memory
 `obj`       | object
+`sir`       | sequencial instructions representation
 `var`       | variable

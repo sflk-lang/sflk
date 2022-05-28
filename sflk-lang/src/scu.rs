@@ -12,11 +12,11 @@ impl SourceCodeUnit {
 	pub fn from_filename(filename: &str) -> SourceCodeUnit {
 		let src = std::fs::read_to_string(filename)
 			.unwrap_or_else(|_| panic!("source file `{}` couldn't be read", filename));
-		SourceCodeUnit::from_str(&src, filename.to_string())
+		SourceCodeUnit::from_str(src, filename.to_string())
 	}
 
-	pub fn from_str(s: &str, name: String) -> SourceCodeUnit {
-		let line_offsets_iter = s.bytes().enumerate().filter_map(|(i, ch)| {
+	pub fn from_str(string: String, name: String) -> SourceCodeUnit {
+		let line_offsets_iter = string.bytes().enumerate().filter_map(|(i, ch)| {
 			if ch as char == '\n' {
 				Some(i + 1)
 			} else {
@@ -25,7 +25,7 @@ impl SourceCodeUnit {
 		});
 		let mut line_offsets: Vec<usize> =
 			Some(0usize).into_iter().chain(line_offsets_iter).collect();
-		let mut content = s.to_string();
+		let mut content = string;
 		if *line_offsets.last().unwrap() != content.len() {
 			content += "\n";
 			line_offsets.push(content.len());
