@@ -1,5 +1,4 @@
-
-fh "sflk-lang/std.sflk"
+fh "sflk-std/std.sflk"
 
 ## heyyy ##
 ev 8 > prnl
