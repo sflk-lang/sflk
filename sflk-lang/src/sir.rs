@@ -726,21 +726,21 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 		Stmt::If { cond_expr, th_stmts, el_stmts } => {
 			expr_to_sir_instrs(cond_expr.unwrap_ref(), sir_instrs);
 			sir_instrs.push(SirInstr::LogicalNot);
-			let mut th_bc = Vec::new();
+			let mut th_sir = Vec::new();
 			for stmt in th_stmts {
-				stmt_to_sir_instrs(stmt.unwrap_ref(), &mut th_bc);
+				stmt_to_sir_instrs(stmt.unwrap_ref(), &mut th_sir);
 			}
-			let el_jump_bc_len = 1;
+			let el_jump_sir_len = 1;
 			sir_instrs.push(SirInstr::RelativeJumpIf {
-				offset: th_bc.len() as isize + el_jump_bc_len + 1,
+				offset: th_sir.len() as isize + el_jump_sir_len + 1,
 			});
-			sir_instrs.extend(th_bc);
-			let mut el_bc = Vec::new();
+			sir_instrs.extend(th_sir);
+			let mut el_sir = Vec::new();
 			for stmt in el_stmts {
-				stmt_to_sir_instrs(stmt.unwrap_ref(), &mut el_bc);
+				stmt_to_sir_instrs(stmt.unwrap_ref(), &mut el_sir);
 			}
-			sir_instrs.push(SirInstr::RelativeJump { offset: el_bc.len() as isize + 1 });
-			sir_instrs.extend(el_bc);
+			sir_instrs.push(SirInstr::RelativeJump { offset: el_sir.len() as isize + 1 });
+			sir_instrs.extend(el_sir);
 		},
 		Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag } => {
 			// TODO: Make this more readable and less error-prone by introducing
@@ -753,55 +753,55 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				// Loop counter for the separator.
 				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(0) });
 			}
-			let mut sp_bc = Vec::new();
+			let mut sp_sir = Vec::new();
 			if !sp_stmts.is_empty() {
-				let mut sub_sp_bc = Vec::new();
+				let mut sub_sp_sir = Vec::new();
 				for stmt in sp_stmts {
-					stmt_to_sir_instrs(stmt.unwrap_ref(), &mut sub_sp_bc);
+					stmt_to_sir_instrs(stmt.unwrap_ref(), &mut sub_sp_sir);
 				}
 				// We skip the separation if the loop counter is 0.
-				sp_bc.push(SirInstr::Duplicate);
-				sp_bc.push(SirInstr::LogicalNot);
-				sp_bc.push(SirInstr::RelativeJumpIf { offset: sub_sp_bc.len() as isize + 1 });
-				sp_bc.extend(sub_sp_bc);
+				sp_sir.push(SirInstr::Duplicate);
+				sp_sir.push(SirInstr::LogicalNot);
+				sp_sir.push(SirInstr::RelativeJumpIf { offset: sub_sp_sir.len() as isize + 1 });
+				sp_sir.extend(sub_sp_sir);
 			}
-			let mut bd_bc = Vec::new();
+			let mut bd_sir = Vec::new();
 			if !bd_stmts.is_empty() {
 				for stmt in bd_stmts {
-					stmt_to_sir_instrs(stmt.unwrap_ref(), &mut bd_bc);
+					stmt_to_sir_instrs(stmt.unwrap_ref(), &mut bd_sir);
 				}
 				if has_loop_counter {
 					// Increment the loop counter.
-					bd_bc.push(SirInstr::PushConstant { value: Object::Integer(1) });
-					bd_bc.push(SirInstr::Plus);
+					bd_sir.push(SirInstr::PushConstant { value: Object::Integer(1) });
+					bd_sir.push(SirInstr::Plus);
 				}
 			}
-			let loop_back_bc_len = 1;
-			let mut wh_bc = Vec::new();
+			let loop_back_sir_len = 1;
+			let mut wh_sir = Vec::new();
 			if let Some((last, exprs)) = wh_exprs.split_last() {
 				for expr in exprs {
-					expr_to_sir_instrs(expr.unwrap_ref(), &mut wh_bc);
-					bd_bc.push(SirInstr::LogicalAnd);
+					expr_to_sir_instrs(expr.unwrap_ref(), &mut wh_sir);
+					bd_sir.push(SirInstr::LogicalAnd);
 				}
-				expr_to_sir_instrs(last.unwrap_ref(), &mut wh_bc);
-				wh_bc.push(SirInstr::LogicalNot);
-				wh_bc.push(SirInstr::RelativeJumpIf {
-					offset: sp_bc.len() as isize + bd_bc.len() as isize + loop_back_bc_len + 1,
+				expr_to_sir_instrs(last.unwrap_ref(), &mut wh_sir);
+				wh_sir.push(SirInstr::LogicalNot);
+				wh_sir.push(SirInstr::RelativeJumpIf {
+					offset: sp_sir.len() as isize + bd_sir.len() as isize + loop_back_sir_len + 1,
 				});
 			}
-			let loop_back_bc = vec![SirInstr::RelativeJump {
-				offset: -(wh_bc.len() as isize + sp_bc.len() as isize + bd_bc.len() as isize),
+			let loop_back_sir = vec![SirInstr::RelativeJump {
+				offset: -(wh_sir.len() as isize + sp_sir.len() as isize + bd_sir.len() as isize),
 			}];
-			debug_assert_eq!(loop_back_bc_len, loop_back_bc.len() as isize);
+			debug_assert_eq!(loop_back_sir_len, loop_back_sir.len() as isize);
 			if ao_flag.is_some() {
 				sir_instrs.push(SirInstr::RelativeJump {
-					offset: wh_bc.len() as isize + sp_bc.len() as isize + 1,
+					offset: wh_sir.len() as isize + sp_sir.len() as isize + 1,
 				});
 			}
-			sir_instrs.extend(wh_bc);
-			sir_instrs.extend(sp_bc);
-			sir_instrs.extend(bd_bc);
-			sir_instrs.extend(loop_back_bc);
+			sir_instrs.extend(wh_sir);
+			sir_instrs.extend(sp_sir);
+			sir_instrs.extend(bd_sir);
+			sir_instrs.extend(loop_back_sir);
 			if has_loop_counter {
 				// Didn't forget the loop counter.
 				sir_instrs.push(SirInstr::Discard);
