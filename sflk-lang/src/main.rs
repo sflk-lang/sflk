@@ -36,6 +36,7 @@ struct Settings {
 	debug_mode: bool,
 	wants_help: bool,
 	wants_version: bool,
+	display_tokens: bool,
 }
 
 impl Settings {
@@ -47,6 +48,7 @@ impl Settings {
 			debug_mode: false,
 			wants_help: false,
 			wants_version: false,
+			display_tokens: false,
 		};
 		for arg in args {
 			if arg == "-d" || arg == "--debug" {
@@ -55,6 +57,8 @@ impl Settings {
 				settings.wants_help = true;
 			} else if arg == "-v" || arg == "--version" {
 				settings.wants_version = true;
+			} else if arg == "--tokens" {
+				settings.display_tokens = true;
 			} else if settings.root_filename.is_none() {
 				settings.root_filename = Some(arg);
 			} else {
@@ -101,6 +105,10 @@ fn main() {
 		&settings.root_filename.unwrap(),
 	));
 	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
+	if settings.display_tokens {
+		tfr.display_all();
+		return;
+	}
 	let mut parser = Parser::new();
 	let ast = parser.parse_program(&mut tfr);
 	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());

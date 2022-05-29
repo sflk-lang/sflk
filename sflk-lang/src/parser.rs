@@ -1,6 +1,7 @@
 use crate::ast::{Chop, Comment, Expr, Node, Program, Stmt, TargetExpr, Unop};
 use crate::scu::{Loc, SourceCodeUnit};
 use crate::tokenizer::{BinOp, CharReadingHead, Kw, Matched, StmtBinOp, Tok, Tokenizer};
+use crate::utils::{escape_string, styles};
 use std::collections::HashMap;
 use std::{collections::VecDeque, rc::Rc};
 
@@ -75,6 +76,67 @@ impl TokBuffer {
 	fn disc(&mut self) {
 		if self.toks_ahead.pop_front().is_none() {
 			panic!("bug: token discarded but not peeked before")
+		}
+	}
+}
+
+impl TokBuffer {
+	pub fn display_all(mut self) {
+		let mut last_line = 0;
+		loop {
+			let (tok, loc) = self.tokenizer.pop_tok(&mut self.crh);
+			if last_line < loc.line_start {
+				println!("Line {}:", loc.line_start);
+				last_line = loc.line_start;
+			}
+			match tok {
+				Tok::BinOp(BinOp::Plus) => println!("\tbinary operator +"),
+				Tok::BinOp(BinOp::Minus) => println!("\tbinary operator -"),
+				Tok::BinOp(BinOp::Star) => println!("\tbinary operator *"),
+				Tok::BinOp(BinOp::Slash) => println!("\tbinary operator /"),
+				Tok::BinOp(BinOp::ToRight) => println!("\tbinary operator >"),
+				Tok::BinOp(BinOp::Comma) => println!("\tbinary operator ,"),
+				Tok::BinOp(BinOp::DoubleComma) => println!("\tbinary operator ,,"),
+				Tok::BinOp(BinOp::Dot) => println!("\tbinary operator ."),
+				Tok::Kw(Kw::Np) => println!("\tkeyword np"),
+				Tok::Kw(Kw::Pr) => println!("\tkeyword pr"),
+				Tok::Kw(Kw::Nl) => println!("\tkeyword nl"),
+				Tok::Kw(Kw::Do) => println!("\tkeyword do"),
+				Tok::Kw(Kw::Dh) => println!("\tkeyword dh"),
+				Tok::Kw(Kw::Fh) => println!("\tkeyword fh"),
+				Tok::Kw(Kw::Ev) => println!("\tkeyword ev"),
+				Tok::Kw(Kw::If) => println!("\tkeyword if"),
+				Tok::Kw(Kw::Th) => println!("\tkeyword th"),
+				Tok::Kw(Kw::El) => println!("\tkeyword el"),
+				Tok::Kw(Kw::Lp) => println!("\tkeyword lp"),
+				Tok::Kw(Kw::Wh) => println!("\tkeyword wh"),
+				Tok::Kw(Kw::Bd) => println!("\tkeyword bd"),
+				Tok::Kw(Kw::Sp) => println!("\tkeyword sp"),
+				Tok::Kw(Kw::Ao) => println!("\tkeyword ao"),
+				Tok::Kw(Kw::Ri) => println!("\tkeyword ri"),
+				Tok::Kw(Kw::Em) => println!("\tkeyword em"),
+				Tok::Kw(Kw::Rs) => println!("\tkeyword rs"),
+				Tok::Kw(Kw::Fi) => println!("\tkeyword fi"),
+				Tok::Kw(Kw::In) => println!("\tkeyword in"),
+				Tok::Left(Matched::Paren) => println!("\tleft parenthesis"),
+				Tok::Left(Matched::Curly) => println!("\tleft curly bracket"),
+				Tok::Left(Matched::Bracket) => println!("\tleft bracket"),
+				Tok::Right(Matched::Paren) => println!("\tright parenthesis"),
+				Tok::Right(Matched::Curly) => println!("\tright curly bracket"),
+				Tok::Right(Matched::Bracket) => println!("\tright bracket"),
+				Tok::Comment { .. } => println!("\tcomment"),
+				Tok::Integer(string) => println!("\tinteger {}", string),
+				Tok::Name { string, .. } => println!("\tname {}", string),
+				Tok::StmtBinOp(StmtBinOp::ToLeft) => println!("\tstatement binary operator <"),
+				Tok::String { content, .. } => {
+					println!("\tstring \"{}\"", escape_string(&content, &styles::NORMAL))
+				},
+				Tok::InvalidCharacter(c) => println!("\t\x1b[31minvalid character\x1b[39m {}", c),
+				Tok::Eof => {
+					println!("\tend-of-file");
+					break;
+				},
+			}
 		}
 	}
 }
@@ -367,12 +429,7 @@ impl Parser {
 					let sp_stmts = content_pack.pop_ext_stmts(Kw::Sp);
 					let ao_flag = content_pack.pop_ext_flags(Kw::Ao).pop();
 					Some(Node::from(
-						Stmt::Loop {
-							wh_exprs,
-							bd_stmts,
-							sp_stmts,
-							ao_flag,
-						},
+						Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag },
 						full_loc,
 					))
 				},
@@ -460,36 +517,6 @@ impl Parser {
 			}
 		}
 		content_pack
-	}
-
-	fn maybe_parse_stmt_extension_expr(
-		&mut self,
-		tb: &mut TokBuffer,
-		kw: Kw,
-	) -> Option<Node<Expr>> {
-		let (tok, _) = tb.peek(0);
-		match tok {
-			Tok::Kw(tok_kw) if *tok_kw == kw => {
-				tb.disc();
-				Some(self.parse_expr(tb))
-			},
-			_ => None,
-		}
-	}
-
-	fn maybe_parse_stmt_extension_stmt(
-		&mut self,
-		tb: &mut TokBuffer,
-		kw: Kw,
-	) -> Option<Node<Stmt>> {
-		let (tok, _) = tb.peek(0);
-		match tok {
-			Tok::Kw(tok_kw) if *tok_kw == kw => {
-				tb.disc();
-				Some(self.parse_stmt(tb))
-			},
-			_ => None,
-		}
 	}
 
 	fn maybe_parse_assign_stmt(&mut self, tb: &mut TokBuffer) -> Option<Node<Stmt>> {
