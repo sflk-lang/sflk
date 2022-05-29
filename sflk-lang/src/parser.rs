@@ -296,7 +296,7 @@ impl Parser {
 							can_stack: true,
 						},
 					);
-					let mut content_pack = self.parse_stmt_extensions(tb, &descr_pack);
+					let mut content_pack = self.parse_extensions(tb, &descr_pack);
 					let full_loc = content_pack
 						.loc()
 						.map_or(kw_loc.clone(), |loc| kw_loc + loc);
@@ -308,6 +308,7 @@ impl Parser {
 					))
 				},
 				Kw::Lp => {
+					/*
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let sh_expr_node = self.maybe_parse_stmt_extension_expr(tb, Kw::Wh);
@@ -328,6 +329,49 @@ impl Parser {
 							wh_expr: sh_expr_node,
 							bd_stmt: bd_stmt_node.map(Box::new),
 							sp_stmt: sp_stmt_node.map(Box::new),
+						},
+						full_loc,
+					))
+					*/
+					let kw_loc = first_loc.clone();
+					tb.disc();
+					let mut descr_pack = HashMap::new();
+					descr_pack.insert(
+						Kw::Wh,
+						StmtExtDescr {
+							content_type: ExtType::Expr,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					descr_pack.insert(
+						Kw::Bd,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					descr_pack.insert(
+						Kw::Sp,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					let mut content_pack = self.parse_extensions(tb, &descr_pack);
+					let full_loc = content_pack
+						.loc()
+						.map_or(kw_loc.clone(), |loc| kw_loc + loc);
+					let wh_exprs = content_pack.pop_ext_exprs(Kw::Wh);
+					let bd_stmts = content_pack.pop_ext_stmts(Kw::Bd);
+					let sp_stmts = content_pack.pop_ext_stmts(Kw::Sp);
+					Some(Node::from(
+						Stmt::Loop {
+							wh_exprs,
+							bd_stmts,
+							sp_stmts,
 						},
 						full_loc,
 					))
@@ -380,7 +424,7 @@ impl Parser {
 		}
 	}
 
-	fn parse_stmt_extensions(
+	fn parse_extensions(
 		&mut self,
 		tb: &mut TokBuffer,
 		descr_pack: &StmtExtPackDescr,

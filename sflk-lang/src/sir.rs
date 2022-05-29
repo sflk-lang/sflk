@@ -32,8 +32,9 @@ enum SirInstr {
 	PushInputSignal,     // ( -- sig)
 	IntoReadFileSignal,  // (value -- sig)
 
-	// Unary operators
+	// Logical operators
 	LogicalNot, // (a -- not_a)
+	LogicalAnd, // (a b -- (a && b))
 
 	// Binary operators
 	Plus,        // (l r -- (l + r))
@@ -368,6 +369,18 @@ impl Execution {
 				match right {
 					Object::Integer(value) => {
 						self.push_obj(Object::Integer(if value == 0 { 1 } else { 0 }));
+					},
+					_ => unimplemented!(),
+				}
+				self.advance_instr_index();
+			},
+			SirInstr::LogicalAnd => {
+				let left = self.pop_obj();
+				let right = self.pop_obj();
+				match (left, right) {
+					(Object::Integer(left_value), Object::Integer(right_value)) => {
+						let value = if left_value != 0 && right_value != 0 { 1 } else { 0 };
+						self.push_obj(Object::Integer(value));
 					},
 					_ => unimplemented!(),
 				}
@@ -725,20 +738,22 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::RelativeJump { offset: el_bc.len() as isize + 1 });
 			sir_instrs.extend(el_bc);
 		},
-		Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => {
+		Stmt::Loop { wh_exprs, bd_stmts, sp_stmts } => {
 			// TODO: Make this more readable and less error-prone by introducing
 			// labels and gotos that get resolved into sir here.
 			// Maybe do it by introducing BcInstrUnresolved or something
 			// (it ould have the variants: non-jump SirInstr, Label,
 			// and the conditiona jumps to labels).
-			if sp_stmt.is_some() {
+			if !sp_stmts.is_empty() {
 				// Loop counter for the separator.
 				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(0) });
 			}
 			let mut sp_bc = Vec::new();
-			if let Some(stmt) = sp_stmt {
+			if !sp_stmts.is_empty() {
 				let mut sub_sp_bc = Vec::new();
-				stmt_to_sir_instrs(stmt.unwrap_ref(), &mut sub_sp_bc);
+				for stmt in sp_stmts {
+					stmt_to_sir_instrs(stmt.unwrap_ref(), &mut sub_sp_bc);
+				}
 				// We skip the separation if the loop counter is 0.
 				sp_bc.push(SirInstr::Duplicate);
 				sp_bc.push(SirInstr::LogicalNot);
@@ -746,9 +761,11 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				sp_bc.extend(sub_sp_bc);
 			}
 			let mut bd_bc = Vec::new();
-			if let Some(stmt) = bd_stmt {
-				stmt_to_sir_instrs(stmt.unwrap_ref(), &mut bd_bc);
-				if sp_stmt.is_some() {
+			if !bd_stmts.is_empty() {
+				for stmt in bd_stmts {
+					stmt_to_sir_instrs(stmt.unwrap_ref(), &mut bd_bc);
+				}
+				if !sp_stmts.is_empty() {
 					// Increment the loop counter.
 					bd_bc.push(SirInstr::PushConstant { value: Object::Integer(1) });
 					bd_bc.push(SirInstr::Plus);
@@ -756,8 +773,12 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			}
 			let loop_back_bc_len = 1;
 			let mut wh_bc = Vec::new();
-			if let Some(expr) = wh_expr {
-				expr_to_sir_instrs(expr.unwrap_ref(), &mut wh_bc);
+			if let Some((last, exprs)) = wh_exprs.split_last() {
+				for expr in exprs {
+					expr_to_sir_instrs(expr.unwrap_ref(), &mut wh_bc);
+					bd_bc.push(SirInstr::LogicalAnd);
+				}
+				expr_to_sir_instrs(last.unwrap_ref(), &mut wh_bc);
 				wh_bc.push(SirInstr::LogicalNot);
 				wh_bc.push(SirInstr::RelativeJumpIf {
 					offset: sp_bc.len() as isize + bd_bc.len() as isize + loop_back_bc_len + 1,
@@ -771,7 +792,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.extend(sp_bc);
 			sir_instrs.extend(bd_bc);
 			sir_instrs.extend(loop_back_bc);
-			if sp_stmt.is_some() {
+			if !sp_stmts.is_empty() {
 				// Didn't forget the loop counter.
 				sir_instrs.push(SirInstr::Discard);
 			}

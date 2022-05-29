@@ -139,9 +139,9 @@ pub enum Stmt {
 		el_stmts: Vec<Node<Stmt>>,
 	},
 	Loop {
-		wh_expr: Option<Node<Expr>>,
-		bd_stmt: Option<Box<Node<Stmt>>>,
-		sp_stmt: Option<Box<Node<Stmt>>>,
+		wh_exprs: Vec<Node<Expr>>,
+		bd_stmts: Vec<Node<Stmt>>,
+		sp_stmts: Vec<Node<Stmt>>,
 	},
 	RegisterInterceptor {
 		expr: Node<Expr>,
@@ -358,7 +358,8 @@ impl Treeable for Stmt {
 				*/
 				unimplemented!()
 			},
-			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => {
+			Stmt::Loop { .. } => {
+				/*
 				StringTree::new_node("loop".to_string(), styles::NORMAL, {
 					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
 					if let Some(expr) = wh_expr {
@@ -384,6 +385,8 @@ impl Treeable for Stmt {
 					}
 					vec
 				})
+				*/
+				unimplemented!()
 			},
 			Stmt::RegisterInterceptor { expr } => StringTree::new_node(
 				"register interceptor".to_string(),
@@ -445,33 +448,27 @@ impl Stmt {
 			Stmt::Do { expr } => expr.content.is_invalid(),
 			Stmt::DoHere { expr } => expr.content.is_invalid(),
 			Stmt::DoFileHere { expr } => expr.content.is_invalid(),
+			#[rustfmt::skip]
 			Stmt::If { cond_expr, th_stmts, el_stmts } => {
 				cond_expr.content.is_invalid()
-					|| th_stmts
-						.iter()
-						.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
-					|| el_stmts
-						.iter()
-						.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+				|| th_stmts
+					.iter()
+					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+				|| el_stmts
+					.iter()
+					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
 			},
 			#[rustfmt::skip]
-			Stmt::Loop {
-				wh_expr,
-				bd_stmt,
-				sp_stmt,
-			} => {
-				wh_expr
-					.as_ref()
-					.map(|expr| (*expr).content.is_invalid())
-					.unwrap_or(false)
-				|| bd_stmt
-					.as_ref()
-					.map(|stmt| (*stmt).content.is_invalid())
-					.unwrap_or(false)
-				|| sp_stmt
-					.as_ref()
-					.map(|stmt| (*stmt).content.is_invalid())
-					.unwrap_or(false)
+			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts } => {
+				wh_exprs
+					.iter()
+					.fold(false, |acc, expr| acc || (*expr).content.is_invalid())
+				|| bd_stmts
+					.iter()
+					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+				|| sp_stmts
+					.iter()
+					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
 			},
 			Stmt::RegisterInterceptor { expr } => expr.content.is_invalid(),
 			#[rustfmt::skip]
@@ -509,15 +506,15 @@ impl Stmt {
 				program::Stmt::DoFileHere { expr: expr.content.to_machine_expr() }
 			},
 			Stmt::If { .. } => unimplemented!(), /* program::Stmt::If {
-				cond_expr: cond_expr.content.to_machine_expr(),
-				th_stmt: th_stmt
-					.as_ref()
-					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-				el_stmt: el_stmt
-					.as_ref()
-					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+			cond_expr: cond_expr.content.to_machine_expr(),
+			th_stmt: th_stmt
+			.as_ref()
+			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+			el_stmt: el_stmt
+			.as_ref()
+			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
 			}, */
-			Stmt::Loop { wh_expr, bd_stmt, sp_stmt } => program::Stmt::Loop {
+			Stmt::Loop { .. } => unimplemented!(), /* program::Stmt::Loop {
 				wh_expr: wh_expr
 					.as_ref()
 					.map(|expr| ((*expr).content.to_machine_expr())),
@@ -527,7 +524,7 @@ impl Stmt {
 				sp_stmt: sp_stmt
 					.as_ref()
 					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-			},
+			}, */
 			Stmt::RegisterInterceptor { .. } => unimplemented!(),
 			Stmt::Emit { .. } => unimplemented!(),
 			Stmt::Invalid => program::Stmt::Invalid,

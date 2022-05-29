@@ -72,6 +72,7 @@ impl AddAssign<&Loc> for Loc {
 			self.raw_length += (right.raw_index_start - self.raw_index_start) + right.raw_length;
 		} else {
 			std::assert!(self.line_start >= right.line_start);
+			self.line_start = right.line_start;
 			let left_part_length = self.raw_index_start - right.raw_index_start;
 			self.raw_index_start -= left_part_length;
 			self.raw_length += left_part_length;

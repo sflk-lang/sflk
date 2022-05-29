@@ -87,3 +87,4 @@ do {
 x < "<uncomment the line below to have to type stuff>\n"
 # x < in #
 pr "u typed: " pr x
+x < 0 lp bd pr x sp pr ", " bd x < x +1 wh x -8 nl
