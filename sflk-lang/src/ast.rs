@@ -454,22 +454,22 @@ impl Stmt {
 				cond_expr.content.is_invalid()
 				|| th_stmts
 					.iter()
-					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+					.any(|stmt| (*stmt).content.is_invalid())
 				|| el_stmts
 					.iter()
-					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+					.any(|stmt| (*stmt).content.is_invalid())
 			},
 			#[rustfmt::skip]
 			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag: _ } => {
 				wh_exprs
 					.iter()
-					.fold(false, |acc, expr| acc || (*expr).content.is_invalid())
+					.any(|expr| (*expr).content.is_invalid())
 				|| bd_stmts
 					.iter()
-					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+					.any(|stmt| (*stmt).content.is_invalid())
 				|| sp_stmts
 					.iter()
-					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
+					.any(|stmt| (*stmt).content.is_invalid())
 			},
 			Stmt::RegisterInterceptor { expr } => expr.content.is_invalid(),
 			#[rustfmt::skip]
