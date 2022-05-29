@@ -67,9 +67,15 @@ impl Loc {
 impl AddAssign<&Loc> for Loc {
 	fn add_assign(&mut self, right: &Loc) {
 		std::assert_eq!(Rc::as_ptr(&self.scu), Rc::as_ptr(&right.scu));
-		std::assert!(self.line_start <= right.line_start);
-		std::assert!(self.raw_index_start <= right.raw_index_start);
-		self.raw_length += (right.raw_index_start - self.raw_index_start) + right.raw_length;
+		if self.raw_index_start <= right.raw_index_start {
+			std::assert!(self.line_start <= right.line_start);
+			self.raw_length += (right.raw_index_start - self.raw_index_start) + right.raw_length;
+		} else {
+			std::assert!(self.line_start >= right.line_start);
+			let left_part_length = self.raw_index_start - right.raw_index_start;
+			self.raw_index_start -= left_part_length;
+			self.raw_length += left_part_length;
+		}
 	}
 }
 

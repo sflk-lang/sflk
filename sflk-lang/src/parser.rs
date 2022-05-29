@@ -112,7 +112,72 @@ enum SingleContent {
 	Expr(Node<Expr>),
 }
 
-type StmtExtPackContent = HashMap<Kw, Vec<SingleContent>>;
+impl SingleContent {
+	fn loc(&self) -> &Loc {
+		match self {
+			SingleContent::Stmt(node) => node.loc(),
+			SingleContent::Expr(node) => node.loc(),
+		}
+	}
+}
+
+struct StmtExtPackContent {
+	table: HashMap<Kw, Vec<SingleContent>>,
+}
+
+impl StmtExtPackContent {
+	fn from(descr_pack: &StmtExtPackDescr) -> StmtExtPackContent {
+		let mut table = HashMap::new();
+		for kw in descr_pack.keys() {
+			table.insert(*kw, Vec::new());
+		}
+		StmtExtPackContent { table }
+	}
+
+	fn add_ext_content(&mut self, kw: Kw, content: SingleContent) {
+		self.table.get_mut(&kw).unwrap().push(content)
+	}
+
+	fn is_ext_empty(&self, kw: Kw) -> bool {
+		self.table.get(&kw).unwrap().is_empty()
+	}
+
+	fn pop_ext_stmts(&mut self, kw: Kw) -> Vec<Node<Stmt>> {
+		self.table
+			.remove(&kw)
+			.unwrap()
+			.into_iter()
+			.map(|single| match single {
+				SingleContent::Stmt(stmt) => stmt,
+				_ => panic!("bug"),
+			})
+			.collect()
+	}
+
+	fn pop_ext_exprs(&mut self, kw: Kw) -> Vec<Node<Expr>> {
+		self.table
+			.remove(&kw)
+			.unwrap()
+			.into_iter()
+			.map(|single| match single {
+				SingleContent::Expr(expr) => expr,
+				_ => panic!("bug"),
+			})
+			.collect()
+	}
+
+	fn loc(&self) -> Option<Loc> {
+		let mut loc = None;
+		for ext_contents in self.table.values() {
+			for ext_content in ext_contents {
+				loc = Some(loc.map_or(ext_content.loc().clone(), |loc: Loc| {
+					loc + ext_content.loc().clone()
+				}));
+			}
+		}
+		loc
+	}
+}
 
 impl Parser {
 	pub fn parse_program(&mut self, tb: &mut TokBuffer) -> Node<Program> {
@@ -232,31 +297,11 @@ impl Parser {
 						},
 					);
 					let mut content_pack = self.parse_stmt_extensions(tb, &descr_pack);
-					let th_stmts: Vec<_> = content_pack
-						.remove(&Kw::Th)
-						.unwrap()
-						.into_iter()
-						.map(|single| match single {
-							SingleContent::Stmt(stmt) => stmt,
-							_ => panic!("bug"),
-						})
-						.collect();
-					let el_stmts: Vec<_> = content_pack
-						.remove(&Kw::El)
-						.unwrap()
-						.into_iter()
-						.map(|single| match single {
-							SingleContent::Stmt(stmt) => stmt,
-							_ => panic!("bug"),
-						})
-						.collect();
-					let mut full_loc = kw_loc;
-					if let Some(stmt_node) = th_stmts.last() {
-						full_loc += stmt_node.loc();
-					}
-					if let Some(stmt_node) = el_stmts.last() {
-						full_loc += stmt_node.loc();
-					}
+					let full_loc = content_pack
+						.loc()
+						.map_or(kw_loc.clone(), |loc| kw_loc + loc);
+					let th_stmts = content_pack.pop_ext_stmts(Kw::Th);
+					let el_stmts = content_pack.pop_ext_stmts(Kw::El);
 					Some(Node::from(
 						Stmt::If { cond_expr: cond_expr_node, th_stmts, el_stmts },
 						full_loc,
@@ -340,30 +385,22 @@ impl Parser {
 		tb: &mut TokBuffer,
 		descr_pack: &StmtExtPackDescr,
 	) -> StmtExtPackContent {
-		let mut content_pack = HashMap::new();
-		for kw in descr_pack.keys() {
-			content_pack.insert(*kw, Vec::new());
-		}
+		let mut content_pack = StmtExtPackContent::from(descr_pack);
 		loop {
 			let (tok, _) = tb.peek(0);
 			match tok {
 				Tok::Kw(kw) => {
 					if let Some(descr) = descr_pack.get(kw) {
-						if !descr.can_stack && !content_pack.get(kw).unwrap().is_empty() {
-							panic!("no");
-						}
 						let kw = *kw;
-						tb.disc();
-						match descr.content_type {
-							ExtType::Stmt => content_pack
-								.get_mut(&kw)
-								.unwrap()
-								.push(SingleContent::Stmt(self.parse_stmt(tb))),
-							ExtType::Expr => content_pack
-								.get_mut(&kw)
-								.unwrap()
-								.push(SingleContent::Expr(self.parse_expr(tb))),
+						if !descr.can_stack && !content_pack.is_ext_empty(kw) {
+							panic!("Error: Cannot have multiple {:?} extentions", kw);
 						}
+						tb.disc();
+						let content = match descr.content_type {
+							ExtType::Stmt => SingleContent::Stmt(self.parse_stmt(tb)),
+							ExtType::Expr => SingleContent::Expr(self.parse_expr(tb)),
+						};
+						content_pack.add_ext_content(kw, content);
 					} else {
 						break;
 					}
@@ -372,7 +409,7 @@ impl Parser {
 			}
 		}
 		for (kw, descr) in descr_pack {
-			if !descr.optional && content_pack.get(kw).unwrap().is_empty() {
+			if !descr.optional && content_pack.is_ext_empty(*kw) {
 				panic!("no");
 			}
 		}

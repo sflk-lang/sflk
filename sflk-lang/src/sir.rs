@@ -159,7 +159,7 @@ impl Context {
 		self.var_table.insert(var_name, value);
 	}
 
-	fn get_var_cloned(&self, var_name: &str) -> Option<Object> {
+	fn var_value_cloned(&self, var_name: &str) -> Option<Object> {
 		self.var_table.get(var_name).cloned()
 	}
 
@@ -275,7 +275,7 @@ impl Execution {
 		let popped_frame = self.frame_stack.pop().unwrap();
 		let cx_id = popped_frame.cx_id;
 		if popped_frame.push_v {
-			if let Some(v_value) = context_table.get(cx_id).unwrap().get_var_cloned("v") {
+			if let Some(v_value) = context_table.get(cx_id).unwrap().var_value_cloned("v") {
 				// Is undefining v really necessary? Or even a good idea?
 				context_table.get_mut(cx_id).unwrap().undefine_var("v");
 				self.push_obj(v_value);
@@ -345,7 +345,7 @@ impl Execution {
 					context_table
 						.get(self.cx_id())
 						.unwrap()
-						.get_var_cloned(&var_name)
+						.var_value_cloned(&var_name)
 						.unwrap()
 				});
 				self.push_obj(value);
