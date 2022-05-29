@@ -379,7 +379,11 @@ impl Execution {
 				let right = self.pop_obj();
 				match (left, right) {
 					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						let value = if left_value != 0 && right_value != 0 { 1 } else { 0 };
+						let value = if left_value != 0 && right_value != 0 {
+							1
+						} else {
+							0
+						};
 						self.push_obj(Object::Integer(value));
 					},
 					_ => unimplemented!(),
@@ -738,13 +742,14 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::RelativeJump { offset: el_bc.len() as isize + 1 });
 			sir_instrs.extend(el_bc);
 		},
-		Stmt::Loop { wh_exprs, bd_stmts, sp_stmts } => {
+		Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag } => {
 			// TODO: Make this more readable and less error-prone by introducing
 			// labels and gotos that get resolved into sir here.
 			// Maybe do it by introducing BcInstrUnresolved or something
 			// (it ould have the variants: non-jump SirInstr, Label,
 			// and the conditiona jumps to labels).
-			if !sp_stmts.is_empty() {
+			let has_loop_counter = !sp_stmts.is_empty();
+			if has_loop_counter {
 				// Loop counter for the separator.
 				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(0) });
 			}
@@ -765,7 +770,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				for stmt in bd_stmts {
 					stmt_to_sir_instrs(stmt.unwrap_ref(), &mut bd_bc);
 				}
-				if !sp_stmts.is_empty() {
+				if has_loop_counter {
 					// Increment the loop counter.
 					bd_bc.push(SirInstr::PushConstant { value: Object::Integer(1) });
 					bd_bc.push(SirInstr::Plus);
@@ -788,11 +793,16 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				offset: -(wh_bc.len() as isize + sp_bc.len() as isize + bd_bc.len() as isize),
 			}];
 			debug_assert_eq!(loop_back_bc_len, loop_back_bc.len() as isize);
+			if ao_flag.is_some() {
+				sir_instrs.push(SirInstr::RelativeJump {
+					offset: wh_bc.len() as isize + sp_bc.len() as isize + 1,
+				});
+			}
 			sir_instrs.extend(wh_bc);
 			sir_instrs.extend(sp_bc);
 			sir_instrs.extend(bd_bc);
 			sir_instrs.extend(loop_back_bc);
-			if !sp_stmts.is_empty() {
+			if has_loop_counter {
 				// Didn't forget the loop counter.
 				sir_instrs.push(SirInstr::Discard);
 			}

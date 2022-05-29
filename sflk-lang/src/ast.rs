@@ -142,6 +142,7 @@ pub enum Stmt {
 		wh_exprs: Vec<Node<Expr>>,
 		bd_stmts: Vec<Node<Stmt>>,
 		sp_stmts: Vec<Node<Stmt>>,
+		ao_flag: Option<Node<()>>,
 	},
 	RegisterInterceptor {
 		expr: Node<Expr>,
@@ -459,7 +460,7 @@ impl Stmt {
 					.fold(false, |acc, stmt| acc || (*stmt).content.is_invalid())
 			},
 			#[rustfmt::skip]
-			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts } => {
+			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag: _ } => {
 				wh_exprs
 					.iter()
 					.fold(false, |acc, expr| acc || (*expr).content.is_invalid())

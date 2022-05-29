@@ -96,6 +96,7 @@ impl Parser {
 enum ExtType {
 	Stmt,
 	Expr,
+	Flag,
 }
 
 struct StmtExtDescr {
@@ -110,6 +111,7 @@ type StmtExtPackDescr = HashMap<Kw, StmtExtDescr>;
 enum SingleContent {
 	Stmt(Node<Stmt>),
 	Expr(Node<Expr>),
+	Flag(Node<()>),
 }
 
 impl SingleContent {
@@ -117,6 +119,7 @@ impl SingleContent {
 		match self {
 			SingleContent::Stmt(node) => node.loc(),
 			SingleContent::Expr(node) => node.loc(),
+			SingleContent::Flag(node) => node.loc(),
 		}
 	}
 }
@@ -161,6 +164,18 @@ impl StmtExtPackContent {
 			.into_iter()
 			.map(|single| match single {
 				SingleContent::Expr(expr) => expr,
+				_ => panic!("bug"),
+			})
+			.collect()
+	}
+
+	fn pop_ext_flags(&mut self, kw: Kw) -> Vec<Node<()>> {
+		self.table
+			.remove(&kw)
+			.unwrap()
+			.into_iter()
+			.map(|single| match single {
+				SingleContent::Flag(node) => node,
 				_ => panic!("bug"),
 			})
 			.collect()
@@ -308,31 +323,6 @@ impl Parser {
 					))
 				},
 				Kw::Lp => {
-					/*
-					let kw_loc = first_loc.clone();
-					tb.disc();
-					let sh_expr_node = self.maybe_parse_stmt_extension_expr(tb, Kw::Wh);
-					let bd_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::Bd);
-					let sp_stmt_node = self.maybe_parse_stmt_extension_stmt(tb, Kw::Sp);
-					let mut full_loc = kw_loc;
-					if let Some(expr_node) = &sh_expr_node {
-						full_loc += expr_node.loc();
-					}
-					if let Some(stmt_node) = &bd_stmt_node {
-						full_loc += stmt_node.loc();
-					}
-					if let Some(stmt_node) = &sp_stmt_node {
-						full_loc += stmt_node.loc();
-					}
-					Some(Node::from(
-						Stmt::Loop {
-							wh_expr: sh_expr_node,
-							bd_stmt: bd_stmt_node.map(Box::new),
-							sp_stmt: sp_stmt_node.map(Box::new),
-						},
-						full_loc,
-					))
-					*/
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let mut descr_pack = HashMap::new();
@@ -360,6 +350,14 @@ impl Parser {
 							can_stack: true,
 						},
 					);
+					descr_pack.insert(
+						Kw::Ao,
+						StmtExtDescr {
+							content_type: ExtType::Flag,
+							optional: true,
+							can_stack: false,
+						},
+					);
 					let mut content_pack = self.parse_extensions(tb, &descr_pack);
 					let full_loc = content_pack
 						.loc()
@@ -367,11 +365,13 @@ impl Parser {
 					let wh_exprs = content_pack.pop_ext_exprs(Kw::Wh);
 					let bd_stmts = content_pack.pop_ext_stmts(Kw::Bd);
 					let sp_stmts = content_pack.pop_ext_stmts(Kw::Sp);
+					let ao_flag = content_pack.pop_ext_flags(Kw::Ao).pop();
 					Some(Node::from(
 						Stmt::Loop {
 							wh_exprs,
 							bd_stmts,
 							sp_stmts,
+							ao_flag,
 						},
 						full_loc,
 					))
@@ -431,7 +431,7 @@ impl Parser {
 	) -> StmtExtPackContent {
 		let mut content_pack = StmtExtPackContent::from(descr_pack);
 		loop {
-			let (tok, _) = tb.peek(0);
+			let (tok, loc) = tb.peek(0);
 			match tok {
 				Tok::Kw(kw) => {
 					if let Some(descr) = descr_pack.get(kw) {
@@ -439,10 +439,12 @@ impl Parser {
 						if !descr.can_stack && !content_pack.is_ext_empty(kw) {
 							panic!("Error: Cannot have multiple {:?} extentions", kw);
 						}
+						let loc = loc.clone();
 						tb.disc();
 						let content = match descr.content_type {
 							ExtType::Stmt => SingleContent::Stmt(self.parse_stmt(tb)),
 							ExtType::Expr => SingleContent::Expr(self.parse_expr(tb)),
+							ExtType::Flag => SingleContent::Flag(Node::from((), loc)),
 						};
 						content_pack.add_ext_content(kw, content);
 					} else {
