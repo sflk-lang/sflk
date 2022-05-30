@@ -17,12 +17,14 @@ use std::rc::Rc;
 
 const HELP_MESSAGE: &str = "\
 	Usage:\n\
-	\tsflk <filename.sflk> [options]\n\
+	\tsflk [filename.sflk] [options]\n\
 	\n\
 	Options:\n\
-	\t-d --debug    Turns on debug mode\n\
-	\t-h --help     Prints this help message\n\
-	\t-v --version  Prints the interpreter version\n\
+	\t-d --debug         Turns on debug mode\n\
+	\t-h --help          Prints this help message\n\
+	\t-v --version       Prints the interpreter version\n\
+	\t-v --tokens        Prints tokens\n\
+	\t-v --tokens-lines  Prints tokens with their line numbers\n\
 	";
 
 const NO_WARRANTY_NOTE: &str = "\
@@ -88,7 +90,7 @@ fn main() {
 		did_something = true;
 	}
 	if settings.wants_help {
-		print!("{}", HELP_MESSAGE);
+		println!("{}", HELP_MESSAGE);
 		did_something = true;
 	}
 	if settings.root_filename.is_none() && !did_something {
