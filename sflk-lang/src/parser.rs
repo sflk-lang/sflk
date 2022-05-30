@@ -81,11 +81,11 @@ impl TokBuffer {
 }
 
 impl TokBuffer {
-	pub fn display_all(mut self) {
+	pub fn display_all(mut self, line_numbers: bool) {
 		let mut last_line = 0;
 		loop {
 			let (tok, loc) = self.tokenizer.pop_tok(&mut self.crh);
-			if last_line < loc.line_start {
+			if line_numbers && last_line < loc.line_start {
 				println!("Line {}:", loc.line_start);
 				last_line = loc.line_start;
 			}

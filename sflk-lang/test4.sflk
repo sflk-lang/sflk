@@ -90,5 +90,6 @@ pr "u typed: " pr x
 x < 0 lp bd pr x sp pr ", " bd x < x +1 wh x -8 nl
 lp wh 0 ao bd pr "h" bd nl
 ri {type < v ix 0 if type -"readfile" th em v rs v el v < v ix 1 + "|"}
-do {pr fi "uwu" + "owo" nl}
-do {pr fi "uwu". + "owo" nl}
+do {pr fi "uwu" + "owo" nl}  # (fi "uwu" + "owo") #
+do {pr fi "uwu". + "owo" nl} # (fi "uwu") + "owo" #
+ri ()

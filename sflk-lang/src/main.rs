@@ -37,6 +37,7 @@ struct Settings {
 	wants_help: bool,
 	wants_version: bool,
 	display_tokens: bool,
+	display_tokens_lines: bool,
 }
 
 impl Settings {
@@ -49,6 +50,7 @@ impl Settings {
 			wants_help: false,
 			wants_version: false,
 			display_tokens: false,
+			display_tokens_lines: false,
 		};
 		for arg in args {
 			if arg == "-d" || arg == "--debug" {
@@ -59,6 +61,9 @@ impl Settings {
 				settings.wants_version = true;
 			} else if arg == "--tokens" {
 				settings.display_tokens = true;
+			} else if arg == "--tokens-lines" {
+				settings.display_tokens = true;
+				settings.display_tokens_lines = true;
 			} else if settings.root_filename.is_none() {
 				settings.root_filename = Some(arg);
 			} else {
@@ -106,7 +111,7 @@ fn main() {
 	));
 	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 	if settings.display_tokens {
-		tfr.display_all();
+		tfr.display_all(settings.display_tokens_lines);
 		return;
 	}
 	let mut parser = Parser::new();
