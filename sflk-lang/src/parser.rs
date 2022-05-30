@@ -573,6 +573,14 @@ impl Parser {
 					left_loc + loc_right,
 				)
 			},
+			Tok::Op(Op::Minus) => {
+				let expr_node = self.parse_expr(tb);
+				let loc_right = expr_node.loc().clone();
+				Node::from(
+					Expr::Unop(Unop::Negate(Box::from(expr_node))),
+					left_loc + loc_right,
+				)
+			},
 			Tok::Kw(Kw::In) => Node::from(Expr::Input, left_loc),
 			Tok::Left(Matched::Curly) => {
 				let stmts = self.parse_stmts(tb);

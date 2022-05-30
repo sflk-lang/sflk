@@ -879,6 +879,11 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 				sir_instrs.push(SirInstr::IntoReadFileSignal);
 				sir_instrs.push(SirInstr::EmitSignal);
 			},
+			Unop::Negate(expr) => {
+				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(-1) });
+				sir_instrs.push(SirInstr::Star);
+			},
 		},
 		Expr::Chain { init, chops } => {
 			expr_to_sir_instrs(init.unwrap_ref(), sir_instrs);

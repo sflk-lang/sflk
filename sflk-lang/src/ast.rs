@@ -176,6 +176,7 @@ pub enum Expr {
 #[derive(Debug)]
 pub enum Unop {
 	ReadFile(Box<Node<Expr>>),
+	Negate(Box<Node<Expr>>),
 }
 
 #[derive(Debug)]
