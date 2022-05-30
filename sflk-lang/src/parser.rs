@@ -1,6 +1,6 @@
 use crate::ast::{Chop, Comment, Expr, Node, Program, Stmt, TargetExpr, Unop};
 use crate::scu::{Loc, SourceCodeUnit};
-use crate::tokenizer::{BinOp, CharReadingHead, Kw, Matched, StmtBinOp, Tok, Tokenizer};
+use crate::tokenizer::{CharReadingHead, Kw, Matched, Op, StmtBinOp, Tok, Tokenizer};
 use crate::utils::{escape_string, styles};
 use std::collections::HashMap;
 use std::{collections::VecDeque, rc::Rc};
@@ -90,14 +90,15 @@ impl TokBuffer {
 				last_line = loc.line_start;
 			}
 			match tok {
-				Tok::BinOp(BinOp::Plus) => println!("\tbinary operator +"),
-				Tok::BinOp(BinOp::Minus) => println!("\tbinary operator -"),
-				Tok::BinOp(BinOp::Star) => println!("\tbinary operator *"),
-				Tok::BinOp(BinOp::Slash) => println!("\tbinary operator /"),
-				Tok::BinOp(BinOp::ToRight) => println!("\tbinary operator >"),
-				Tok::BinOp(BinOp::Comma) => println!("\tbinary operator ,"),
-				Tok::BinOp(BinOp::DoubleComma) => println!("\tbinary operator ,,"),
-				Tok::BinOp(BinOp::Dot) => println!("\tbinary operator ."),
+				Tok::Op(Op::Plus) => println!("\toperator +"),
+				Tok::Op(Op::Minus) => println!("\toperator -"),
+				Tok::Op(Op::Star) => println!("\toperator *"),
+				Tok::Op(Op::Slash) => println!("\toperator /"),
+				Tok::Op(Op::ToRight) => println!("\toperator >"),
+				Tok::Op(Op::Comma) => println!("\toperator ,"),
+				Tok::Op(Op::DoubleComma) => println!("\toperator ,,"),
+				Tok::Op(Op::Dot) => println!("\toperator ."),
+				Tok::Op(Op::ToLeft) => println!("\toperator <"),
 				Tok::Kw(Kw::Np) => println!("\tkeyword np"),
 				Tok::Kw(Kw::Pr) => println!("\tkeyword pr"),
 				Tok::Kw(Kw::Nl) => println!("\tkeyword nl"),
@@ -118,6 +119,7 @@ impl TokBuffer {
 				Tok::Kw(Kw::Rs) => println!("\tkeyword rs"),
 				Tok::Kw(Kw::Fi) => println!("\tkeyword fi"),
 				Tok::Kw(Kw::In) => println!("\tkeyword in"),
+				Tok::Kw(Kw::Ix) => println!("\tkeyword ix"),
 				Tok::Left(Matched::Paren) => println!("\tleft parenthesis"),
 				Tok::Left(Matched::Curly) => println!("\tleft curly bracket"),
 				Tok::Left(Matched::Bracket) => println!("\tleft bracket"),
@@ -127,7 +129,6 @@ impl TokBuffer {
 				Tok::Comment { .. } => println!("\tcomment"),
 				Tok::Integer(string) => println!("\tinteger {}", string),
 				Tok::Name { string, .. } => println!("\tname {}", string),
-				Tok::StmtBinOp(StmtBinOp::ToLeft) => println!("\tstatement binary operator <"),
 				Tok::String { content, .. } => {
 					println!("\tstring \"{}\"", escape_string(&content, &styles::NORMAL))
 				},
@@ -525,7 +526,7 @@ impl Parser {
 		tb.prepare_max_index(1);
 		let prepared = tb.prepared();
 		match (&prepared[0], &prepared[1]) {
-			((Tok::Name { string, .. }, name_loc), (Tok::StmtBinOp(StmtBinOp::ToLeft), _)) => {
+			((Tok::Name { string, .. }, name_loc), (Tok::Op(Op::ToLeft), _)) => {
 				let target_node =
 					Node::from(TargetExpr::VariableName(string.clone()), name_loc.clone());
 				tb.disc();
@@ -601,22 +602,60 @@ impl Parser {
 
 	fn maybe_parse_chop(&mut self, tb: &mut TokBuffer) -> Option<Node<Chop>> {
 		let (op_tok, op_loc) = tb.peek(0).clone();
-		if let Tok::BinOp(op) = op_tok {
-			tb.disc();
-			let expr_node = self.parse_expr_beg(tb);
-			let full_loc = &op_loc + expr_node.loc();
-			match op {
-				BinOp::Plus => Some(Node::from(Chop::Plus(expr_node), full_loc)),
-				BinOp::Minus => Some(Node::from(Chop::Minus(expr_node), full_loc)),
-				BinOp::Star => Some(Node::from(Chop::Star(expr_node), full_loc)),
-				BinOp::Slash => Some(Node::from(Chop::Slash(expr_node), full_loc)),
-				BinOp::Comma => Some(Node::from(Chop::Comma(expr_node), full_loc)),
-				BinOp::DoubleComma => Some(Node::from(Chop::DoubleComma(expr_node), full_loc)),
-				BinOp::Dot => Some(Node::from(Chop::Dot(expr_node), full_loc)),
-				BinOp::ToRight => Some(Node::from(Chop::ToRight(expr_node), full_loc)),
-			}
-		} else {
-			None
+		match op_tok {
+			Tok::Op(Op::Plus) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::Plus(expr_node), full_loc))
+			},
+			Tok::Op(Op::Minus) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::Minus(expr_node), full_loc))
+			},
+			Tok::Op(Op::Star) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::Star(expr_node), full_loc))
+			},
+			Tok::Op(Op::Slash) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::Slash(expr_node), full_loc))
+			},
+			Tok::Op(Op::Comma) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::Comma(expr_node), full_loc))
+			},
+			Tok::Op(Op::DoubleComma) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::DoubleComma(expr_node), full_loc))
+			},
+			Tok::Op(Op::ToRight) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::ToRight(expr_node), full_loc))
+			},
+			Tok::Kw(Kw::Ix) => {
+				tb.disc();
+				let expr_node = self.parse_expr_beg(tb);
+				let full_loc = &op_loc + expr_node.loc();
+				Some(Node::from(Chop::Index(expr_node), full_loc))
+			},
+			Tok::Op(Op::Dot) => {
+				tb.disc();
+				None
+			},
+			_ => None,
 		}
 	}
 

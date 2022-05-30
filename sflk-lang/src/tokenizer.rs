@@ -58,11 +58,14 @@ impl CharReadingHead {
 
 #[derive(Debug, Clone)]
 pub enum Tok {
+	Kw(Kw),
+	Op(Op),
+	Left(Matched),
+	Right(Matched),
 	Name {
 		string: String,
 		unstable_warning: bool,
 	},
-	Kw(Kw),
 	Integer(String),
 	String {
 		content: String,
@@ -70,10 +73,6 @@ pub enum Tok {
 		invalid_escape_sequence_errors: Vec<(EscapeSequenceError, usize)>,
 		// The usize is the `\` character offset in literal
 	},
-	BinOp(BinOp),
-	Left(Matched),
-	Right(Matched),
-	StmtBinOp(StmtBinOp),
 	InvalidCharacter(char),
 	Comment {
 		content: String,
@@ -113,10 +112,11 @@ pub enum Kw {
 	Rs,
 	Fi,
 	In,
+	Ix,
 }
 
 #[derive(Debug, Clone)]
-pub enum BinOp {
+pub enum Op {
 	Plus,
 	Minus,
 	Star,
@@ -125,6 +125,7 @@ pub enum BinOp {
 	DoubleComma,
 	Dot,
 	ToRight,
+	ToLeft,
 }
 
 #[derive(Debug, Clone)]
@@ -163,37 +164,37 @@ impl Tokenizer {
 			Some('\"') => self.pop_string_tok(crh),
 			Some('+') => {
 				crh.disc();
-				(Tok::BinOp(BinOp::Plus), loc)
+				(Tok::Op(Op::Plus), loc)
 			},
 			Some('-') => {
 				crh.disc();
-				(Tok::BinOp(BinOp::Minus), loc)
+				(Tok::Op(Op::Minus), loc)
 			},
 			Some('*') => {
 				crh.disc();
-				(Tok::BinOp(BinOp::Star), loc)
+				(Tok::Op(Op::Star), loc)
 			},
 			Some('/') => {
 				crh.disc();
-				(Tok::BinOp(BinOp::Slash), loc)
+				(Tok::Op(Op::Slash), loc)
 			},
 			Some(',') => {
 				crh.disc();
 				let loc2 = crh.loc();
 				if crh.peek() == Some(',') {
 					crh.disc();
-					(Tok::BinOp(BinOp::DoubleComma), loc + loc2)
+					(Tok::Op(Op::DoubleComma), loc + loc2)
 				} else {
-					(Tok::BinOp(BinOp::Comma), loc)
+					(Tok::Op(Op::Comma), loc)
 				}
 			},
 			Some('.') => {
 				crh.disc();
-				(Tok::BinOp(BinOp::Dot), loc)
+				(Tok::Op(Op::Dot), loc)
 			},
 			Some('>') => {
 				crh.disc();
-				(Tok::BinOp(BinOp::ToRight), loc)
+				(Tok::Op(Op::ToRight), loc)
 			},
 			Some('(') => {
 				crh.disc();
@@ -221,7 +222,7 @@ impl Tokenizer {
 			},
 			Some('<') => {
 				crh.disc();
-				(Tok::StmtBinOp(StmtBinOp::ToLeft), loc)
+				(Tok::Op(Op::ToLeft), loc)
 			},
 			Some('#') => self.pop_comment_tok(crh),
 			Some(ch) => {
@@ -269,6 +270,7 @@ impl Tokenizer {
 			"rs" => Tok::Kw(Kw::Rs),
 			"fi" => Tok::Kw(Kw::Fi),
 			"in" => Tok::Kw(Kw::In),
+			"ix" => Tok::Kw(Kw::Ix),
 			_ => {
 				let len = word.len();
 				Tok::Name { string: word, unstable_warning: len == 2 }

@@ -908,7 +908,7 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 						expr_to_sir_instrs(right.unwrap_ref(), sir_instrs);
 						sir_instrs.push(SirInstr::DoubleComma);
 					},
-					Chop::Dot(right) => {
+					Chop::Index(right) => {
 						expr_to_sir_instrs(right.unwrap_ref(), sir_instrs);
 						sir_instrs.push(SirInstr::Dot);
 					},

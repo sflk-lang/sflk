@@ -28,25 +28,25 @@ replace < "jej"
 ri {pr replace nl}
 do {pr "not jej"}
 uwu < () ,"a" ,"b" ,"c"
-x < 0 lp wh x -3 bd dh {pr uwu .x x < x +1} sp pr ", " nl
+x < 0 lp wh x -3 bd dh {pr uwu ix x x < x +1} sp pr ", " nl
 pr "o" + "k" nl
 if "hh" - "hh" th pr "no" el pr "yes" nl
-ri {pr "\e[33m" pr v.1 pr "\e[39m" nl} do {pr "h"}
+ri {pr "\e[33m" pr v ix 1 pr "\e[39m" nl} do {pr "h"}
 ri () do {pr "normal" nl}
 not < {if v th v < 0 el v < 1}
 pr 3 >not pr ", " pr 0 >not nl
-streq < {v < v.0 - (v.1) >{v<1-v}}
+streq < {v < v ix 0 - (v ix 1) >{v<1-v}}
 pr (), "heh", "heh" >streq pr ", " pr (), "heh", "xxx" >streq nl
 ri {
-	streq < {v < v.0 - (v.1) >{v<1-v}}
-	if (), (v.0), "print" >streq
-	th em (), (v.0), ("\e[33m" + (v.1) + "\e[39m") rs v
+	streq < {v < v ix 0 - (v ix 1) >{v<1-v}}
+	if (), (v ix 0), "print" >streq
+	th em (), (v ix 0), ("\e[33m" + (v ix 1) + "\e[39m") rs v
 	el em v rs v
 }
 do {pr "h" nl}
 semicolons < {
-	streq < {v < v.0 - (v.1) >{v<1-v}}
-	if (), (v.0), "newline" >streq
+	streq < {v < v ix 0 - (v ix 1) >{v<1-v}}
+	if (), (v ix 0), "newline" >streq
 	th dh {pr ";" em v rs v}
 	el em v rs v
 }
@@ -73,7 +73,7 @@ pr ((8)) nl
 dh fi "sflk-lang/std.sflk"
 ev "jej" >prnl
 ri {
-	type < v .0
+	type < v ix 0
 	if type -"readfile" el dh {
 		v < "fun < {v < v +3}"
 	} th dh {
@@ -89,4 +89,6 @@ x < "<uncomment the line below to have to type stuff>\n"
 pr "u typed: " pr x
 x < 0 lp bd pr x sp pr ", " bd x < x +1 wh x -8 nl
 lp wh 0 ao bd pr "h" bd nl
-$
+ri {type < v ix 0 if type -"readfile" th em v rs v el v < v ix 1 + "|"}
+do {pr fi "uwu" + "owo" nl}
+do {pr fi "uwu". + "owo" nl}

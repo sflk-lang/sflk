@@ -186,7 +186,7 @@ pub enum Chop {
 	Slash(Node<Expr>),
 	Comma(Node<Expr>),
 	DoubleComma(Node<Expr>),
-	Dot(Node<Expr>),
+	Index(Node<Expr>),
 	ToRight(Node<Expr>),
 	Invalid, // TODO: Add error details
 }
@@ -242,7 +242,7 @@ impl Treeable for Chop {
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
-			Chop::Dot(expr_node) => StringTree::new_node(
+			Chop::Index(expr_node) => StringTree::new_node(
 				"chop dot".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
@@ -602,7 +602,7 @@ impl Chop {
 			Chop::ToRight(expr) => expr.content.is_invalid(),
 			Chop::Comma(expr) => expr.content.is_invalid(),
 			Chop::DoubleComma(expr) => expr.content.is_invalid(),
-			Chop::Dot(expr) => expr.content.is_invalid(),
+			Chop::Index(expr) => expr.content.is_invalid(),
 			Chop::Invalid => true,
 		}
 	}
@@ -616,7 +616,7 @@ impl Chop {
 			Chop::ToRight(expr) => program::Chop::ToRight(expr.content.to_machine_expr()),
 			Chop::Comma(expr) => unimplemented!(),
 			Chop::DoubleComma(expr) => unimplemented!(),
-			Chop::Dot(expr) => unimplemented!(),
+			Chop::Index(expr) => unimplemented!(),
 			Chop::Invalid => unreachable!(),
 		}
 	}

@@ -54,10 +54,14 @@ contexts:
       captures:
         1: keyword.other.sflk
         2: variable.function.sflk
-    - match: '\,\,|\,|\.'
+    - match: '\,\,|\,'
+      scope: keyword.operator.sflk
+    - match: '\.'
       scope: keyword.operator.sflk
     - match: '>'
       scope: keyword.operator.sflk
+    - match: '\b(ix)\b'
+      scope: punctuation.accessor.sflk
     - match: '\b(if|th|el)\b'
       scope: keyword.control.conditional.if.sflk
     - match: '\b(lp|wh|bd|sp|ao)\b'
