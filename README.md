@@ -11,8 +11,8 @@ Enjoy!
 ## Presentation
 
 The language is very unstable as it is still in very early development.
-What is written here may not be accurate.
 Many many essential features are still missing.
+What is written here may not have beed updated properly (but all that is described here works or have worked in somepast commit, SFLK is not vaporware).
 
 ### Syntax
 
