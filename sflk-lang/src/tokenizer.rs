@@ -135,11 +135,6 @@ pub enum Matched {
 	Bracket,
 }
 
-#[derive(Debug, Clone)]
-pub enum StmtBinOp {
-	ToLeft,
-}
-
 pub struct Tokenizer {}
 
 impl Tokenizer {

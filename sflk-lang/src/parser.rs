@@ -1,6 +1,6 @@
 use crate::ast::{Chop, Comment, Expr, Node, Program, Stmt, TargetExpr, Unop};
 use crate::scu::{Loc, SourceCodeUnit};
-use crate::tokenizer::{CharReadingHead, Kw, Matched, Op, StmtBinOp, Tok, Tokenizer};
+use crate::tokenizer::{CharReadingHead, Kw, Matched, Op, Tok, Tokenizer};
 use crate::utils::{escape_string, styles};
 use std::collections::HashMap;
 use std::{collections::VecDeque, rc::Rc};
@@ -162,6 +162,7 @@ impl Parser {
 enum ExtType {
 	Stmt,
 	Expr,
+	Targ,
 	Flag,
 }
 
@@ -177,6 +178,7 @@ type StmtExtPackDescr = HashMap<Kw, StmtExtDescr>;
 enum SingleContent {
 	Stmt(Node<Stmt>),
 	Expr(Node<Expr>),
+	Targ(Node<TargetExpr>),
 	Flag(Node<()>),
 }
 
@@ -185,6 +187,7 @@ impl SingleContent {
 		match self {
 			SingleContent::Stmt(node) => node.loc(),
 			SingleContent::Expr(node) => node.loc(),
+			SingleContent::Targ(node) => node.loc(),
 			SingleContent::Flag(node) => node.loc(),
 		}
 	}
@@ -230,6 +233,18 @@ impl StmtExtPackContent {
 			.into_iter()
 			.map(|single| match single {
 				SingleContent::Expr(expr) => expr,
+				_ => panic!("bug"),
+			})
+			.collect()
+	}
+
+	fn pop_ext_targs(&mut self, kw: Kw) -> Vec<Node<TargetExpr>> {
+		self.table
+			.remove(&kw)
+			.unwrap()
+			.into_iter()
+			.map(|single| match single {
+				SingleContent::Targ(targ) => targ,
 				_ => panic!("bug"),
 			})
 			.collect()
@@ -451,26 +466,22 @@ impl Parser {
 					let kw_loc = first_loc.clone();
 					tb.disc();
 					let expr_node = self.parse_expr(tb);
-					let (tok, _) = tb.peek(0);
-					let target_node = match tok {
-						Tok::Kw(tok_kw) if *tok_kw == Kw::Rs => {
-							tb.disc();
-							let (name_tok, loc) = tb.pop();
-							match name_tok {
-								Tok::Name { string, .. } => {
-									Some(Node::from(TargetExpr::VariableName(string), loc))
-								},
-								_ => Some(Node::from(TargetExpr::Invalid, loc)),
-							}
+					let mut descr_pack = HashMap::new();
+					descr_pack.insert(
+						Kw::Rs,
+						StmtExtDescr {
+							content_type: ExtType::Targ,
+							optional: true,
+							can_stack: false,
 						},
-						_ => None,
-					};
-					let mut full_loc = &kw_loc + expr_node.loc();
-					if let Some(node) = &target_node {
-						full_loc += node.loc();
-					}
+					);
+					let mut content_pack = self.parse_extensions(tb, &descr_pack);
+					let full_loc = content_pack
+						.loc()
+						.map_or(kw_loc.clone(), |loc| kw_loc + loc);
+					let rs_targ = content_pack.pop_ext_targs(Kw::Rs).pop();
 					Some(Node::from(
-						Stmt::Emit { expr: expr_node, target: target_node },
+						Stmt::Emit { expr: expr_node, target: rs_targ },
 						full_loc,
 					))
 				},
@@ -505,6 +516,7 @@ impl Parser {
 						let content = match descr.content_type {
 							ExtType::Stmt => SingleContent::Stmt(self.parse_stmt(tb)),
 							ExtType::Expr => SingleContent::Expr(self.parse_expr(tb)),
+							ExtType::Targ => SingleContent::Targ(self.parse_target_expr(tb)),
 							ExtType::Flag => SingleContent::Flag(Node::from((), loc)),
 						};
 						content_pack.add_ext_content(kw, content);
@@ -521,6 +533,16 @@ impl Parser {
 			}
 		}
 		content_pack
+	}
+
+	fn parse_target_expr(&mut self, tb: &mut TokBuffer) -> Node<TargetExpr> {
+		let (tok, loc) = tb.pop();
+		match tok {
+			Tok::Name { string, .. } => {
+				Node::from(TargetExpr::VariableName(string.clone()), loc.clone())
+			},
+			_ => unimplemented!(),
+		}
 	}
 
 	fn maybe_parse_assign_stmt(&mut self, tb: &mut TokBuffer) -> Option<Node<Stmt>> {
