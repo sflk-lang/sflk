@@ -93,4 +93,6 @@ ri {type < v ix 0 if type -"readfile" th em v rs v el v < v ix 1 + "|"}
 do {pr fi "uwu" + "owo" nl}  # (fi "uwu" + "owo") #
 do {pr fi "uwu". + "owo" nl} # (fi "uwu") + "owo" #
 ri ()
-pr -1 nl pr -1+1+1 nl pr -1+1.+1 nl
+pr -1 nl
+pr -1+1+1 nl
+pr -1+1.+1 nl
