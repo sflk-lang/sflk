@@ -51,8 +51,8 @@ of successive #s ####
 
 ```sflk
 x < "So long"
-x < x +" gay "
-pr x +"Bowser" nl
+x < x + " gay "
+pr x + "Bowser" nl
 ```
 
 Here, `x` is a variable that is being assigned a string object, and again, to finally be used in an expression that is printed.
@@ -71,7 +71,7 @@ This piece of code prints `uwu` as one might expect. The code block `{pr "uwu" n
 
 ```sflk
 x < {pr "uwu"}
-x < x +{nl}
+x < x + {nl}
 do x
 ```
 
