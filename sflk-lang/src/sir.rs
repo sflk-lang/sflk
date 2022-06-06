@@ -1,8 +1,8 @@
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
-	parser::{Parser, TokBuffer},
+	parser::{Parser},
 	scu::SourceCodeUnit,
-	tokenizer::CharReadingHead,
+	tokenizer::{CharReadingHead, TokBuffer},
 };
 use std::{collections::HashMap, rc::Rc};
 

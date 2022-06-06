@@ -156,7 +156,7 @@ impl Mem {
 	fn exec_file_here(&mut self, filename: String) {
 		let scu = std::rc::Rc::new(crate::scu::SourceCodeUnit::from_filename(&filename));
 		let mut tfr =
-			crate::parser::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
+			crate::tokenizer::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
 
 		let mut parser = crate::parser::Parser::new();
 		let ast = parser.parse_program(&mut tfr);

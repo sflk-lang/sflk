@@ -10,9 +10,9 @@ mod stringtree;
 mod tokenizer;
 mod utils;
 
-use crate::parser::{Parser, TokBuffer};
+use crate::parser::{Parser};
 use crate::scu::SourceCodeUnit;
-use crate::tokenizer::CharReadingHead;
+use crate::tokenizer::{CharReadingHead, TokBuffer};
 use std::rc::Rc;
 
 const HELP_MESSAGE: &str = "\

@@ -1,5 +1,5 @@
-use crate::scu::{Loc, SourceCodeUnit};
-use std::rc::Rc;
+use crate::{scu::{Loc, SourceCodeUnit}, utils::{escape_string, styles}};
+use std::{rc::Rc, collections::VecDeque};
 
 #[derive(Debug)]
 pub struct CharReadingHead {
@@ -547,5 +547,142 @@ impl Tokenizer {
 			},
 			loc,
 		)
+	}
+}
+
+pub struct TokBuffer {
+	crh: CharReadingHead,
+	tokenizer: Tokenizer,
+	toks_ahead: VecDeque<(Tok, Loc)>,
+}
+
+impl TokBuffer {
+	pub fn from(crh: CharReadingHead) -> TokBuffer {
+		TokBuffer {
+			crh,
+			tokenizer: Tokenizer::new(),
+			toks_ahead: VecDeque::new(),
+		}
+	}
+
+	pub fn scu(&self) -> Rc<SourceCodeUnit> {
+		self.crh.scu()
+	}
+
+	fn tokenizer_pop_tok_no_comments(&mut self) -> (Tok, Loc) {
+		loop {
+			let (tok, loc) = self.tokenizer.pop_tok(&mut self.crh);
+			if !matches!(tok, Tok::Comment { .. }) {
+				break (tok, loc);
+			}
+		}
+	}
+
+	pub fn prepare_max_index(&mut self, n: usize) {
+		if self.toks_ahead.len() < n + 1 {
+			self.toks_ahead.reserve(n - self.toks_ahead.len());
+		}
+		while self.toks_ahead.len() < n + 1 {
+			let (tok, loc) = self.tokenizer_pop_tok_no_comments();
+			self.toks_ahead.push_back((tok, loc));
+		}
+	}
+
+	fn prepare_all(&mut self) {
+		loop {
+			let (tok, loc) = self.tokenizer_pop_tok_no_comments();
+			self.toks_ahead.push_back((tok, loc));
+			if matches!(self.toks_ahead.back().map(|t| &t.0), Some(Tok::Eof)) {
+				break;
+			}
+		}
+	}
+
+	pub fn peek(&mut self, n: usize) -> &(Tok, Loc) {
+		self.prepare_max_index(n);
+		&self.toks_ahead[n]
+	}
+
+	pub fn prepared(&self) -> &VecDeque<(Tok, Loc)> {
+		&self.toks_ahead
+	}
+
+	pub fn pop(&mut self) -> (Tok, Loc) {
+		self.peek(0);
+		let tok_loc_opt = self.toks_ahead.pop_front();
+		if let Some(tok_loc) = tok_loc_opt {
+			tok_loc
+		} else {
+			panic!("bug: no token to pop")
+		}
+	}
+
+	pub fn disc(&mut self) {
+		if self.toks_ahead.pop_front().is_none() {
+			panic!("bug: token discarded but not peeked before")
+		}
+	}
+
+	pub fn display_all(mut self, line_numbers: bool) {
+		let mut last_line = 0;
+		loop {
+			let (tok, loc) = self.tokenizer.pop_tok(&mut self.crh);
+			if line_numbers && last_line < loc.line_start {
+				println!("Line {}:", loc.line_start);
+				last_line = loc.line_start;
+			}
+			if line_numbers {
+				print!("\t");
+			}
+			match tok {
+				Tok::Op(Op::Plus) => println!("operator +"),
+				Tok::Op(Op::Minus) => println!("operator -"),
+				Tok::Op(Op::Star) => println!("operator *"),
+				Tok::Op(Op::Slash) => println!("operator /"),
+				Tok::Op(Op::ToRight) => println!("operator >"),
+				Tok::Op(Op::Comma) => println!("operator ,"),
+				Tok::Op(Op::DoubleComma) => println!("operator ,,"),
+				Tok::Op(Op::Dot) => println!("operator ."),
+				Tok::Op(Op::ToLeft) => println!("operator <"),
+				Tok::Kw(Kw::Np) => println!("keyword np"),
+				Tok::Kw(Kw::Pr) => println!("keyword pr"),
+				Tok::Kw(Kw::Nl) => println!("keyword nl"),
+				Tok::Kw(Kw::Do) => println!("keyword do"),
+				Tok::Kw(Kw::Dh) => println!("keyword dh"),
+				Tok::Kw(Kw::Fh) => println!("keyword fh"),
+				Tok::Kw(Kw::Ev) => println!("keyword ev"),
+				Tok::Kw(Kw::If) => println!("keyword if"),
+				Tok::Kw(Kw::Th) => println!("keyword th"),
+				Tok::Kw(Kw::El) => println!("keyword el"),
+				Tok::Kw(Kw::Lp) => println!("keyword lp"),
+				Tok::Kw(Kw::Wh) => println!("keyword wh"),
+				Tok::Kw(Kw::Bd) => println!("keyword bd"),
+				Tok::Kw(Kw::Sp) => println!("keyword sp"),
+				Tok::Kw(Kw::Ao) => println!("keyword ao"),
+				Tok::Kw(Kw::Ri) => println!("keyword ri"),
+				Tok::Kw(Kw::Em) => println!("keyword em"),
+				Tok::Kw(Kw::Rs) => println!("keyword rs"),
+				Tok::Kw(Kw::Fi) => println!("keyword fi"),
+				Tok::Kw(Kw::In) => println!("keyword in"),
+				Tok::Kw(Kw::Ix) => println!("keyword ix"),
+				Tok::Left(Matched::Paren) => println!("left parenthesis"),
+				Tok::Left(Matched::Curly) => println!("left curly bracket"),
+				Tok::Left(Matched::Bracket) => println!("left bracket"),
+				Tok::Right(Matched::Paren) => println!("right parenthesis"),
+				Tok::Right(Matched::Curly) => println!("right curly bracket"),
+				Tok::Right(Matched::Bracket) => println!("right bracket"),
+				Tok::Comment { .. } => println!("comment"),
+				Tok::Integer(string) => println!("integer {}", string),
+				Tok::Name { string, .. } => println!("name {}", string),
+				Tok::String { content, .. } => {
+					println!("string \"{}\"", escape_string(&content, &styles::NORMAL))
+				},
+				Tok::InvalidCharacter(c) => println!("\x1b[31minvalid character\x1b[39m {}", c),
+				Tok::Eof => {
+					println!("end-of-file");
+					break;
+				},
+			}
+		}
 	}
 }
