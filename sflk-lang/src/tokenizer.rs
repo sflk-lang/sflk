@@ -1,5 +1,8 @@
-use crate::{scu::{Loc, SourceCodeUnit}, utils::{escape_string, styles}};
-use std::{rc::Rc, collections::VecDeque};
+use crate::{
+	scu::{Loc, SourceCodeUnit},
+	utils::{escape_string, styles},
+};
+use std::{collections::VecDeque, rc::Rc, fmt};
 
 #[derive(Debug)]
 pub struct CharReadingHead {
@@ -683,6 +686,57 @@ impl TokBuffer {
 					break;
 				},
 			}
+		}
+	}
+}
+
+impl fmt::Display for Tok {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Tok::Op(Op::Plus) => write!(f, "operator +"),
+			Tok::Op(Op::Minus) => write!(f, "operator -"),
+			Tok::Op(Op::Star) => write!(f, "operator *"),
+			Tok::Op(Op::Slash) => write!(f, "operator /"),
+			Tok::Op(Op::ToRight) => write!(f, "operator >"),
+			Tok::Op(Op::Comma) => write!(f, "operator ,"),
+			Tok::Op(Op::DoubleComma) => write!(f, "operator ,,"),
+			Tok::Op(Op::Dot) => write!(f, "operator ."),
+			Tok::Op(Op::ToLeft) => write!(f, "operator <"),
+			Tok::Kw(Kw::Np) => write!(f, "keyword np"),
+			Tok::Kw(Kw::Pr) => write!(f, "keyword pr"),
+			Tok::Kw(Kw::Nl) => write!(f, "keyword nl"),
+			Tok::Kw(Kw::Do) => write!(f, "keyword do"),
+			Tok::Kw(Kw::Dh) => write!(f, "keyword dh"),
+			Tok::Kw(Kw::Fh) => write!(f, "keyword fh"),
+			Tok::Kw(Kw::Ev) => write!(f, "keyword ev"),
+			Tok::Kw(Kw::If) => write!(f, "keyword if"),
+			Tok::Kw(Kw::Th) => write!(f, "keyword th"),
+			Tok::Kw(Kw::El) => write!(f, "keyword el"),
+			Tok::Kw(Kw::Lp) => write!(f, "keyword lp"),
+			Tok::Kw(Kw::Wh) => write!(f, "keyword wh"),
+			Tok::Kw(Kw::Bd) => write!(f, "keyword bd"),
+			Tok::Kw(Kw::Sp) => write!(f, "keyword sp"),
+			Tok::Kw(Kw::Ao) => write!(f, "keyword ao"),
+			Tok::Kw(Kw::Ri) => write!(f, "keyword ri"),
+			Tok::Kw(Kw::Em) => write!(f, "keyword em"),
+			Tok::Kw(Kw::Rs) => write!(f, "keyword rs"),
+			Tok::Kw(Kw::Fi) => write!(f, "keyword fi"),
+			Tok::Kw(Kw::In) => write!(f, "keyword in"),
+			Tok::Kw(Kw::Ix) => write!(f, "keyword ix"),
+			Tok::Left(Matched::Paren) => write!(f, "left parenthesis"),
+			Tok::Left(Matched::Curly) => write!(f, "left curly bracket"),
+			Tok::Left(Matched::Bracket) => write!(f, "left bracket"),
+			Tok::Right(Matched::Paren) => write!(f, "right parenthesis"),
+			Tok::Right(Matched::Curly) => write!(f, "right curly bracket"),
+			Tok::Right(Matched::Bracket) => write!(f, "right bracket"),
+			Tok::Comment { .. } => write!(f, "comment"),
+			Tok::Integer(string) => write!(f, "integer {}", string),
+			Tok::Name { string, .. } => write!(f, "name {}", string),
+			Tok::String { content, .. } => {
+				write!(f, "string \"{}\"", escape_string(content, &styles::NORMAL))
+			},
+			Tok::InvalidCharacter(c) => write!(f, "\x1b[31minvalid character\x1b[39m {}", c),
+			Tok::Eof => write!(f, "end-of-file"),
 		}
 	}
 }
