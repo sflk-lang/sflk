@@ -83,7 +83,7 @@ impl Parser {
 			},
 			_ => {
 				self.tb.pop();
-				self.log_normal("TODO");
+				unimplemented!();
 			},
 		}
 		self.stack.push(top_frame);

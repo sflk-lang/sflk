@@ -86,7 +86,7 @@ impl IndentedLogger {
 				},
 				indent.style.1
 			)
-			.expect("TODO");
+			.expect("write failure");
 		}
 		for indent in self.indents[last_important_index..].iter() {
 			write!(
@@ -94,7 +94,7 @@ impl IndentedLogger {
 				"{}{}{}",
 				indent.style.0, INDENT_NORMAL, indent.style.1
 			)
-			.expect("TODO");
+			.expect("write failure");
 		}
 		if let Some(indent) = new_indent {
 			write!(
@@ -102,7 +102,7 @@ impl IndentedLogger {
 				"{}{}{}",
 				indent.style.0, INDENT_START, indent.style.1
 			)
-			.expect("TODO");
+			.expect("write failure");
 		}
 	}
 }
