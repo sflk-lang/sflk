@@ -121,10 +121,10 @@ fn main() {
 		tfr.display_all(settings.display_tokens_lines);
 		return;
 	}
-	let parser_debug = ParserDebuggingLogger {
-		logger: IndentedLogger::new(),
+	let parser_logger = ParserDebuggingLogger {
+		logger: Some(IndentedLogger::new()),
 	};
-	let mut parser = Parser::new(tfr, Some(parser_debug));
+	let mut parser = Parser::new(tfr, parser_logger);
 	let ast = parser.parse_program();
 	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());
 	dbg!(&sir_block);
