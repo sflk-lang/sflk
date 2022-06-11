@@ -295,8 +295,8 @@ struct StmtExtDescr {
 }
 
 struct StmtDescr {
-	name: String,
 	name_article: String,
+	name: String,
 	content_type: ExtType,
 	extentions: HashMap<Kw, StmtExtDescr>,
 }
@@ -311,8 +311,17 @@ impl LanguageDescr {
 		stmts.insert(
 			Kw::Np,
 			StmtDescr {
-				name: "nop".to_string(),
 				name_article: "a".to_string(),
+				name: "nop".to_string(),
+				content_type: ExtType::None,
+				extentions: HashMap::new(),
+			},
+		);
+		stmts.insert(
+			Kw::Nl,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "newline".to_string(),
 				content_type: ExtType::None,
 				extentions: HashMap::new(),
 			},
@@ -320,8 +329,8 @@ impl LanguageDescr {
 		stmts.insert(
 			Kw::Pr,
 			StmtDescr {
-				name: "print".to_string(),
 				name_article: "a".to_string(),
+				name: "print".to_string(),
 				content_type: ExtType::Expr,
 				extentions: HashMap::new(),
 			},
@@ -339,6 +348,7 @@ fn temporary_into_ast_stmt(
 	let kw_loc = kw.loc().to_owned();
 	match kw.unwrap() {
 		Kw::Np => Node::from(Stmt::Nop, kw_loc),
+		Kw::Nl => Node::from(Stmt::Newline, kw_loc),
 		Kw::Pr => Node::from(
 			Stmt::Print {
 				expr: {
