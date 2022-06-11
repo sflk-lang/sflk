@@ -92,7 +92,7 @@ pub enum Tok {
 		content: String,
 		no_end_quote_warning: bool,
 		invalid_escape_sequence_errors: Vec<(EscapeSequenceError, usize)>,
-		// The usize is the `\` character offset in literal
+		// The usize is the `\` character index in the literal.
 	},
 	InvalidCharacter(char),
 	Comment {
