@@ -637,54 +637,9 @@ impl TokBuffer {
 			if line_numbers {
 				print!("\t");
 			}
-			match tok {
-				Tok::Op(Op::Plus) => println!("operator +"),
-				Tok::Op(Op::Minus) => println!("operator -"),
-				Tok::Op(Op::Star) => println!("operator *"),
-				Tok::Op(Op::Slash) => println!("operator /"),
-				Tok::Op(Op::ToRight) => println!("operator >"),
-				Tok::Op(Op::Comma) => println!("operator ,"),
-				Tok::Op(Op::DoubleComma) => println!("operator ,,"),
-				Tok::Op(Op::Dot) => println!("operator ."),
-				Tok::Op(Op::ToLeft) => println!("operator <"),
-				Tok::Kw(Kw::Np) => println!("keyword np"),
-				Tok::Kw(Kw::Pr) => println!("keyword pr"),
-				Tok::Kw(Kw::Nl) => println!("keyword nl"),
-				Tok::Kw(Kw::Do) => println!("keyword do"),
-				Tok::Kw(Kw::Dh) => println!("keyword dh"),
-				Tok::Kw(Kw::Fh) => println!("keyword fh"),
-				Tok::Kw(Kw::Ev) => println!("keyword ev"),
-				Tok::Kw(Kw::If) => println!("keyword if"),
-				Tok::Kw(Kw::Th) => println!("keyword th"),
-				Tok::Kw(Kw::El) => println!("keyword el"),
-				Tok::Kw(Kw::Lp) => println!("keyword lp"),
-				Tok::Kw(Kw::Wh) => println!("keyword wh"),
-				Tok::Kw(Kw::Bd) => println!("keyword bd"),
-				Tok::Kw(Kw::Sp) => println!("keyword sp"),
-				Tok::Kw(Kw::Ao) => println!("keyword ao"),
-				Tok::Kw(Kw::Ri) => println!("keyword ri"),
-				Tok::Kw(Kw::Em) => println!("keyword em"),
-				Tok::Kw(Kw::Rs) => println!("keyword rs"),
-				Tok::Kw(Kw::Fi) => println!("keyword fi"),
-				Tok::Kw(Kw::In) => println!("keyword in"),
-				Tok::Kw(Kw::Ix) => println!("keyword ix"),
-				Tok::Left(Matched::Paren) => println!("left parenthesis"),
-				Tok::Left(Matched::Curly) => println!("left curly bracket"),
-				Tok::Left(Matched::Bracket) => println!("left bracket"),
-				Tok::Right(Matched::Paren) => println!("right parenthesis"),
-				Tok::Right(Matched::Curly) => println!("right curly bracket"),
-				Tok::Right(Matched::Bracket) => println!("right bracket"),
-				Tok::Comment { .. } => println!("comment"),
-				Tok::Integer(string) => println!("integer {}", string),
-				Tok::Name { string, .. } => println!("name {}", string),
-				Tok::String { content, .. } => {
-					println!("string \"{}\"", escape_string(&content, &styles::NORMAL))
-				},
-				Tok::InvalidCharacter(c) => println!("\x1b[31minvalid character\x1b[39m {}", c),
-				Tok::Eof => {
-					println!("end-of-file");
-					break;
-				},
+			println!("{}", tok);
+			if matches!(tok, Tok::Eof) {
+				break;
 			}
 		}
 	}
@@ -702,27 +657,6 @@ impl fmt::Display for Tok {
 			Tok::Op(Op::DoubleComma) => write!(f, "operator ,,"),
 			Tok::Op(Op::Dot) => write!(f, "operator ."),
 			Tok::Op(Op::ToLeft) => write!(f, "operator <"),
-			Tok::Kw(Kw::Np) => write!(f, "keyword np"),
-			Tok::Kw(Kw::Pr) => write!(f, "keyword pr"),
-			Tok::Kw(Kw::Nl) => write!(f, "keyword nl"),
-			Tok::Kw(Kw::Do) => write!(f, "keyword do"),
-			Tok::Kw(Kw::Dh) => write!(f, "keyword dh"),
-			Tok::Kw(Kw::Fh) => write!(f, "keyword fh"),
-			Tok::Kw(Kw::Ev) => write!(f, "keyword ev"),
-			Tok::Kw(Kw::If) => write!(f, "keyword if"),
-			Tok::Kw(Kw::Th) => write!(f, "keyword th"),
-			Tok::Kw(Kw::El) => write!(f, "keyword el"),
-			Tok::Kw(Kw::Lp) => write!(f, "keyword lp"),
-			Tok::Kw(Kw::Wh) => write!(f, "keyword wh"),
-			Tok::Kw(Kw::Bd) => write!(f, "keyword bd"),
-			Tok::Kw(Kw::Sp) => write!(f, "keyword sp"),
-			Tok::Kw(Kw::Ao) => write!(f, "keyword ao"),
-			Tok::Kw(Kw::Ri) => write!(f, "keyword ri"),
-			Tok::Kw(Kw::Em) => write!(f, "keyword em"),
-			Tok::Kw(Kw::Rs) => write!(f, "keyword rs"),
-			Tok::Kw(Kw::Fi) => write!(f, "keyword fi"),
-			Tok::Kw(Kw::In) => write!(f, "keyword in"),
-			Tok::Kw(Kw::Ix) => write!(f, "keyword ix"),
 			Tok::Left(Matched::Paren) => write!(f, "left parenthesis"),
 			Tok::Left(Matched::Curly) => write!(f, "left curly bracket"),
 			Tok::Left(Matched::Bracket) => write!(f, "left bracket"),
@@ -730,6 +664,7 @@ impl fmt::Display for Tok {
 			Tok::Right(Matched::Curly) => write!(f, "right curly bracket"),
 			Tok::Right(Matched::Bracket) => write!(f, "right bracket"),
 			Tok::Comment { .. } => write!(f, "comment"),
+			Tok::Kw(kw) => write!(f, "keyword {}", kw),
 			Tok::Integer(string) => write!(f, "integer {}", string),
 			Tok::Name { string, .. } => write!(f, "name {}", string),
 			Tok::String { content, .. } => {
@@ -737,6 +672,34 @@ impl fmt::Display for Tok {
 			},
 			Tok::InvalidCharacter(c) => write!(f, "\x1b[31minvalid character\x1b[39m {}", c),
 			Tok::Eof => write!(f, "end-of-file"),
+		}
+	}
+}
+
+impl fmt::Display for Kw {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Kw::Np => write!(f, "np"),
+			Kw::Pr => write!(f, "pr"),
+			Kw::Nl => write!(f, "nl"),
+			Kw::Do => write!(f, "do"),
+			Kw::Dh => write!(f, "dh"),
+			Kw::Fh => write!(f, "fh"),
+			Kw::Ev => write!(f, "ev"),
+			Kw::If => write!(f, "if"),
+			Kw::Th => write!(f, "th"),
+			Kw::El => write!(f, "el"),
+			Kw::Lp => write!(f, "lp"),
+			Kw::Wh => write!(f, "wh"),
+			Kw::Bd => write!(f, "bd"),
+			Kw::Sp => write!(f, "sp"),
+			Kw::Ao => write!(f, "ao"),
+			Kw::Ri => write!(f, "ri"),
+			Kw::Em => write!(f, "em"),
+			Kw::Rs => write!(f, "rs"),
+			Kw::Fi => write!(f, "fi"),
+			Kw::In => write!(f, "in"),
+			Kw::Ix => write!(f, "ix"),
 		}
 	}
 }

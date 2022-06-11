@@ -19,15 +19,16 @@ enum StmtExt {
 	None,
 }
 
-/// The idea here is to get a parser that can perform one small step at a time
-/// so that it can be quite verbose in explaining what it does, as well as being
-/// interactive and all.
-/// It has a stack of `ParsingFrame`, each of which sould represent a simple step
-/// that is to be performed or advanced in the next step call (possibly pushing
-/// more frames). For now a `ParsingFrame` does not quite represent a simple step
-/// and the whole code is messy and not very readable. This has to be improved.
-/// TODO.
-enum ParsingFrame {
+// The idea here is to get a parser that can perform one small step at a time
+// so that it can be quite verbose in explaining what it does, as well as being
+// interactive and all.
+// It has a stack of `ParsingAction`, each of which sould represent a simple step
+// that is to be performed or advanced in the next step call (possibly pushing
+// more actions). For now a `ParsingFrame` does not quite represent a simple step
+// and the whole code is messy and not very readable. This has to be improved.
+// TODO.
+
+enum ParsingData {
 	BlockLevel {
 		stmts: Vec<Node<Stmt>>,
 		expected_terminator: BlockLevelExpectedTerminator,
@@ -37,13 +38,29 @@ enum ParsingFrame {
 		content: Option<Node<StmtExt>>,
 		exts: HashMap<Kw, Vec<StmtExt>>,
 	},
-	Ext(Kw),
-	Expr(Option<Node<Expr>>),
-	ExprEnd,
+	Expr(Node<Expr>),
+}
+
+/// Each of these should represent one simple action that the parser may perform.
+/// A simple action is popped from the action stack, it can modify the data stack as
+/// it pleases, it can push actions on the action stack, but it can either consume at
+/// most one token or peek at most one token.
+/// This restriction on its sight of the token stream will allow for debugging parsing
+/// directives to be insertable anywhere in between tokens and it will allow the
+/// step-by-step verbose parsing to go token-by-token.
+enum ParsingAction {
+	Terminate,
+	ParseStmtOrStopOnTerminator,
+	ParseStmt,    // ( -- stmt)
+	AddStmt,      // (stmt -- )
+	ParseContent, // (stmt -- stmt content)
+	SetContent,   // (stmt content -- stmt)
+	ParseExpr,    // ( -- expr)
 }
 
 pub struct ParserDebuggingLogger {
 	pub logger: Option<IndentedLogger>,
+	// Logging parameters should be added here...
 }
 
 impl ParserDebuggingLogger {
@@ -59,23 +76,29 @@ impl ParserDebuggingLogger {
 		}
 	}
 
-	fn log_deindent(&mut self) {
+	fn log_deindent(&mut self, string: &str) {
 		if let Some(logger) = &mut self.logger {
-			logger.deindent();
+			logger.deindent(string);
 		}
 	}
 
-	fn log_encounter(&mut self, string: &str) {
+	fn log_peek_token(&mut self, tok: &Tok) {
 		if let Some(logger) = &mut self.logger {
-			logger.log_string(&format!("Encounter {}", string), styles::NORMAL);
+			logger.log_string(&format!("Peek {}", tok), styles::NORMAL);
+		}
+	}
+
+	fn log_consume_token(&mut self, tok: &Tok) {
+		if let Some(logger) = &mut self.logger {
+			logger.log_string(&format!("Consume {}", tok), styles::NORMAL);
 		}
 	}
 }
 
 pub struct Parser {
 	tb: TokBuffer,
-	stack: Vec<ParsingFrame>,
-	done: bool,
+	data_stack: Vec<ParsingData>,
+	action_stack: Vec<ParsingAction>,
 	lang: LanguageDescr,
 	debug: ParserDebuggingLogger,
 }
@@ -84,21 +107,23 @@ impl Parser {
 	pub fn new(tb: TokBuffer, debug: ParserDebuggingLogger) -> Parser {
 		Parser {
 			tb,
-			stack: Vec::new(),
-			done: false,
+			data_stack: Vec::new(),
+			action_stack: Vec::new(),
 			lang: LanguageDescr::new(),
 			debug,
 		}
 	}
 
 	pub fn parse_program(&mut self) -> Node<Program> {
-		self.stack.push(ParsingFrame::BlockLevel {
+		self.data_stack.push(ParsingData::BlockLevel {
 			stmts: Vec::new(),
 			expected_terminator: BlockLevelExpectedTerminator::Eof,
 		});
+		self.action_stack
+			.push(ParsingAction::ParseStmtOrStopOnTerminator);
 		self.parse();
-		match self.stack.pop() {
-			Some(ParsingFrame::BlockLevel { stmts, .. }) => {
+		match self.data_stack.pop() {
+			Some(ParsingData::BlockLevel { stmts, .. }) => {
 				Node::from(Program { stmts }, Loc::total_of(self.tb.scu()))
 			},
 			_ => panic!(),
@@ -107,39 +132,63 @@ impl Parser {
 
 	fn parse(&mut self) {
 		loop {
-			self.parse_step();
-			if self.done {
+			self.perform_one_action();
+			let terminated = matches!(self.action_stack.last(), Some(&ParsingAction::Terminate));
+			if terminated {
+				self.debug.log_normal("Done parsing");
 				break;
 			}
 		}
 	}
 
-	fn parse_step(&mut self) {
-		let (tok, loc) = self.tb.pop();
-		self.debug.log_encounter(&format!("{}", tok));
-		let mut top_frame = self.stack.last_mut().unwrap();
-		match &mut top_frame {
-			ParsingFrame::BlockLevel { expected_terminator, .. } => match tok {
-				Tok::Eof => {
-					if matches!(expected_terminator, BlockLevelExpectedTerminator::Eof) {
-						self.done = true;
-					} else {
-						panic!("Unexpected end-of-file at line {}", loc.line());
+	fn perform_one_action(&mut self) {
+		match self.action_stack.pop().unwrap() {
+			ParsingAction::ParseStmtOrStopOnTerminator => {
+				let (tok, loc) = self.tb.peek(0);
+				self.debug.log_peek_token(tok);
+				if let ParsingData::BlockLevel { expected_terminator, .. } =
+					self.data_stack.last().unwrap()
+				{
+					match tok {
+						Tok::Eof => {
+							if matches!(expected_terminator, BlockLevelExpectedTerminator::Eof) {
+								self.action_stack.push(ParsingAction::Terminate);
+							} else {
+								panic!("Unexpected end-of-file at line {}", loc.line());
+							}
+						},
+						Tok::Right(Matched::Curly) => {
+							if matches!(
+								expected_terminator,
+								BlockLevelExpectedTerminator::RightCurly
+							) {
+							} else {
+								//panic!("Unexpected right curly at line {}", loc.line());
+								self.debug
+									.log_normal("TODO: error for unmached right curly");
+								self.action_stack
+									.push(ParsingAction::ParseStmtOrStopOnTerminator);
+								self.action_stack.push(ParsingAction::ParseStmt);
+							}
+						},
+						_ => {
+							self.action_stack
+								.push(ParsingAction::ParseStmtOrStopOnTerminator);
+							self.action_stack.push(ParsingAction::ParseStmt);
+						},
 					}
-				},
-				Tok::Right(Matched::Curly) => {
-					if matches!(
-						expected_terminator,
-						BlockLevelExpectedTerminator::RightCurly
-					) {
-					} else {
-						panic!("Unexpected right curly at line {}", loc.line());
-					}
-				},
-				Tok::Kw(kw) => {
+				} else {
+					panic!()
+				}
+			},
+			ParsingAction::ParseStmt => {
+				let (tok, loc) = self.tb.pop();
+				self.debug.log_consume_token(&tok);
+				if let Tok::Kw(kw) = tok {
 					let stmt_descr = self.lang.stmts.get(&kw);
 					if let Some(stmt_descr) = stmt_descr {
-						self.stack.push(ParsingFrame::Stmt {
+						self.action_stack.push(ParsingAction::AddStmt);
+						self.data_stack.push(ParsingData::Stmt {
 							kw: Node::from(kw, loc),
 							content: None,
 							exts: HashMap::new(),
@@ -151,71 +200,72 @@ impl Parser {
 						match stmt_descr.content_type {
 							ExtType::None => (),
 							ExtType::Expr => {
-								self.stack.push(ParsingFrame::Expr(None));
-								self.debug.log_normal_indent(&format!(
-									"Parsing expression that will be \
-									the main content of the current {} statement",
-									&stmt_descr.name
-								));
+								self.action_stack.push(ParsingAction::SetContent);
+								self.action_stack.push(ParsingAction::ParseContent);
 							},
 							_ => unimplemented!(),
 						}
 					} else {
-						self.debug.log_normal("TODO: handle keyword");
+						self.debug
+							.log_normal(&format!("TODO: handle keyword {}", kw));
 					}
-				},
-				_ => {
-					self.debug.log_normal("TODO: handle token");
-				},
-			},
-			ParsingFrame::Expr(expr) => {
-				if expr.is_none() {
-					self.debug.log_normal("TODO: parse expression");
-					expr.insert(Node::from(Expr::NothingLiteral, loc));
 				} else {
-					self.stack.push(ParsingFrame::ExprEnd);
-					self.debug.log_normal("Done parsing expression");
-					self.debug.log_deindent();
+					self.debug
+						.log_normal(&format!("TODO: handle token {}", tok));
 				}
 			},
-			ParsingFrame::ExprEnd => {
-				self.stack.pop();
-				let expr_frame = self.stack.pop();
-				assert!(matches!(expr_frame, Some(ParsingFrame::Expr(_))));
-				match self.stack.last_mut().unwrap() {
-					ParsingFrame::Stmt { kw, content, exts } => {
-						let expr_node = match expr_frame.unwrap() {
-							ParsingFrame::Expr(expr) => expr,
-							_ => panic!("bug"),
-						}
-						.unwrap();
-						assert!(content.is_none());
-						content.insert(expr_node.map(StmtExt::Expr));
-						self.debug.log_normal("Done parsing statement main content");
-					},
-					_ => unimplemented!(),
-				}
-			},
-			ParsingFrame::Stmt { kw, content, exts } => {
-				if content.is_some() || (content.is_none() && matches!(
-					self.lang.stmts.get(kw.unwrap_ref()).unwrap().content_type,
-					ExtType::None
-				)) {
-					self.debug.log_normal("Done parsing statement");
-					self.debug.log_deindent();
-					if let ParsingFrame::Stmt { kw, content, exts } = self.stack.pop().unwrap() {
-						match self.stack.last_mut().unwrap() {
-							ParsingFrame::BlockLevel { stmts, .. } => {
-								stmts.push(temporary_into_ast_stmt(kw, content, exts))
-							},
-							_ => panic!("bug"),
-						}
-					} else {
-						panic!("bug");
+			ParsingAction::AddStmt => {
+				if let ParsingData::Stmt { kw, content, exts } = self.data_stack.pop().unwrap() {
+					self.debug.log_deindent("Done parsing statement");
+					match self.data_stack.last_mut().unwrap() {
+						ParsingData::BlockLevel { stmts, .. } => {
+							stmts.push(temporary_into_ast_stmt(kw, content, exts))
+						},
+						_ => panic!(),
 					}
 				} else {
 					unimplemented!();
 				}
+			},
+			ParsingAction::ParseContent => {
+				if let ParsingData::Stmt { kw, content, .. } = self.data_stack.last_mut().unwrap() {
+					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
+					match stmt_descr.content_type {
+						ExtType::None => panic!(),
+						ExtType::Expr => {
+							self.debug
+								.log_normal_indent("Parsing expression that is the main content");
+							self.action_stack.push(ParsingAction::ParseExpr);
+						},
+						_ => unimplemented!(),
+					}
+				} else {
+					panic!()
+				}
+			},
+			ParsingAction::SetContent => {
+				let content_data = self.data_stack.pop().unwrap();
+				if let ParsingData::Stmt { kw, content, .. } = self.data_stack.last_mut().unwrap() {
+					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
+					match (&stmt_descr.content_type, content_data) {
+						(ExtType::None, _) => panic!(),
+						(ExtType::Expr, ParsingData::Expr(expr)) => {
+							self.debug.log_deindent("Done parsing main content");
+							content.insert(expr.map(StmtExt::Expr));
+						},
+						_ => unimplemented!(),
+					}
+				} else {
+					panic!()
+				}
+			},
+			ParsingAction::ParseExpr => {
+				self.debug.log_normal_indent("Parsing expression");
+				let (tok, loc) = self.tb.pop();
+				self.debug.log_consume_token(&tok);
+				self.data_stack
+					.push(ParsingData::Expr(Node::from(Expr::NothingLiteral, loc)));
+				self.debug.log_deindent("Done parsing expression");
 			},
 			_ => {
 				unimplemented!();
@@ -289,7 +339,7 @@ fn temporary_into_ast_stmt(
 					let node = content.unwrap();
 					node.map(|ext| match ext {
 						StmtExt::Expr(expr) => expr,
-						_ => panic!("bug"),
+						_ => panic!(),
 					})
 				},
 			},

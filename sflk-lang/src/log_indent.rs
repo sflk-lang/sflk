@@ -22,7 +22,7 @@ impl IndentedLogger {
 		let new_indent = Indent { is_important, style };
 		let mut lines = string.lines();
 		let first_line = lines.next().unwrap_or("");
-		self.print_indents(Some(new_indent.clone()));
+		self.print_indents(Some((new_indent.clone(), StartOrEnd::Start)));
 		writeln!(self.writer, "{}{}{}", style.0, first_line, style.1).unwrap();
 		self.indents.push(new_indent);
 		for line in lines {
@@ -30,8 +30,18 @@ impl IndentedLogger {
 		}
 	}
 
-	pub fn deindent(&mut self) {
-		self.indents.pop().expect("bug: unmatched deindentation");
+	pub fn deindent(&mut self, string: &str) {
+		// TODO: Make this more readable or something.
+		assert!(!self.indents.is_empty());
+		let style = self.indents.last().unwrap().style;
+		let lines: Vec<_> = string.lines().collect();
+		let (last_line, lines) = lines.split_last().unwrap_or((&"", &[]));
+		for line in lines {
+			self.log_line(line, style);
+		}
+		let ended_indent = self.indents.pop().unwrap();
+		self.print_indents(Some((ended_indent, StartOrEnd::End)));
+		writeln!(self.writer, "{}{}{}", style.0, last_line, style.1).unwrap();
 	}
 
 	pub fn log_line(&mut self, line: &str, style: Style) {
@@ -61,13 +71,28 @@ struct Indent {
 }
 
 const INDENT_START: &str = "┌";
+const INDENT_END: &str = "└";
 const INDENT_NORMAL: &str = "│";
 const INDENT_WEAK: &str = "╎";
 
+enum StartOrEnd {
+	Start,
+	End,
+}
+
+impl StartOrEnd {
+	fn indent_text(&self) -> &str {
+		match self {
+			StartOrEnd::Start => INDENT_START,
+			StartOrEnd::End => INDENT_END,
+		}
+	}
+}
+
 impl IndentedLogger {
-	fn print_indents(&mut self, new_indent: Option<Indent>) {
-		let last_important_index = match &new_indent {
-			Some(indent) if indent.is_important => self.indents.len(),
+	fn print_indents(&mut self, added_indent: Option<(Indent, StartOrEnd)>) {
+		let last_important_index = match &added_indent {
+			Some((indent, _)) if indent.is_important => self.indents.len(),
 			_ => self
 				.indents
 				.iter()
@@ -96,11 +121,11 @@ impl IndentedLogger {
 			)
 			.expect("write failure");
 		}
-		if let Some(indent) = new_indent {
+		if let Some((indent, start_or_end)) = added_indent {
 			write!(
 				self.writer,
 				"{}{}{}",
-				indent.style.0, INDENT_START, indent.style.1
+				indent.style.0, start_or_end.indent_text(), indent.style.1
 			)
 			.expect("write failure");
 		}

@@ -127,6 +127,6 @@ fn main() {
 	let mut parser = Parser::new(tfr, parser_logger);
 	let ast = parser.parse_program();
 	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());
-	dbg!(&sir_block);
-	sir::exec_sir_block(sir_block);
+	//dbg!(&sir_block);
+	//sir::exec_sir_block(sir_block);
 }
