@@ -45,7 +45,7 @@ pub struct DebugMem {
 }
 
 impl DebugMem {
-	fn new() -> DebugMem {
+	pub fn new() -> DebugMem {
 		DebugMem { log: IndentedLog::new() }
 	}
 }

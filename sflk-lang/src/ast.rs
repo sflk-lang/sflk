@@ -622,3 +622,15 @@ impl Chop {
 		}
 	}
 }
+
+impl Node<Program> {
+	pub fn print(&self) {
+		// TODO: Clean this old wird stuff.
+		let mut debug_mem = crate::machine::DebugMem::new();
+		debug_mem
+			.log
+			.log_line("Program tree".to_string(), crate::utils::styles::NEGATIVE);
+		crate::stringtree::StringTree::from(self).print(&mut debug_mem.log);
+		debug_mem.log.print_to_stdout();
+	}
+}

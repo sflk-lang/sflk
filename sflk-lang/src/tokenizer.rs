@@ -2,7 +2,7 @@ use crate::{
 	scu::{Loc, SourceCodeUnit},
 	utils::{escape_string, styles},
 };
-use std::{collections::VecDeque, rc::Rc, fmt};
+use std::{collections::VecDeque, rc::Rc, fmt, convert::TryFrom};
 
 #[derive(Debug)]
 pub struct CharReadingHead {
@@ -59,6 +59,24 @@ impl CharReadingHead {
 	}
 }
 
+#[derive(PartialEq, Eq, Hash)]
+pub enum SimpleTok {
+	Kw(Kw),
+	Op(Op),
+}
+
+impl TryFrom<&Tok> for SimpleTok {
+	type Error = ();
+
+	fn try_from(tok: &Tok) -> Result<SimpleTok, Self::Error> {
+		match tok {
+			Tok::Kw(kw) => Ok(SimpleTok::Kw(*kw)),
+			Tok::Op(op) => Ok(SimpleTok::Op(*op)),
+			_ => Err(()),
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub enum Tok {
 	Kw(Kw),
@@ -85,7 +103,7 @@ pub enum Tok {
 	Eof,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum EscapeSequenceError {
 	InvalidFirstCharacter(char),
 	InvalidDigitCharacter(char),
@@ -118,7 +136,7 @@ pub enum Kw {
 	Ix,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
 	Plus,
 	Minus,

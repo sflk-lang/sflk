@@ -14,8 +14,8 @@ mod stringtree;
 mod tokenizer;
 mod utils;
 
-use crate::parser2::{Parser, ParserDebuggingLogger};
 use crate::log_indent::IndentedLogger;
+use crate::parser2::{Parser, ParserDebuggingLogger};
 use crate::scu::SourceCodeUnit;
 use crate::tokenizer::{CharReadingHead, TokBuffer};
 use std::rc::Rc;
@@ -121,11 +121,10 @@ fn main() {
 		tfr.display_all(settings.display_tokens_lines);
 		return;
 	}
-	let parser_logger = ParserDebuggingLogger {
-		logger: Some(IndentedLogger::new()),
-	};
+	let parser_logger = ParserDebuggingLogger { logger: Some(IndentedLogger::new()) };
 	let mut parser = Parser::new(tfr, parser_logger);
 	let ast = parser.parse_program();
+	ast.print();
 	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());
 	dbg!(&sir_block);
 	sir::exec_sir_block(sir_block);
