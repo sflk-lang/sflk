@@ -263,8 +263,14 @@ impl Parser {
 				self.debug.log_normal_indent("Parsing expression");
 				let (tok, loc) = self.tb.pop();
 				self.debug.log_consume_token(&tok);
-				self.data_stack
-					.push(ParsingData::Expr(Node::from(Expr::NothingLiteral, loc)));
+				match tok {
+					Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr(
+						Node::from(Expr::IntegerLiteral(integer_string), loc),
+					)),
+					_ => self
+						.data_stack
+						.push(ParsingData::Expr(Node::from(Expr::NothingLiteral, loc))),
+				}
 				self.debug.log_deindent("Done parsing expression");
 			},
 			_ => {
