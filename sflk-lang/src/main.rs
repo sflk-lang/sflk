@@ -1,3 +1,5 @@
+#![allow(unused)] // TODO: Remove.
+
 mod ast;
 mod log;
 mod log_indent;

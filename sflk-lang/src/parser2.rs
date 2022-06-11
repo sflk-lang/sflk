@@ -1,13 +1,15 @@
+use std::collections::HashMap;
 use crate::{
 	ast::{Node, Program, Stmt},
 	log_indent::IndentedLogger,
 	scu::Loc,
-	tokenizer::{Tok, TokBuffer, Kw},
+	tokenizer::{Kw, Tok, TokBuffer},
 	utils::styles,
 };
 
-enum ParserFrame {
+enum ParsingFrame {
 	Program(Program),
+	Stmt(Stmt),
 }
 
 pub struct ParserDebuggingLogger {
@@ -16,7 +18,7 @@ pub struct ParserDebuggingLogger {
 
 pub struct Parser {
 	tb: TokBuffer,
-	stack: Vec<ParserFrame>,
+	stack: Vec<ParsingFrame>,
 	done: bool,
 	debug: Option<ParserDebuggingLogger>,
 }
@@ -28,10 +30,10 @@ impl Parser {
 
 	pub fn parse_program(&mut self) -> Node<Program> {
 		self.stack
-			.push(ParserFrame::Program(Program { stmts: Vec::new() }));
+			.push(ParsingFrame::Program(Program { stmts: Vec::new() }));
 		self.parse();
 		match self.stack.pop() {
-			Some(ParserFrame::Program(program)) => {
+			Some(ParsingFrame::Program(program)) => {
 				Node::from(program, Loc::total_of(self.tb.scu()))
 			},
 			_ => panic!(),
@@ -62,30 +64,73 @@ impl Parser {
 	}
 
 	fn parse_step(&mut self) {
-		let mut top_frame = self.stack.pop().unwrap();
+		let (tok, loc) = self.tb.pop();
+		self.log_encounter(&format!("{}", tok));
+		let mut top_frame = self.stack.last_mut().unwrap();
 		match &mut top_frame {
-			ParserFrame::Program(program) => {
-				let (tok, loc) = self.tb.peek(0).clone();
-				self.log_encounter(&format!("{}", tok));
+			ParsingFrame::Program(program) => {
 				match tok {
 					Tok::Eof => {
 						self.done = true;
 					},
 					Tok::Kw(Kw::Np) => {
-						self.tb.pop();
 						program.stmts.push(Node::from(Stmt::Nop, loc));
 					},
+					Tok::Kw(Kw::Pr) => {
+						self.log_normal("TODO");
+					},
 					_ => {
-						self.tb.pop();
 						self.log_normal("TODO");
 					},
 				}
 			},
 			_ => {
-				self.tb.pop();
 				unimplemented!();
 			},
 		}
-		self.stack.push(top_frame);
+	}
+}
+
+enum ExtType {
+	Stmt,
+	Expr,
+	Targ,
+	None,
+}
+
+struct StmtExtDescr {
+	content_type: ExtType,
+	optional: bool,
+	/// Can this extention be present multiple times in the same statement?
+	can_stack: bool,
+}
+
+struct StmtDescr {
+	content_type: ExtType,
+	extentions: HashMap<Kw, StmtExtDescr>,
+}
+
+struct LanguageDescr {
+	stmts: HashMap<Kw, StmtDescr>,
+}
+
+impl LanguageDescr {
+	fn new() -> LanguageDescr {
+		let mut stmts = HashMap::new();
+		stmts.insert(
+			Kw::Np,
+			StmtDescr {
+				content_type: ExtType::None,
+				extentions: HashMap::new(),
+			},
+		);
+		stmts.insert(
+			Kw::Pr,
+			StmtDescr {
+				content_type: ExtType::Expr,
+				extentions: HashMap::new(),
+			},
+		);
+		LanguageDescr { stmts }
 	}
 }
