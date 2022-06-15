@@ -1,4 +1,4 @@
 np
-pr 9 nl
+pr "h" nl
 pr 18 - 8 - 4 + 2 nl # 8 #
 pr $

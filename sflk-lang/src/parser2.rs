@@ -331,6 +331,10 @@ impl Parser {
 						init: Node::from(Expr::IntegerLiteral(integer_string), loc),
 						chops: Vec::new(),
 					}),
+					Tok::String { content, .. } => self.data_stack.push(ParsingData::Expr {
+						init: Node::from(Expr::StringLiteral(content), loc),
+						chops: Vec::new(),
+					}),
 					_ => {
 						let error_string = format!("Unexpected token {}", tok);
 						self.debug.log_error(&error_string);
