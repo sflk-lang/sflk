@@ -46,8 +46,6 @@ enum ParsingData {
 		chops: Vec<Chop>,
 	},
 	Binop(Node<Binop>),
-	DummyStmt, // TODO: Remoe when not needed anymore.
-	DummyExpr, // TODO: Remoe when not needed anymore.
 	StmtInvalid {
 		error: Node<Expr>,
 	},
@@ -62,6 +60,8 @@ struct Chop {
 enum Binop {
 	Plus,
 	Minus,
+	Star,
+	Slash,
 }
 
 /// Each of these should represent one simple action that the parser may perform.
@@ -269,13 +269,6 @@ impl Parser {
 					}
 					self.debug.log_deindent("Done parsing statement");
 				},
-				ParsingData::DummyStmt => {
-					assert!(matches!(
-						self.data_stack.last_mut().unwrap(),
-						ParsingData::BlockLevel { .. }
-					));
-					self.debug.log_deindent("Done parsing statement");
-				},
 				ParsingData::StmtInvalid { error } => {
 					let loc = error.loc().clone();
 					match self.data_stack.last_mut().unwrap() {
@@ -461,6 +454,8 @@ impl LanguageDescr {
 		let mut binops = HashMap::new();
 		binops.insert(SimpleTok::Op(Op::Plus), Binop::Plus);
 		binops.insert(SimpleTok::Op(Op::Minus), Binop::Minus);
+		binops.insert(SimpleTok::Op(Op::Star), Binop::Star);
+		binops.insert(SimpleTok::Op(Op::Slash), Binop::Slash);
 		LanguageDescr { stmts, binops }
 	}
 }
@@ -506,6 +501,8 @@ fn temporary_into_ast_expr(init: Node<Expr>, chops: Vec<Chop>) -> Node<Expr> {
 					match binop.unwrap() {
 						Binop::Plus => Node::from(AstChop::Plus(expr), loc),
 						Binop::Minus => Node::from(AstChop::Minus(expr), loc),
+						Binop::Star => Node::from(AstChop::Star(expr), loc),
+						Binop::Slash => Node::from(AstChop::Slash(expr), loc),
 					}
 				}
 			})
