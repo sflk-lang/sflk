@@ -48,6 +48,9 @@ enum ParsingData {
 	Binop(Node<Binop>),
 	DummyStmt, // TODO: Remoe when not needed anymore.
 	DummyExpr, // TODO: Remoe when not needed anymore.
+	StmtInvalid {
+		error: Node<Expr>,
+	},
 }
 
 struct Chop {
@@ -97,6 +100,12 @@ impl ParserDebuggingLogger {
 	fn log_normal_indent(&mut self, string: &str) {
 		if let Some(logger) = &mut self.logger {
 			logger.indent(string, false, styles::NORMAL);
+		}
+	}
+
+	fn log_error_indent(&mut self, string: &str) {
+		if let Some(logger) = &mut self.logger {
+			logger.indent(string, false, styles::BOLD_LIGHT_RED);
 		}
 	}
 
@@ -228,14 +237,20 @@ impl Parser {
 							_ => unimplemented!(),
 						}
 					} else {
-						self.debug
-							.log_normal_indent(&format!("TODO: handle keyword {}", kw));
-						self.data_stack.push(ParsingData::DummyStmt);
+						let error_string = format!("Unexpected keyword {}", kw);
+						let error_line_string = format!("{} on line {}", error_string, loc.line());
+						self.debug.log_error_indent(&error_string);
+						self.data_stack.push(ParsingData::StmtInvalid {
+							error: Node::from(Expr::StringLiteral(error_line_string), loc),
+						});
 					}
 				} else {
-					self.debug
-						.log_normal_indent(&format!("TODO: handle token {}", tok));
-					self.data_stack.push(ParsingData::DummyStmt);
+					let error_string = format!("Unexpected token {}", tok);
+					let error_line_string = format!("{} on line {}", error_string, loc.line());
+					self.debug.log_error_indent(&error_string);
+					self.data_stack.push(ParsingData::StmtInvalid {
+						error: Node::from(Expr::StringLiteral(error_line_string), loc),
+					});
 				}
 			},
 			ParsingAction::AddStmt => match self.data_stack.pop().unwrap() {
@@ -253,6 +268,16 @@ impl Parser {
 						self.data_stack.last_mut().unwrap(),
 						ParsingData::BlockLevel { .. }
 					));
+					self.debug.log_deindent("Done parsing statement");
+				},
+				ParsingData::StmtInvalid { error } => {
+					let loc = error.loc().clone();
+					match self.data_stack.last_mut().unwrap() {
+						ParsingData::BlockLevel { stmts, .. } => {
+							stmts.push(Node::from(Stmt::Invalid { error_expr: error }, loc));
+						},
+						_ => panic!(),
+					}
 					self.debug.log_deindent("Done parsing statement");
 				},
 				_ => {

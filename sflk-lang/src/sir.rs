@@ -1,6 +1,6 @@
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
-	parser::{Parser},
+	parser::Parser,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
 };
@@ -843,6 +843,15 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			} else {
 				sir_instrs.push(SirInstr::Discard);
 			}
+		},
+		Stmt::Invalid { error_expr } => {
+			expr_to_sir_instrs(error_expr.unwrap_ref(), sir_instrs);
+			sir_instrs.push(SirInstr::IntoPrintSignal);
+			sir_instrs.push(SirInstr::EmitSignal);
+			sir_instrs.push(SirInstr::Discard);
+			sir_instrs.push(SirInstr::PushNewlineSignal);
+			sir_instrs.push(SirInstr::EmitSignal);
+			sir_instrs.push(SirInstr::Discard);
 		},
 		h => unimplemented!("{:?}", h),
 	}

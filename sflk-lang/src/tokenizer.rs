@@ -2,7 +2,7 @@ use crate::{
 	scu::{Loc, SourceCodeUnit},
 	utils::{escape_string, styles},
 };
-use std::{collections::VecDeque, rc::Rc, fmt, convert::TryFrom};
+use std::{collections::VecDeque, convert::TryFrom, fmt, rc::Rc};
 
 #[derive(Debug)]
 pub struct CharReadingHead {
@@ -655,7 +655,10 @@ impl TokBuffer {
 			if line_numbers {
 				print!("\t");
 			}
-			println!("{}", tok);
+			match tok {
+				Tok::InvalidCharacter(_) => println!("\x1b31m{}\x1b39m", tok),
+				_ => println!("{}", tok),
+			}
 			if matches!(tok, Tok::Eof) {
 				break;
 			}
@@ -688,7 +691,7 @@ impl fmt::Display for Tok {
 			Tok::String { content, .. } => {
 				write!(f, "string \"{}\"", escape_string(content, &styles::NORMAL))
 			},
-			Tok::InvalidCharacter(c) => write!(f, "\x1b[31minvalid character\x1b[39m {}", c),
+			Tok::InvalidCharacter(c) => write!(f, "invalid character {}", c),
 			Tok::Eof => write!(f, "end-of-file"),
 		}
 	}

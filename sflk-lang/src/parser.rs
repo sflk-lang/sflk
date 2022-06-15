@@ -173,7 +173,7 @@ impl Parser {
 			stmt_node
 		} else {
 			let (_tok, loc) = tb.pop();
-			Node::from(Stmt::Invalid, loc)
+			Node::from(unimplemented!(), loc)
 		};
 		stmt_node.add_left_comments(left_comments);
 		stmt_node
@@ -345,7 +345,7 @@ impl Parser {
 				_ => {
 					let kw_loc = first_loc.clone();
 					tb.disc();
-					Some(Node::from(Stmt::Invalid, kw_loc)) // TODO: do
+					Some(Node::from(unimplemented!(), kw_loc)) // TODO: do
 				},
 			}
 		} else {

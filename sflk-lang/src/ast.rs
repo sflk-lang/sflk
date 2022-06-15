@@ -151,7 +151,9 @@ pub enum Stmt {
 		expr: Node<Expr>,
 		target: Option<Node<TargetExpr>>,
 	},
-	Invalid, // TODO: Add error details
+	Invalid {
+		error_expr: Node<Expr>,
+	},
 }
 
 #[derive(Debug)]
@@ -410,7 +412,11 @@ impl Treeable for Stmt {
 					vec
 				})
 			},
-			Stmt::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
+			Stmt::Invalid { error_expr } => StringTree::new_node(
+				"invalid".to_string(),
+				styles::BOLD_LIGHT_RED,
+				vec![StringTree::from(error_expr)],
+			),
 		}
 	}
 }
@@ -483,7 +489,7 @@ impl Stmt {
 					.map(|target_expr| (*target_expr).content.is_invalid())
 					.unwrap_or(false)
 			},
-			Stmt::Invalid => true,
+			Stmt::Invalid { .. } => true,
 		}
 	}
 
@@ -517,19 +523,19 @@ impl Stmt {
 			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
 			}, */
 			Stmt::Loop { .. } => unimplemented!(), /* program::Stmt::Loop {
-				wh_expr: wh_expr
-					.as_ref()
-					.map(|expr| ((*expr).content.to_machine_expr())),
-				bd_stmt: bd_stmt
-					.as_ref()
-					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-				sp_stmt: sp_stmt
-					.as_ref()
-					.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+			wh_expr: wh_expr
+			.as_ref()
+			.map(|expr| ((*expr).content.to_machine_expr())),
+			bd_stmt: bd_stmt
+			.as_ref()
+			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
+			sp_stmt: sp_stmt
+			.as_ref()
+			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
 			}, */
 			Stmt::RegisterInterceptor { .. } => unimplemented!(),
 			Stmt::Emit { .. } => unimplemented!(),
-			Stmt::Invalid => program::Stmt::Invalid,
+			Stmt::Invalid { .. } => program::Stmt::Invalid,
 		}
 	}
 }
