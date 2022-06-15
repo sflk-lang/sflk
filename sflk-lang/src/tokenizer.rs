@@ -656,7 +656,7 @@ impl TokBuffer {
 				print!("\t");
 			}
 			match tok {
-				Tok::InvalidCharacter(_) => println!("\x1b31m{}\x1b39m", tok),
+				Tok::InvalidCharacter(_) => println!("\x1b[31m{}\x1b[39m", tok),
 				_ => println!("{}", tok),
 			}
 			if matches!(tok, Tok::Eof) {
