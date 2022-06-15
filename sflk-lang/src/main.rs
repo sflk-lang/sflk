@@ -40,7 +40,8 @@ const NO_WARRANTY_NOTE: &str = "\
 struct Settings {
 	path: String,
 	root_filename: Option<String>,
-	debug_mode: bool,
+	debug: bool,
+	debug_lines: bool,
 	wants_help: bool,
 	wants_version: bool,
 	display_tokens: bool,
@@ -53,7 +54,8 @@ impl Settings {
 		let mut settings = Settings {
 			path: args.next().unwrap_or_else(|| "sflk".to_string()),
 			root_filename: None,
-			debug_mode: false,
+			debug: false,
+			debug_lines: false,
 			wants_help: false,
 			wants_version: false,
 			display_tokens: false,
@@ -61,7 +63,10 @@ impl Settings {
 		};
 		for arg in args {
 			if arg == "-d" || arg == "--debug" {
-				settings.debug_mode = true;
+				settings.debug = true;
+			} else if arg == "--debug-lines" {
+				settings.debug = true;
+				settings.debug_lines = true;
 			} else if arg == "-h" || arg == "--help" {
 				settings.wants_help = true;
 			} else if arg == "-v" || arg == "--version" {
@@ -106,7 +111,7 @@ fn main() {
 	}
 
 	/*
-	let mut mem = machine::Mem::new(settings.debug_mode);
+	let mut mem = machine::Mem::new(settings.debug);
 	mem.exec_file(settings.root_filename.unwrap());
 	if let Some(debug_mem) = mem.debug_mem_opt {
 		debug_mem.log.print_to_stdout();
@@ -121,18 +126,26 @@ fn main() {
 		tfr.display_all(settings.display_tokens_lines);
 		return;
 	}
-	let parser_logger = if settings.debug_mode {
-		ParserDebuggingLogger { logger: Some(IndentedLogger::new()) }
+	let parser_logger = if settings.debug {
+		ParserDebuggingLogger {
+			logger: Some(IndentedLogger::new()),
+			log_lines: settings.debug_lines,
+			last_line: 0,
+		}
 	} else {
-		ParserDebuggingLogger { logger: None }
+		ParserDebuggingLogger {
+			logger: None,
+			log_lines: settings.debug_lines,
+			last_line: 0,
+		}
 	};
 	let mut parser = Parser::new(tfr, parser_logger);
 	let ast = parser.parse_program();
-	if settings.debug_mode {
+	if settings.debug {
 		ast.print();
 	}
 	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());
-	if settings.debug_mode {
+	if settings.debug {
 		dbg!(&sir_block);
 	}
 	sir::exec_sir_block(sir_block);

@@ -87,7 +87,8 @@ enum ParsingAction {
 
 pub struct ParserDebuggingLogger {
 	pub logger: Option<IndentedLogger>,
-	// Logging parameters should be added here...
+	pub log_lines: bool,
+	pub last_line: usize,
 }
 
 impl ParserDebuggingLogger {
@@ -121,13 +122,24 @@ impl ParserDebuggingLogger {
 		}
 	}
 
-	fn log_peek_token(&mut self, tok: &Tok) {
+	fn log_line_number_if_new(&mut self, line: usize) {
+		if let Some(logger) = &mut self.logger {
+			if self.log_lines && self.last_line != line {
+				logger.log_string(&format!("Line {}", line), styles::NORMAL);
+				self.last_line = line;
+			}
+		}
+	}
+
+	fn log_peek_token(&mut self, tok: &Tok, loc: &Loc) {
+		self.log_line_number_if_new(loc.line());
 		if let Some(logger) = &mut self.logger {
 			logger.log_string(&format!("Peek {}", tok), styles::NORMAL);
 		}
 	}
 
-	fn log_consume_token(&mut self, tok: &Tok) {
+	fn log_consume_token(&mut self, tok: &Tok, loc: &Loc) {
+		self.log_line_number_if_new(loc.line());
 		if let Some(logger) = &mut self.logger {
 			logger.log_string(&format!("Consume {}", tok), styles::NORMAL);
 		}
@@ -183,7 +195,7 @@ impl Parser {
 		match self.action_stack.pop().unwrap() {
 			ParsingAction::ParseStmtOrStop => {
 				let (tok, loc) = self.tb.peek(0);
-				self.debug.log_peek_token(tok);
+				self.debug.log_peek_token(tok, loc);
 				if let ParsingData::BlockLevel { expected_terminator, .. } =
 					self.data_stack.last().unwrap()
 				{
@@ -221,7 +233,7 @@ impl Parser {
 			},
 			ParsingAction::ParseStmt => {
 				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok);
+				self.debug.log_consume_token(&tok, &loc);
 				if let Tok::Kw(kw) = tok {
 					let stmt_descr = self.lang.stmts.get(&kw);
 					if let Some(stmt_descr) = stmt_descr {
@@ -318,7 +330,7 @@ impl Parser {
 			},
 			ParsingAction::ParseNonChainExpr => {
 				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok);
+				self.debug.log_consume_token(&tok, &loc);
 				match tok {
 					Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
 						init: Node::from(Expr::IntegerLiteral(integer_string), loc),
@@ -354,7 +366,7 @@ impl Parser {
 			},
 			ParsingAction::ParseChopOrStop => {
 				let (tok, loc) = self.tb.peek(0);
-				self.debug.log_peek_token(tok);
+				self.debug.log_peek_token(tok, loc);
 				let simple_tok = SimpleTok::try_from(tok).ok();
 				if simple_tok.is_some() && self.lang.binops.contains_key(&simple_tok.unwrap()) {
 					self.action_stack.push(ParsingAction::ParseChopOrStop);
@@ -365,7 +377,7 @@ impl Parser {
 			ParsingAction::ParseChop => {
 				self.debug.log_normal_indent("Parsing chain operation");
 				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok);
+				self.debug.log_consume_token(&tok, &loc);
 				let simple_tok = SimpleTok::try_from(&tok).unwrap();
 				assert!(self.lang.binops.contains_key(&simple_tok));
 				self.data_stack.push(ParsingData::Binop(Node::from(
