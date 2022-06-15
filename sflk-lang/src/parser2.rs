@@ -103,6 +103,12 @@ impl ParserDebuggingLogger {
 		}
 	}
 
+	fn log_error(&mut self, string: &str) {
+		if let Some(logger) = &mut self.logger {
+			logger.log_string(string, styles::BOLD_LIGHT_RED);
+		}
+	}
+
 	fn log_error_indent(&mut self, string: &str) {
 		if let Some(logger) = &mut self.logger {
 			logger.indent(string, false, styles::BOLD_LIGHT_RED);
@@ -325,10 +331,23 @@ impl Parser {
 						init: Node::from(Expr::IntegerLiteral(integer_string), loc),
 						chops: Vec::new(),
 					}),
-					_ => self.data_stack.push(ParsingData::Expr {
-						init: Node::from(Expr::NothingLiteral, loc),
-						chops: Vec::new(),
-					}),
+					_ => {
+						let error_string = format!("Unexpected token {}", tok);
+						self.debug.log_error(&error_string);
+						let error_line_string = format!("{} on line {}", error_string, loc.line());
+						self.data_stack.push(ParsingData::Expr {
+							init: Node::from(
+								Expr::Invalid {
+									error_expr: Box::new(Node::from(
+										Expr::StringLiteral(error_line_string),
+										loc.clone(),
+									)),
+								},
+								loc,
+							),
+							chops: Vec::new(),
+						})
+					},
 				}
 			},
 			ParsingAction::ParseExpr => {

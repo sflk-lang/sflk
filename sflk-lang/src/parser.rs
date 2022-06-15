@@ -486,7 +486,7 @@ impl Parser {
 					}
 				}
 			},
-			_ => Node::from(Expr::Invalid, left_loc), // TODO: do!
+			_ => Node::from(unimplemented!(), left_loc), // TODO: do!
 		}
 	}
 

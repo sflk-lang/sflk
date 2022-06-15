@@ -660,6 +660,7 @@ fn peform_signal(signal: Object) -> Object {
 					print!("{}", string);
 					Object::Nothing
 				},
+				Some(Object::Nothing) => Object::Nothing,
 				_ => unimplemented!(),
 			},
 			Some(Object::String(sig_name)) if sig_name == "newline" => {
@@ -933,6 +934,16 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 					_ => unimplemented!(),
 				}
 			}
+		},
+		Expr::Invalid { error_expr } => {
+			expr_to_sir_instrs(error_expr.unwrap_ref(), sir_instrs);
+			sir_instrs.push(SirInstr::IntoPrintSignal);
+			sir_instrs.push(SirInstr::EmitSignal);
+			sir_instrs.push(SirInstr::Discard);
+			sir_instrs.push(SirInstr::PushNewlineSignal);
+			sir_instrs.push(SirInstr::EmitSignal);
+			sir_instrs.push(SirInstr::Discard);
+			sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing });
 		},
 		_ => unimplemented!(),
 	}

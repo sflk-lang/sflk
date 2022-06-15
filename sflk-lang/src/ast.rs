@@ -172,7 +172,7 @@ pub enum Expr {
 	Input,
 	Unop(Unop),
 	Chain { init: Box<Node<Expr>>, chops: Vec<Node<Chop>> },
-	Invalid, // TODO: Add error details
+	Invalid { error_expr: Box<Node<Expr>> },
 }
 
 #[derive(Debug)]
@@ -283,7 +283,11 @@ impl Treeable for Expr {
 					.chain(chops.iter().map(StringTree::from))
 					.collect(),
 			),
-			Expr::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
+			Expr::Invalid { error_expr } => StringTree::new_node(
+				"invalid".to_string(),
+				styles::BOLD_LIGHT_RED,
+				vec![StringTree::from(&**error_expr)],
+			),
 		}
 	}
 }
@@ -563,7 +567,7 @@ impl Expr {
 				(*init).content.is_invalid()
 					|| chops.iter().any(|chop| (*chop).content.is_invalid())
 			},
-			Expr::Invalid => true,
+			Expr::Invalid { .. } => true,
 		}
 	}
 
@@ -594,7 +598,7 @@ impl Expr {
 					.map(|chop_node| chop_node.content.to_machine_chop())
 					.collect(),
 			}),
-			Expr::Invalid => unreachable!(),
+			Expr::Invalid { .. } => unreachable!(),
 		}
 	}
 }
