@@ -41,6 +41,10 @@ enum ParsingData {
 		content: Option<Node<StmtExt>>,
 		exts: HashMap<Kw, Vec<StmtExt>>,
 	},
+	AssignmentStmt {
+		target: Node<TargetExpr>,
+		content: Option<Node<Expr>>,
+	},
 	Expr {
 		init: Node<Expr>,
 		chops: Vec<Chop>,
@@ -78,6 +82,7 @@ enum ParsingAction {
 	AddStmt,           // (block stmt -- block)
 	ParseContent,      // (stmt -- stmt content)
 	SetContent,        // (stmt content -- stmt)
+	ConfirmToLeft,     // (stmt -- stmt)
 	ParseExpr,         // ( -- expr)
 	ParseNonChainExpr, // ( -- expr)
 	ParseChopOrStop,
@@ -262,6 +267,16 @@ impl Parser {
 							error: Node::from(Expr::StringLiteral(error_line_string), loc),
 						});
 					}
+				} else if let Tok::Name { string, .. } = tok {
+					self.debug
+						.log_normal_indent("Parsing an assignment statement");
+					self.data_stack.push(ParsingData::AssignmentStmt {
+						target: Node::from(TargetExpr::VariableName(string), loc),
+						content: None,
+					});
+					self.action_stack.push(ParsingAction::SetContent);
+					self.action_stack.push(ParsingAction::ParseContent);
+					self.action_stack.push(ParsingAction::ConfirmToLeft);
 				} else {
 					let error_string = format!("Unexpected token {}", tok);
 					let error_line_string = format!("{} on line {}", error_string, loc.line());
@@ -276,6 +291,19 @@ impl Parser {
 					match self.data_stack.last_mut().unwrap() {
 						ParsingData::BlockLevel { stmts, .. } => {
 							stmts.push(temporary_into_ast_stmt(kw, content, exts));
+						},
+						_ => panic!(),
+					}
+					self.debug.log_deindent("Done parsing statement");
+				},
+				ParsingData::AssignmentStmt { target, content } => {
+					match self.data_stack.last_mut().unwrap() {
+						ParsingData::BlockLevel { stmts, .. } => {
+							let loc = target.loc() + content.as_ref().unwrap().loc();
+							stmts.push(Node::from(
+								(Stmt::Assign { target, expr: content.unwrap() }),
+								loc,
+							));
 						},
 						_ => panic!(),
 					}
@@ -296,7 +324,7 @@ impl Parser {
 				},
 			},
 			ParsingAction::ParseContent => {
-				if let ParsingData::Stmt { kw, content, .. } = self.data_stack.last_mut().unwrap() {
+				if let ParsingData::Stmt { kw, .. } = self.data_stack.last().unwrap() {
 					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
 					match stmt_descr.content_type {
 						ExtType::None => panic!(),
@@ -307,8 +335,12 @@ impl Parser {
 						},
 						_ => unimplemented!(),
 					}
+				} else if let ParsingData::AssignmentStmt { .. } = self.data_stack.last().unwrap() {
+					self.debug
+						.log_normal_indent("Parsing expression that is the main content");
+					self.action_stack.push(ParsingAction::ParseExpr);
 				} else {
-					panic!()
+					panic!();
 				}
 			},
 			ParsingAction::SetContent => {
@@ -324,8 +356,31 @@ impl Parser {
 						},
 						_ => unimplemented!(),
 					}
+				} else if let ParsingData::AssignmentStmt { content, .. } =
+					self.data_stack.last_mut().unwrap()
+				{
+					self.debug.log_deindent("Done parsing expression");
+					self.debug.log_deindent("Done parsing main content");
+					if let ParsingData::Expr { init, chops } = content_data {
+						content.insert(temporary_into_ast_expr(init, chops));
+					} else {
+						panic!();
+					}
 				} else {
-					panic!()
+					panic!();
+				}
+			},
+			ParsingAction::ConfirmToLeft => {
+				let (tok, loc) = self.tb.pop();
+				self.debug.log_consume_token(&tok, &loc);
+				if let Tok::Op(Op::ToLeft) = tok {
+				} else {
+					self.debug.log_error(&format!(
+						"Expected {} for assignment statement but got {} at line {}",
+						Tok::Op(Op::ToLeft),
+						tok,
+						loc.line()
+					));
 				}
 			},
 			ParsingAction::ParseNonChainExpr => {
@@ -338,6 +393,10 @@ impl Parser {
 					}),
 					Tok::String { content, .. } => self.data_stack.push(ParsingData::Expr {
 						init: Node::from(Expr::StringLiteral(content), loc),
+						chops: Vec::new(),
+					}),
+					Tok::Name { string, .. } =>  self.data_stack.push(ParsingData::Expr {
+						init: Node::from(Expr::VariableName(string), loc),
 						chops: Vec::new(),
 					}),
 					_ => {
