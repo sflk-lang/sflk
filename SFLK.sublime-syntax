@@ -43,7 +43,7 @@ contexts:
     - match: '[0-9]+'
       scope: constant.numeric.integer.decimal.sflk
     - match: '(<)'
-      scope: keyword.operator.assignment.flk
+      scope: keyword.other.sflk
     - match: '\+|\-|\*|/'
       scope: keyword.operator.arithmetic.sflk
     - match: '(>)\s*({{name}})'

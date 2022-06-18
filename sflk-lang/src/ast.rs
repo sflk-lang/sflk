@@ -340,32 +340,31 @@ impl Treeable for Stmt {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::If { .. } => {
-				/*
-				StringTree::new_node("if".to_string(), styles::NORMAL, {
-					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
-					vec.push(StringTree::from(cond_expr));
-					if let Some(stmt) = th_stmt {
-						vec.push(StringTree::from(&**stmt));
-					} else {
-						vec.push(StringTree::new_leaf(
-							"no then branch".to_string(),
+			Stmt::If { cond_expr, th_stmts, el_stmts } => StringTree::new_node(
+				"if".to_string(),
+				styles::NORMAL,
+				vec![
+					StringTree::from(cond_expr),
+					if !th_stmts.is_empty() {
+						StringTree::new_node(
+							"then branch".to_string(),
 							styles::NORMAL,
-						));
-					}
-					if let Some(stmt) = el_stmt {
-						vec.push(StringTree::from(&**stmt));
+							th_stmts.iter().map(StringTree::from).collect(),
+						)
 					} else {
-						vec.push(StringTree::new_leaf(
-							"no else branch".to_string(),
+						StringTree::new_leaf("no then branch".to_string(), styles::NORMAL)
+					},
+					if !el_stmts.is_empty() {
+						StringTree::new_node(
+							"else branch".to_string(),
 							styles::NORMAL,
-						));
-					}
-					vec
-				})
-				*/
-				unimplemented!()
-			},
+							el_stmts.iter().map(StringTree::from).collect(),
+						)
+					} else {
+						StringTree::new_leaf("no else branch".to_string(), styles::NORMAL)
+					},
+				],
+			),
 			Stmt::Loop { .. } => {
 				/*
 				StringTree::new_node("loop".to_string(), styles::NORMAL, {

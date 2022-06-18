@@ -39,8 +39,9 @@ enum ParsingData {
 	Stmt {
 		kw: Node<Kw>,
 		content: Option<Node<StmtExt>>,
-		exts: HashMap<Kw, Vec<StmtExt>>,
+		exts: HashMap<Kw, Vec<Node<StmtExt>>>,
 	},
+	ExtKw(Node<Kw>),
 	AssignmentStmt {
 		target: Node<TargetExpr>,
 		content: Option<Node<Expr>>,
@@ -78,11 +79,14 @@ enum Binop {
 enum ParsingAction {
 	Terminate,
 	ParseStmtOrStop,
-	ParseStmt,         // ( -- stmt)
-	AddStmt,           // (block stmt -- block)
-	ParseContent,      // (stmt -- stmt content)
-	SetContent,        // (stmt content -- stmt)
-	ConfirmToLeft,     // (stmt -- stmt)
+	ParseStmt,     // ( -- stmt)
+	AddStmt,       // (block stmt -- block)
+	ParseContent,  // (stmt -- stmt content)
+	SetContent,    // (stmt content -- stmt)
+	ConfirmToLeft, // (stmt -- stmt)
+	ParseExtOrStop,
+	ParseExt,          // (stmt -- stmt kw ext)
+	SetExt,            // (stmt kw ext -- stmt)
 	ParseExpr,         // ( -- expr)
 	ParseNonChainExpr, // ( -- expr)
 	ParseChopOrStop,
@@ -249,8 +253,11 @@ impl Parser {
 						self.data_stack.push(ParsingData::Stmt {
 							kw: Node::from(kw, loc),
 							content: None,
-							exts: HashMap::new(),
+							exts: stmt_descr.initial_exts_map(),
 						});
+						if !stmt_descr.extentions.is_empty() {
+							self.action_stack.push(ParsingAction::ParseExtOrStop);
+						}
 						match stmt_descr.content_type {
 							ExtType::None => (),
 							ExtType::Expr => {
@@ -288,6 +295,16 @@ impl Parser {
 			},
 			ParsingAction::AddStmt => match self.data_stack.pop().unwrap() {
 				ParsingData::Stmt { kw, content, exts } => {
+					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
+					for (ext_kw, ext_descr) in stmt_descr.extentions.iter() {
+						if !ext_descr.optional && exts.get(ext_kw).unwrap().is_empty() {
+							panic!(
+								"Extention {} is non-optional but \
+								does not appear in the same statement",
+								ext_kw
+							);
+						}
+					}
 					match self.data_stack.last_mut().unwrap() {
 						ParsingData::BlockLevel { stmts, .. } => {
 							stmts.push(temporary_into_ast_stmt(kw, content, exts));
@@ -383,6 +400,109 @@ impl Parser {
 					));
 				}
 			},
+			ParsingAction::ParseExtOrStop => {
+				let (tok, loc) = self.tb.peek(0);
+				self.debug.log_peek_token(tok, loc);
+				let has_ext = if let Tok::Kw(ext_kw) = tok {
+					if let ParsingData::Stmt { kw, .. } = self.data_stack.last().unwrap() {
+						self.lang
+							.stmts
+							.get(kw.unwrap_ref())
+							.unwrap()
+							.extentions
+							.contains_key(ext_kw)
+					} else {
+						false
+					}
+				} else {
+					false
+				};
+				if has_ext {
+					self.action_stack.push(ParsingAction::ParseExtOrStop);
+					self.action_stack.push(ParsingAction::SetExt);
+					self.action_stack.push(ParsingAction::ParseExt);
+				}
+			},
+			ParsingAction::ParseExt => {
+				let (tok, loc) = self.tb.pop();
+				self.debug.log_consume_token(&tok, &loc);
+				let ext_kw = if let Tok::Kw(ext_kw) = tok {
+					ext_kw
+				} else {
+					panic!()
+				};
+				let ext_descr =
+					if let ParsingData::Stmt { kw, .. } = self.data_stack.last().unwrap() {
+						self.lang
+							.stmts
+							.get(kw.unwrap_ref())
+							.unwrap()
+							.extentions
+							.get(&ext_kw)
+							.unwrap()
+					} else {
+						panic!();
+					};
+				if !ext_descr.can_stack {
+					if let ParsingData::Stmt { exts, .. } = self.data_stack.last().unwrap() {
+						if !exts.get(&ext_kw).unwrap().is_empty() {
+							panic!(
+								"Extention {} is non-stackable but appears \
+								multiple times in the same statement",
+								ext_kw
+							);
+						}
+					} else {
+						panic!();
+					};
+				}
+				self.debug
+					.log_normal_indent(&format!("Parsing extention {}", ext_kw));
+				self.data_stack
+					.push(ParsingData::ExtKw(Node::from(ext_kw, loc)));
+				match ext_descr.content_type {
+					ExtType::None => todo!(),
+					ExtType::Expr => todo!(),
+					ExtType::Targ => todo!(),
+					ExtType::Stmt => {
+						self.action_stack.push(ParsingAction::ParseStmt);
+					},
+				}
+			},
+			ParsingAction::SetExt => {
+				let content_data = self.data_stack.pop().unwrap();
+				let ext_kw = if let ParsingData::ExtKw(ext_kw) = self.data_stack.pop().unwrap() {
+					ext_kw
+				} else {
+					panic!()
+				};
+				if let ParsingData::Stmt { kw, exts, .. } = self.data_stack.last_mut().unwrap() {
+					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
+					match (
+						&stmt_descr
+							.extentions
+							.get(ext_kw.unwrap_ref())
+							.unwrap()
+							.content_type,
+						content_data,
+					) {
+						(ExtType::None, _) => panic!(),
+						(ExtType::Stmt, ParsingData::Stmt { kw: kw_, content, exts: exts_ }) => {
+							self.debug.log_deindent("Done parsing statement");
+							self.debug.log_deindent(&format!(
+								"Done parsing extention {}",
+								ext_kw.unwrap_ref()
+							));
+							exts.get_mut(ext_kw.unwrap_ref()).unwrap().push(
+								temporary_into_ast_stmt(kw_, content, exts_).map(StmtExt::Stmt),
+							);
+						},
+						_ => unimplemented!(),
+					}
+				} else {
+					panic!();
+				}
+			},
 			ParsingAction::ParseNonChainExpr => {
 				let (tok, loc) = self.tb.pop();
 				self.debug.log_consume_token(&tok, &loc);
@@ -395,7 +515,7 @@ impl Parser {
 						init: Node::from(Expr::StringLiteral(content), loc),
 						chops: Vec::new(),
 					}),
-					Tok::Name { string, .. } =>  self.data_stack.push(ParsingData::Expr {
+					Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
 						init: Node::from(Expr::VariableName(string), loc),
 						chops: Vec::new(),
 					}),
@@ -522,6 +642,34 @@ impl LanguageDescr {
 				extentions: HashMap::new(),
 			},
 		);
+		stmts.insert(
+			Kw::If,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "print".to_string(),
+				content_type: ExtType::Expr,
+				extentions: {
+					let mut exts = HashMap::new();
+					exts.insert(
+						Kw::Th,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					exts.insert(
+						Kw::El,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					exts
+				},
+			},
+		);
 		let mut binops = HashMap::new();
 		binops.insert(SimpleTok::Op(Op::Plus), Binop::Plus);
 		binops.insert(SimpleTok::Op(Op::Minus), Binop::Minus);
@@ -531,11 +679,21 @@ impl LanguageDescr {
 	}
 }
 
+impl StmtDescr {
+	fn initial_exts_map(&self) -> HashMap<Kw, Vec<Node<StmtExt>>> {
+		let mut exts = HashMap::new();
+		for ext_kw in self.extentions.keys() {
+			exts.insert(*ext_kw, Vec::new());
+		}
+		exts
+	}
+}
+
 // TODO: Stop having to use `ast::Stmt` this early, or maybe at all.
 fn temporary_into_ast_stmt(
 	kw: Node<Kw>,
 	content: Option<Node<StmtExt>>,
-	exts: HashMap<Kw, Vec<StmtExt>>,
+	mut exts: HashMap<Kw, Vec<Node<StmtExt>>>,
 ) -> Node<Stmt> {
 	let kw_loc = kw.loc().to_owned();
 	match kw.unwrap() {
@@ -550,6 +708,42 @@ fn temporary_into_ast_stmt(
 						_ => panic!(),
 					})
 				},
+			},
+			kw_loc,
+		),
+		Kw::If => Node::from(
+			Stmt::If {
+				cond_expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
+				th_stmts: exts
+					.remove(&Kw::Th)
+					.unwrap()
+					.into_iter()
+					.map(|stmt_ext| {
+						let loc = stmt_ext.loc().clone();
+						match stmt_ext.unwrap() {
+							StmtExt::Stmt(stmt) => Node::from(stmt, loc),
+							_ => panic!(),
+						}
+					})
+					.collect(),
+				el_stmts: exts
+					.remove(&Kw::El)
+					.unwrap()
+					.into_iter()
+					.map(|stmt_ext| {
+						let loc = stmt_ext.loc().clone();
+						match stmt_ext.unwrap() {
+							StmtExt::Stmt(stmt) => Node::from(stmt, loc),
+							_ => panic!(),
+						}
+					})
+					.collect(),
 			},
 			kw_loc,
 		),

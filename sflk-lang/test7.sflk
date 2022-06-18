@@ -1,5 +1,6 @@
 np
 pr "h" nl
 x < 12
-pr 18 - x / 3 * 4 nl # 8 #
+if x
+	th pr 18 - x / 3 * 4 th nl # 8 #
 pr $
