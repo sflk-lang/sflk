@@ -42,10 +42,10 @@ struct Settings {
 	root_filename: Option<String>,
 	debug: bool,
 	debug_lines: bool,
+	debug_actions: bool,
 	wants_help: bool,
 	wants_version: bool,
 	display_tokens: bool,
-	display_tokens_lines: bool,
 }
 
 impl Settings {
@@ -56,26 +56,24 @@ impl Settings {
 			root_filename: None,
 			debug: false,
 			debug_lines: false,
+			debug_actions: false,
 			wants_help: false,
 			wants_version: false,
 			display_tokens: false,
-			display_tokens_lines: false,
 		};
 		for arg in args {
 			if arg == "-d" || arg == "--debug" {
 				settings.debug = true;
-			} else if arg == "--debug-lines" {
-				settings.debug = true;
-				settings.debug_lines = true;
 			} else if arg == "-h" || arg == "--help" {
 				settings.wants_help = true;
 			} else if arg == "-v" || arg == "--version" {
 				settings.wants_version = true;
 			} else if arg == "--tokens" {
 				settings.display_tokens = true;
-			} else if arg == "--tokens-lines" {
-				settings.display_tokens = true;
-				settings.display_tokens_lines = true;
+			} else if arg == "--lines" {
+				settings.debug_lines = true;
+			} else if arg == "--actions" {
+				settings.debug_actions = true;
 			} else if settings.root_filename.is_none() {
 				settings.root_filename = Some(arg);
 			} else {
@@ -123,19 +121,21 @@ fn main() {
 	));
 	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 	if settings.display_tokens {
-		tfr.display_all(settings.display_tokens_lines);
+		tfr.display_all(settings.debug_lines);
 		return;
 	}
 	let parser_logger = if settings.debug {
 		ParserDebuggingLogger {
 			logger: Some(IndentedLogger::new()),
 			log_lines: settings.debug_lines,
+			log_actions: settings.debug_actions,
 			last_line: 0,
 		}
 	} else {
 		ParserDebuggingLogger {
 			logger: None,
 			log_lines: settings.debug_lines,
+			log_actions: settings.debug_actions,
 			last_line: 0,
 		}
 	};

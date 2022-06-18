@@ -8,6 +8,7 @@ use crate::{
 use std::{
 	collections::HashMap,
 	convert::{TryFrom, TryInto},
+	fmt,
 };
 
 enum BlockLevelExpectedTerminator {
@@ -76,6 +77,7 @@ enum Binop {
 /// This restriction on its sight of the token stream will allow for debugging parsing
 /// directives to be insertable anywhere in between tokens and it will allow the
 /// step-by-step verbose parsing to go token-by-token.
+#[derive(Clone, Copy)]
 enum ParsingAction {
 	Terminate,
 	ParseStmtOrStop,
@@ -94,9 +96,32 @@ enum ParsingAction {
 	AddChop,   // (expr binop expr -- expr)
 }
 
+impl fmt::Display for ParsingAction {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			ParsingAction::Terminate => write!(f, "Terminate"),
+			ParsingAction::ParseStmtOrStop => write!(f, "ParseStmtOrStop"),
+			ParsingAction::ParseStmt => write!(f, "ParseStmt"),
+			ParsingAction::AddStmt => write!(f, "AddStmt"),
+			ParsingAction::ParseContent => write!(f, "ParseContent"),
+			ParsingAction::SetContent => write!(f, "SetContent"),
+			ParsingAction::ConfirmToLeft => write!(f, "ConfirmToLeft"),
+			ParsingAction::ParseExtOrStop => write!(f, "ParseExtOrStop"),
+			ParsingAction::ParseExt => write!(f, "ParseExt"),
+			ParsingAction::SetExt => write!(f, "SetExt"),
+			ParsingAction::ParseExpr => write!(f, "ParseExpr"),
+			ParsingAction::ParseNonChainExpr => write!(f, "ParseNonChainExpr"),
+			ParsingAction::ParseChopOrStop => write!(f, "ParseChopOrStop"),
+			ParsingAction::ParseChop => write!(f, "ParseChop"),
+			ParsingAction::AddChop => write!(f, "AddChop"),
+		}
+	}
+}
+
 pub struct ParserDebuggingLogger {
 	pub logger: Option<IndentedLogger>,
 	pub log_lines: bool,
+	pub log_actions: bool,
 	pub last_line: usize,
 }
 
@@ -128,6 +153,14 @@ impl ParserDebuggingLogger {
 	fn log_deindent(&mut self, string: &str) {
 		if let Some(logger) = &mut self.logger {
 			logger.deindent(string);
+		}
+	}
+
+	fn log_action(&mut self, action: ParsingAction) {
+		if let Some(logger) = &mut self.logger {
+			if self.log_actions {
+				logger.log_string(&format!("Action {}", action), styles::NORMAL);
+			}
 		}
 	}
 
@@ -201,7 +234,9 @@ impl Parser {
 	}
 
 	fn perform_one_action(&mut self) {
-		match self.action_stack.pop().unwrap() {
+		let action = self.action_stack.pop().unwrap();
+		self.debug.log_action(action);
+		match action {
 			ParsingAction::ParseStmtOrStop => {
 				let (tok, loc) = self.tb.peek(0);
 				self.debug.log_peek_token(tok, loc);
