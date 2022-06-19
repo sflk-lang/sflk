@@ -234,14 +234,25 @@ impl Parser {
 		}
 	}
 
+	fn peek_tok(&mut self) -> (Tok, Loc) {
+		let (tok, loc) = self.tb.peek(0).clone();
+		self.debug.log_peek_token(&tok, &loc);
+		(tok, loc)
+	}
+
+	fn consume_tok(&mut self) -> (Tok, Loc) {
+		let (tok, loc) = self.tb.pop();
+		self.debug.log_peek_token(&tok, &loc);
+		(tok, loc)
+	}
+
 	fn perform_one_action(&mut self) {
 		let action = self.action_stack.pop().unwrap();
 		self.debug.log_action(action);
 		match action {
 			ParsingAction::Terminate => panic!(),
 			ParsingAction::ParseStmtOrStop => {
-				let (tok, loc) = self.tb.peek(0);
-				self.debug.log_peek_token(tok, loc);
+				let (tok, loc) = self.peek_tok();
 				if let ParsingData::BlockLevel { expected_terminator, end, .. } =
 					self.data_stack.last_mut().unwrap()
 				{
@@ -274,8 +285,7 @@ impl Parser {
 				}
 			},
 			ParsingAction::AddRightCurly => {
-				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok, &loc);
+				let (tok, loc) = self.consume_tok();
 				if let ParsingData::BlockLevel { end, .. } = self.data_stack.last_mut().unwrap() {
 					end.insert(Node::from((), loc.clone()));
 				} else {
@@ -283,8 +293,7 @@ impl Parser {
 				}
 			},
 			ParsingAction::ParseStmt => {
-				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok, &loc);
+				let (tok, loc) = self.consume_tok();
 				if let Tok::Kw(kw) = tok {
 					let stmt_descr = self.lang.stmts.get(&kw);
 					if let Some(stmt_descr) = stmt_descr {
@@ -426,8 +435,7 @@ impl Parser {
 				}
 			},
 			ParsingAction::ConfirmToLeft => {
-				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok, &loc);
+				let (tok, loc) = self.consume_tok();
 				if let Tok::Op(Op::ToLeft) = tok {
 				} else {
 					self.debug.log_error(&format!(
@@ -439,8 +447,7 @@ impl Parser {
 				}
 			},
 			ParsingAction::ParseExtOrStop => {
-				let (tok, loc) = self.tb.peek(0);
-				self.debug.log_peek_token(tok, loc);
+				let (tok, loc) = self.peek_tok();
 				let has_ext = if let Tok::Kw(ext_kw) = tok {
 					if let ParsingData::Stmt { kw, .. } = self.data_stack.last().unwrap() {
 						self.lang
@@ -448,7 +455,7 @@ impl Parser {
 							.get(kw.unwrap_ref())
 							.unwrap()
 							.extentions
-							.contains_key(ext_kw)
+							.contains_key(&ext_kw)
 					} else {
 						false
 					}
@@ -462,8 +469,7 @@ impl Parser {
 				}
 			},
 			ParsingAction::ParseExt => {
-				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok, &loc);
+				let (tok, loc) = self.consume_tok();
 				let ext_kw = if let Tok::Kw(ext_kw) = tok {
 					ext_kw
 				} else {
@@ -575,8 +581,7 @@ impl Parser {
 				}
 			},
 			ParsingAction::ParseNonChainExpr => {
-				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok, &loc);
+				let (tok, loc) = self.consume_tok();
 				match tok {
 					Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
 						init: Node::from(Expr::IntegerLiteral(integer_string), loc),
@@ -625,9 +630,8 @@ impl Parser {
 				self.action_stack.push(ParsingAction::ParseNonChainExpr);
 			},
 			ParsingAction::ParseChopOrStop => {
-				let (tok, loc) = self.tb.peek(0);
-				self.debug.log_peek_token(tok, loc);
-				let simple_tok = SimpleTok::try_from(tok).ok();
+				let (tok, loc) = self.peek_tok();
+				let simple_tok = SimpleTok::try_from(&tok).ok();
 				if simple_tok.is_some() && self.lang.binops.contains_key(&simple_tok.unwrap()) {
 					self.action_stack.push(ParsingAction::ParseChopOrStop);
 					self.action_stack.push(ParsingAction::AddChop);
@@ -636,8 +640,7 @@ impl Parser {
 			},
 			ParsingAction::ParseChop => {
 				self.debug.log_normal_indent("Parsing chain operation");
-				let (tok, loc) = self.tb.pop();
-				self.debug.log_consume_token(&tok, &loc);
+				let (tok, loc) = self.consume_tok();
 				let simple_tok = SimpleTok::try_from(&tok).unwrap();
 				assert!(self.lang.binops.contains_key(&simple_tok));
 				self.data_stack.push(ParsingData::Binop(Node::from(
