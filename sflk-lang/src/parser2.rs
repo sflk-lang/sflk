@@ -23,15 +23,6 @@ enum StmtExt {
 	None,
 }
 
-// The idea here is to get a parser that can perform one small step at a time
-// so that it can be quite verbose in explaining what it does, as well as being
-// interactive and all.
-// It has a stack of `ParsingAction`, each of which sould represent a simple step
-// that is to be performed or advanced in the next step call (possibly pushing
-// more actions). For now a `ParsingFrame` does not quite represent a simple step
-// and the whole code is messy and not very readable. This has to be improved.
-// TODO.
-
 enum ParsingData {
 	BlockLevel {
 		stmts: Vec<Node<Stmt>>,
