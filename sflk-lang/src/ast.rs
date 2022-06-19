@@ -275,7 +275,16 @@ impl Treeable for Expr {
 				stmts.iter().map(StringTree::from).collect(),
 			),
 			Expr::Input => unimplemented!(),
-			Expr::Unop(unop) => unimplemented!(),
+			Expr::Unop(Unop::Negate(expr)) => StringTree::new_node(
+				"unary minus".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(&**expr)],
+			),
+			Expr::Unop(Unop::ReadFile(expr)) => StringTree::new_node(
+				"unary read file".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(&**expr)],
+			),
 			Expr::Chain { init, chops } => StringTree::new_node(
 				"chain".to_string(),
 				styles::BLUE,

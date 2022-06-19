@@ -1,5 +1,5 @@
 use crate::{
-	ast::{Chop as AstChop, Expr, Node, Program, Stmt, TargetExpr},
+	ast::{Chop as AstChop, Expr, Node, Program, Stmt, TargetExpr, Unop as AstUnop},
 	log_indent::IndentedLogger,
 	scu::Loc,
 	tokenizer::{Kw, Matched, Op, SimpleTok, Tok, TokBuffer},
@@ -47,6 +47,7 @@ enum ParsingData {
 	},
 	LeftParen(Node<()>),
 	Binop(Node<Binop>),
+	Unop(Node<Unop>),
 	StmtInvalid {
 		error: Node<Expr>,
 	},
@@ -65,6 +66,11 @@ enum Binop {
 	Star,
 	Slash,
 	ToRight,
+}
+
+#[derive(Clone, Copy)]
+enum Unop {
+	Minus,
 }
 
 /// Each of these should represent one simple action that the parser may perform.
@@ -88,6 +94,7 @@ enum ParsingAction {
 	ParseExt,          // (stmt -- stmt kw ext)
 	SetExt,            // (stmt kw ext -- stmt)
 	ParseExpr,         // ( -- expr)
+	AddUnop,           // (unop expr -- expr)
 	ParseNonChainExpr, // ( -- [paren] expr)
 	ParseChopOrStop,
 	ConsumeRightParen,  // (paren expr -- expr)
@@ -111,6 +118,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::ParseExt => write!(f, "ParseExt"),
 			ParsingAction::SetExt => write!(f, "SetExt"),
 			ParsingAction::ParseExpr => write!(f, "ParseExpr"),
+			ParsingAction::AddUnop => write!(f, "AddUnop"),
 			ParsingAction::ParseNonChainExpr => write!(f, "ParseNonChainExpr"),
 			ParsingAction::ParseChopOrStop => write!(f, "ParseChopOrStop"),
 			ParsingAction::ConsumeRightParen => write!(f, "ConsumeRightParen"),
@@ -588,56 +596,69 @@ impl Parser {
 			},
 			ParsingAction::ParseNonChainExpr => {
 				let (tok, loc) = self.consume_tok();
-				match tok {
-					Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
-						init: Some(Node::from(Expr::IntegerLiteral(integer_string), loc)),
-						chops: Vec::new(),
-						left_paren: None,
-					}),
-					Tok::String { content, .. } => self.data_stack.push(ParsingData::Expr {
-						init: Some(Node::from(Expr::StringLiteral(content), loc)),
-						chops: Vec::new(),
-						left_paren: None,
-					}),
-					Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
-						init: Some(Node::from(Expr::VariableName(string), loc)),
-						chops: Vec::new(),
-						left_paren: None,
-					}),
-					Tok::Left(Matched::Curly) => {
-						self.data_stack.push(ParsingData::BlockLevel {
-							stmts: Vec::new(),
-							expected_terminator: BlockLevelExpectedTerminator::RightCurly,
-							left_curly: Some(Node::from((), loc)),
-							right_curly: None,
-						});
-						self.action_stack.push(ParsingAction::BlockLevelIntoExpr);
-						self.action_stack.push(ParsingAction::ParseStmtOrStop);
-					},
-					Tok::Left(Matched::Paren) => {
-						self.data_stack
-							.push(ParsingData::LeftParen(Node::from((), loc)));
-						self.action_stack.push(ParsingAction::ConsumeRightParen);
-						self.action_stack.push(ParsingAction::ParseExpr);
-					},
-					_ => {
-						let error_string = format!("Unexpected token {}", tok);
-						self.debug.log_error(&error_string);
-						let error_line_string = format!("{} on line {}", error_string, loc.line());
-						self.data_stack.push(ParsingData::Expr {
-							init: Some(Node::from(
-								Expr::Invalid {
-									error_expr: Box::new(Node::from(
-										Expr::StringLiteral(error_line_string),
-										loc.clone(),
-									)),
-								},
-								loc,
-							)),
+				let simple_tok = SimpleTok::try_from(&tok).ok();
+				if simple_tok.is_some()
+					&& self.lang.unops.contains_key(simple_tok.as_ref().unwrap())
+				{
+					self.data_stack.push(ParsingData::Unop(Node::from(
+						*self.lang.unops.get(&simple_tok.unwrap()).unwrap(),
+						loc,
+					)));
+					self.action_stack.push(ParsingAction::AddUnop);
+					self.action_stack.push(ParsingAction::ParseExpr);
+				} else {
+					match tok {
+						Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(Expr::IntegerLiteral(integer_string), loc)),
 							chops: Vec::new(),
 							left_paren: None,
-						})
-					},
+						}),
+						Tok::String { content, .. } => self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(Expr::StringLiteral(content), loc)),
+							chops: Vec::new(),
+							left_paren: None,
+						}),
+						Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(Expr::VariableName(string), loc)),
+							chops: Vec::new(),
+							left_paren: None,
+						}),
+						Tok::Left(Matched::Curly) => {
+							self.data_stack.push(ParsingData::BlockLevel {
+								stmts: Vec::new(),
+								expected_terminator: BlockLevelExpectedTerminator::RightCurly,
+								left_curly: Some(Node::from((), loc)),
+								right_curly: None,
+							});
+							self.action_stack.push(ParsingAction::BlockLevelIntoExpr);
+							self.action_stack.push(ParsingAction::ParseStmtOrStop);
+						},
+						Tok::Left(Matched::Paren) => {
+							self.data_stack
+								.push(ParsingData::LeftParen(Node::from((), loc)));
+							self.action_stack.push(ParsingAction::ConsumeRightParen);
+							self.action_stack.push(ParsingAction::ParseExpr);
+						},
+						_ => {
+							let error_string = format!("Unexpected token {}", tok);
+							self.debug.log_error(&error_string);
+							let error_line_string =
+								format!("{} on line {}", error_string, loc.line());
+							self.data_stack.push(ParsingData::Expr {
+								init: Some(Node::from(
+									Expr::Invalid {
+										error_expr: Box::new(Node::from(
+											Expr::StringLiteral(error_line_string),
+											loc.clone(),
+										)),
+									},
+									loc,
+								)),
+								chops: Vec::new(),
+								left_paren: None,
+							})
+						},
+					}
 				}
 			},
 			ParsingAction::ParseExpr => {
@@ -659,6 +680,34 @@ impl Parser {
 					self.action_stack.push(ParsingAction::ParseNonChainExpr);
 				}
 			},
+			ParsingAction::AddUnop => {
+				self.debug.log_deindent("Done parsing expression");
+				let (init, chops) =
+					if let ParsingData::Expr { init, chops, .. } = self.data_stack.pop().unwrap() {
+						(init, chops)
+					} else {
+						panic!();
+					};
+				let (unop, unop_loc) =
+					if let ParsingData::Unop(node) = self.data_stack.pop().unwrap() {
+						let loc = node.loc().clone();
+						(node.unwrap(), loc)
+					} else {
+						panic!();
+					};
+				let expr = temporary_into_ast_expr(init, chops);
+				let expr_loc = expr.loc().clone();
+				self.data_stack.push(ParsingData::Expr {
+					init: Some(Node::from(
+						Expr::Unop(match unop {
+							Unop::Minus => AstUnop::Negate(Box::new(expr)),
+						}),
+						unop_loc + expr_loc,
+					)),
+					chops: Vec::new(),
+					left_paren: None,
+				});
+			},
 			ParsingAction::ParseChopOrStop => {
 				let (tok, loc) = self.peek_tok();
 				let simple_tok = SimpleTok::try_from(&tok).ok();
@@ -669,8 +718,8 @@ impl Parser {
 				}
 			},
 			ParsingAction::ConsumeRightParen => {
-				let (tok, loc) = self.consume_tok();
 				self.debug.log_deindent("Done parsing expression");
+				let (tok, loc) = self.consume_tok();
 				assert!(matches!(tok, Tok::Right(Matched::Paren)));
 				let expr = self.data_stack.pop().unwrap();
 				let left_paren = self.data_stack.pop().unwrap();
@@ -744,6 +793,7 @@ struct StmtDescr {
 struct LanguageDescr {
 	stmts: HashMap<Kw, StmtDescr>,
 	binops: HashMap<SimpleTok, Binop>,
+	unops: HashMap<SimpleTok, Unop>,
 }
 
 impl LanguageDescr {
@@ -881,7 +931,9 @@ impl LanguageDescr {
 		binops.insert(SimpleTok::Op(Op::Star), Binop::Star);
 		binops.insert(SimpleTok::Op(Op::Slash), Binop::Slash);
 		binops.insert(SimpleTok::Op(Op::ToRight), Binop::ToRight);
-		LanguageDescr { stmts, binops }
+		let mut unops = HashMap::new();
+		unops.insert(SimpleTok::Op(Op::Minus), Unop::Minus);
+		LanguageDescr { stmts, binops, unops }
 	}
 }
 
