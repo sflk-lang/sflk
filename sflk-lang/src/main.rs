@@ -91,6 +91,7 @@ impl Settings {
 fn main() {
 	let settings = Settings::from_args();
 
+	// Print some messages such as help or version if asked for.
 	let mut did_something = false;
 	if settings.wants_version {
 		let version_name = "indev";
@@ -157,6 +158,6 @@ fn main() {
 		dbg!(&sir_block);
 	}
 
-	// Actually the code.
+	// Actually run the code.
 	sir::exec_sir_block(sir_block);
 }
