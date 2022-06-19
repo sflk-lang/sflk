@@ -43,6 +43,7 @@ struct Settings {
 	debug: bool,
 	debug_lines: bool,
 	debug_actions: bool,
+	debug_sir: bool,
 	wants_help: bool,
 	wants_version: bool,
 	display_tokens: bool,
@@ -57,6 +58,7 @@ impl Settings {
 			debug: false,
 			debug_lines: false,
 			debug_actions: false,
+			debug_sir: false,
 			wants_help: false,
 			wants_version: false,
 			display_tokens: false,
@@ -74,6 +76,8 @@ impl Settings {
 				settings.debug_lines = true;
 			} else if arg == "--actions" {
 				settings.debug_actions = true;
+			} else if arg == "--sir" {
+				settings.debug_sir = true;
 			} else if settings.root_filename.is_none() {
 				settings.root_filename = Some(arg);
 			} else {
@@ -145,7 +149,7 @@ fn main() {
 		ast.print();
 	}
 	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());
-	if settings.debug {
+	if settings.debug_sir {
 		dbg!(&sir_block);
 	}
 	sir::exec_sir_block(sir_block);
