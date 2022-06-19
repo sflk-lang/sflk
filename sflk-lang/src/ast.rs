@@ -274,7 +274,7 @@ impl Treeable for Expr {
 				styles::CYAN,
 				stmts.iter().map(StringTree::from).collect(),
 			),
-			Expr::Input => unimplemented!(),
+			Expr::Input => StringTree::new_leaf("input".to_string(), styles::NORMAL),
 			Expr::Unop(Unop::Negate(expr)) => StringTree::new_node(
 				"unary minus".to_string(),
 				styles::NORMAL,

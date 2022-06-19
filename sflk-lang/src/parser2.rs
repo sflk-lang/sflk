@@ -628,6 +628,11 @@ impl Parser {
 					self.action_stack.push(ParsingAction::ParseExpr);
 				} else {
 					match tok {
+						Tok::Kw(Kw::In) => self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(Expr::Input, loc)),
+							chops: Vec::new(),
+							left_paren: None,
+						}),
 						Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::IntegerLiteral(integer_string), loc)),
 							chops: Vec::new(),
