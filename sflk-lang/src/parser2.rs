@@ -804,6 +804,15 @@ impl LanguageDescr {
 				},
 			},
 		);
+		stmts.insert(
+			Kw::Do,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "do".to_string(),
+				content_type: ExtType::Expr,
+				extentions: HashMap::new(),
+			},
+		);
 		let mut binops = HashMap::new();
 		binops.insert(SimpleTok::Op(Op::Plus), Binop::Plus);
 		binops.insert(SimpleTok::Op(Op::Minus), Binop::Minus);
@@ -925,6 +934,18 @@ fn temporary_into_ast_stmt(
 					.into_iter()
 					.next()
 					.map(|node| node.map(|non_ext| ())),
+			},
+			kw_loc,
+		),
+		Kw::Do => Node::from(
+			Stmt::Do {
+				expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
 			},
 			kw_loc,
 		),
