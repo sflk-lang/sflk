@@ -2,5 +2,15 @@ x < 12
 lp wh x bd pr x sp pr ", " bd x < x - 1 nl
 x < {pr v nl}
 v < "uwu" dh x
-x < "a",, "b", "c", "d", "e"
-idx < 0 lp wh idx - 5 bd pr x ix idx sp pr ", " bd idx < idx + 1 nl
+
+do {
+	ri {
+		pr "\e[32m"
+		em v rs v
+		pr "\e[39m"
+	}
+	do {
+		x < "a",, "b", "c", "d", "e"
+		idx < 0 lp wh idx - 5 bd pr x ix idx sp pr ", " bd idx < idx + 1 nl
+	}
+}

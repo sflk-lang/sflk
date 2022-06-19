@@ -52,6 +52,7 @@ enum ParsingData {
 		error: Node<Expr>,
 	},
 	Nothing,
+	Targ(Node<TargetExpr>),
 }
 
 struct Chop {
@@ -106,6 +107,7 @@ enum ParsingAction {
 	ParseChop,          // ( -- binop expr)
 	AddChop,            // (expr binop expr -- expr)
 	BlockLevelIntoExpr, // (block -- expr)
+	ParseTarg,          // ( -- targ)
 }
 
 impl fmt::Display for ParsingAction {
@@ -131,6 +133,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::ParseChop => write!(f, "ParseChop"),
 			ParsingAction::AddChop => write!(f, "AddChop"),
 			ParsingAction::BlockLevelIntoExpr => write!(f, "BlockLevelIntoExpr"),
+			ParsingAction::ParseTarg => write!(f, "ParseTarg"),
 		}
 	}
 }
@@ -534,7 +537,9 @@ impl Parser {
 					ExtType::Stmt => {
 						self.action_stack.push(ParsingAction::ParseStmt);
 					},
-					ExtType::Targ => todo!(),
+					ExtType::Targ => {
+						self.action_stack.push(ParsingAction::ParseTarg);
+					},
 				}
 			},
 			ParsingAction::SetExt => {
@@ -594,7 +599,16 @@ impl Parser {
 								.unwrap()
 								.push(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
 						},
-						_ => unimplemented!(),
+						(ExtType::Targ, ParsingData::Targ(targ)) => {
+							self.debug.log_deindent(&format!(
+								"Done parsing extention {}",
+								ext_kw.unwrap_ref()
+							));
+							exts.get_mut(ext_kw.unwrap_ref())
+								.unwrap()
+								.push(targ.map(StmtExt::Targ));
+						},
+						_ => panic!(),
 					}
 				} else {
 					panic!();
@@ -775,6 +789,16 @@ impl Parser {
 					panic!();
 				}
 			},
+			ParsingAction::ParseTarg => {
+				let (tok, loc) = self.consume_tok();
+				self.data_stack.push(ParsingData::Targ(Node::from(
+					match tok {
+						Tok::Name { string, .. } => TargetExpr::VariableName(string),
+						_ => TargetExpr::Invalid,
+					},
+					loc,
+				)));
+			},
 		}
 	}
 }
@@ -933,6 +957,35 @@ impl LanguageDescr {
 				name: "evaluate".to_string(),
 				content_type: ExtType::Expr,
 				extentions: HashMap::new(),
+			},
+		);
+		stmts.insert(
+			Kw::Ri,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "register interceptor".to_string(),
+				content_type: ExtType::Expr,
+				extentions: HashMap::new(),
+			},
+		);
+		stmts.insert(
+			Kw::Em,
+			StmtDescr {
+				name_article: "an".to_string(),
+				name: "emit".to_string(),
+				content_type: ExtType::Expr,
+				extentions: {
+					let mut exts = HashMap::new();
+					exts.insert(
+						Kw::Rs,
+						StmtExtDescr {
+							content_type: ExtType::Targ,
+							optional: true,
+							can_stack: false,
+						},
+					);
+					exts
+				},
 			},
 		);
 		let mut binops = HashMap::new();
@@ -1099,6 +1152,42 @@ fn temporary_into_ast_stmt(
 						_ => panic!(),
 					})
 				},
+			},
+			kw_loc,
+		),
+		Kw::Ri => Node::from(
+			Stmt::RegisterInterceptor {
+				expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
+			},
+			kw_loc,
+		),
+		Kw::Em => Node::from(
+			Stmt::Emit {
+				expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
+				target: exts
+					.remove(&Kw::Rs)
+					.unwrap()
+					.into_iter()
+					.next()
+					.map(|targ_ext| {
+						let loc = targ_ext.loc().clone();
+						match targ_ext.unwrap() {
+							StmtExt::Targ(targ) => Node::from(targ, loc),
+							_ => panic!(),
+						}
+					}),
 			},
 			kw_loc,
 		),

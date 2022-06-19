@@ -407,37 +407,33 @@ impl Treeable for Stmt {
 					},
 				]
 				.into_iter()
-				.chain(
-					if ao_flag.is_some() {
-						Some(StringTree::new_leaf(
-							"at least once".to_string(),
-							styles::NORMAL,
-						))
-					} else {
-						None
-					},
-				).collect(),
+				.chain(if ao_flag.is_some() {
+					Some(StringTree::new_leaf(
+						"at least once".to_string(),
+						styles::NORMAL,
+					))
+				} else {
+					None
+				})
+				.collect(),
 			),
 			Stmt::RegisterInterceptor { expr } => StringTree::new_node(
 				"register interceptor".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::Emit { expr, target } => {
-				StringTree::new_node("if".to_string(), styles::NORMAL, {
-					let mut vec: Vec<StringTree> = Vec::with_capacity(2);
-					vec.push(StringTree::from(expr));
+			Stmt::Emit { expr, target } => StringTree::new_node(
+				"emit".to_string(),
+				styles::NORMAL,
+				vec![
+					StringTree::from(expr),
 					if let Some(target_expr) = target {
-						vec.push(StringTree::from(target_expr));
+						StringTree::from(target_expr)
 					} else {
-						vec.push(StringTree::new_leaf(
-							"no target".to_string(),
-							styles::NORMAL,
-						));
-					}
-					vec
-				})
-			},
+						StringTree::new_leaf("no target".to_string(), styles::NORMAL)
+					},
+				],
+			),
 			Stmt::Invalid { error_expr } => StringTree::new_node(
 				"invalid".to_string(),
 				styles::BOLD_LIGHT_RED,
