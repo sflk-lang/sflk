@@ -62,6 +62,7 @@ enum Binop {
 	Minus,
 	Star,
 	Slash,
+	ToRight,
 }
 
 /// Each of these should represent one simple action that the parser may perform.
@@ -813,11 +814,21 @@ impl LanguageDescr {
 				extentions: HashMap::new(),
 			},
 		);
+		stmts.insert(
+			Kw::Ev,
+			StmtDescr {
+				name_article: "an".to_string(),
+				name: "evaluate".to_string(),
+				content_type: ExtType::Expr,
+				extentions: HashMap::new(),
+			},
+		);
 		let mut binops = HashMap::new();
 		binops.insert(SimpleTok::Op(Op::Plus), Binop::Plus);
 		binops.insert(SimpleTok::Op(Op::Minus), Binop::Minus);
 		binops.insert(SimpleTok::Op(Op::Star), Binop::Star);
 		binops.insert(SimpleTok::Op(Op::Slash), Binop::Slash);
+		binops.insert(SimpleTok::Op(Op::ToRight), Binop::ToRight);
 		LanguageDescr { stmts, binops }
 	}
 }
@@ -949,6 +960,18 @@ fn temporary_into_ast_stmt(
 			},
 			kw_loc,
 		),
+		Kw::Ev => Node::from(
+			Stmt::Evaluate {
+				expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
+			},
+			kw_loc,
+		),
 		_ => unimplemented!(),
 	}
 }
@@ -978,6 +1001,7 @@ fn temporary_into_ast_expr(init: Node<Expr>, chops: Vec<Chop>) -> Node<Expr> {
 						Binop::Minus => Node::from(AstChop::Minus(expr), loc),
 						Binop::Star => Node::from(AstChop::Star(expr), loc),
 						Binop::Slash => Node::from(AstChop::Slash(expr), loc),
+						Binop::ToRight => Node::from(AstChop::ToRight(expr), loc),
 					}
 				}
 			})

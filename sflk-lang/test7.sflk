@@ -2,5 +2,5 @@ x < 12
 if x th pr 18 - x / 3 * 4 th nl # 8 #
 pr $
 lp wh x bd pr x sp pr ", " bd x < x - 1 nl
-x < {pr "uwu"}
-do x + {nl}
+x < {pr v nl}
+ev "uwu" > x
