@@ -818,6 +818,15 @@ impl LanguageDescr {
 			},
 		);
 		stmts.insert(
+			Kw::Dh,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "do here".to_string(),
+				content_type: ExtType::Expr,
+				extentions: HashMap::new(),
+			},
+		);
+		stmts.insert(
 			Kw::Ev,
 			StmtDescr {
 				name_article: "an".to_string(),
@@ -953,6 +962,18 @@ fn temporary_into_ast_stmt(
 		),
 		Kw::Do => Node::from(
 			Stmt::Do {
+				expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
+			},
+			kw_loc,
+		),
+		Kw::Dh => Node::from(
+			Stmt::DoHere {
 				expr: {
 					let node = content.unwrap();
 					node.map(|ext| match ext {
