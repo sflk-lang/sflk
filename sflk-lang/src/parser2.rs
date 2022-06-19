@@ -71,6 +71,7 @@ enum Binop {
 #[derive(Clone, Copy)]
 enum Unop {
 	Minus,
+	File,
 }
 
 /// Each of these should represent one simple action that the parser may perform.
@@ -703,6 +704,7 @@ impl Parser {
 					init: Some(Node::from(
 						Expr::Unop(match unop {
 							Unop::Minus => AstUnop::Negate(Box::new(expr)),
+							Unop::File => AstUnop::ReadFile(Box::new(expr)),
 						}),
 						unop_loc + expr_loc,
 					)),
@@ -941,6 +943,7 @@ impl LanguageDescr {
 		binops.insert(SimpleTok::Op(Op::ToRight), Binop::ToRight);
 		let mut unops = HashMap::new();
 		unops.insert(SimpleTok::Op(Op::Minus), Unop::Minus);
+		unops.insert(SimpleTok::Kw(Kw::Fi), Unop::File);
 		LanguageDescr { stmts, binops, unops }
 	}
 }
