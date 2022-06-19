@@ -155,7 +155,7 @@ The `,,` operator is sugar that makes `a,, b` evaluate like `(), a, b` would.
 
 ```sflk
 x < "a",, "us", {pr "mog"}
-pr x ix 0 do x ix 1 pr x ix 2 nl
+pr x ix 0 do x ix 2 pr x ix 1 nl
 ```
 
 The `ix` binary operator allow access to a list element via its 0-based index. The above example also demonstrates that lists are not bound to contain only one type (this is a dynamic language after all, all the footguns of dynamic languages are to be supported by SFLK, it would be no fun otherwise).
