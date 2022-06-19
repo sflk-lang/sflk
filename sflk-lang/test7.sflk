@@ -2,5 +2,5 @@ x < 12
 lp wh x bd pr x sp pr ", " bd x < x - 1 nl
 x < {pr v nl}
 v < "uwu" dh x
-x < -1+1+1+1
+x < -1+1+1.+1
 pr x nl

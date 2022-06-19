@@ -97,6 +97,7 @@ enum ParsingAction {
 	AddUnop,           // (unop expr -- expr)
 	ParseNonChainExpr, // ( -- [paren] expr)
 	ParseChopOrStop,
+	ConsumeDot,
 	ConsumeRightParen,  // (paren expr -- expr)
 	ParseChop,          // ( -- binop expr)
 	AddChop,            // (expr binop expr -- expr)
@@ -121,6 +122,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::AddUnop => write!(f, "AddUnop"),
 			ParsingAction::ParseNonChainExpr => write!(f, "ParseNonChainExpr"),
 			ParsingAction::ParseChopOrStop => write!(f, "ParseChopOrStop"),
+			ParsingAction::ConsumeDot => write!(f, "ConsumeDot"),
 			ParsingAction::ConsumeRightParen => write!(f, "ConsumeRightParen"),
 			ParsingAction::ParseChop => write!(f, "ParseChop"),
 			ParsingAction::AddChop => write!(f, "AddChop"),
@@ -715,7 +717,13 @@ impl Parser {
 					self.action_stack.push(ParsingAction::ParseChopOrStop);
 					self.action_stack.push(ParsingAction::AddChop);
 					self.action_stack.push(ParsingAction::ParseChop);
+				} else if matches!(tok, Tok::Op(Op::Dot)) {
+					self.action_stack.push(ParsingAction::ConsumeDot);
 				}
+			},
+			ParsingAction::ConsumeDot => {
+				let (tok, loc) = self.consume_tok();
+				assert!(matches!(tok, Tok::Op(Op::Dot)));
 			},
 			ParsingAction::ConsumeRightParen => {
 				self.debug.log_deindent("Done parsing expression");
