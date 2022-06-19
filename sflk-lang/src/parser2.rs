@@ -66,6 +66,9 @@ enum Binop {
 	Star,
 	Slash,
 	ToRight,
+	Comma,
+	DoubleComma,
+	Ix,
 }
 
 #[derive(Clone, Copy)]
@@ -938,6 +941,9 @@ impl LanguageDescr {
 		binops.insert(SimpleTok::Op(Op::Star), Binop::Star);
 		binops.insert(SimpleTok::Op(Op::Slash), Binop::Slash);
 		binops.insert(SimpleTok::Op(Op::ToRight), Binop::ToRight);
+		binops.insert(SimpleTok::Op(Op::Comma), Binop::Comma);
+		binops.insert(SimpleTok::Op(Op::DoubleComma), Binop::DoubleComma);
+		binops.insert(SimpleTok::Kw(Kw::Ix), Binop::Ix);
 		let mut unops = HashMap::new();
 		unops.insert(SimpleTok::Op(Op::Minus), Unop::Minus);
 		unops.insert(SimpleTok::Kw(Kw::Fi), Unop::File);
@@ -1128,6 +1134,9 @@ fn temporary_into_ast_expr(init: Option<Node<Expr>>, chops: Vec<Chop>) -> Node<E
 						Binop::Star => Node::from(AstChop::Star(expr), loc),
 						Binop::Slash => Node::from(AstChop::Slash(expr), loc),
 						Binop::ToRight => Node::from(AstChop::ToRight(expr), loc),
+						Binop::Comma => Node::from(AstChop::Comma(expr), loc),
+						Binop::DoubleComma => Node::from(AstChop::DoubleComma(expr), loc),
+						Binop::Ix => Node::from(AstChop::Index(expr), loc),
 					}
 				}
 			})
