@@ -105,11 +105,14 @@ fn main() {
 		println!("{}", HELP_MESSAGE);
 		did_something = true;
 	}
-	if settings.root_filename.is_none() && !did_something {
-		println!(
-			"No filename provided, nothing to do. Try `{} --help` for usage.",
-			settings.path
-		);
+	if settings.root_filename.is_none() {
+		if !did_something {
+			println!(
+				"No filename provided, nothing to do. Try `{} --help` for usage.",
+				settings.path
+			);
+		}
+		return;
 	}
 
 	// Get the source code in memory.
