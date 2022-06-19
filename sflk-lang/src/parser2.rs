@@ -55,6 +55,7 @@ enum ParsingData {
 	StmtInvalid {
 		error: Node<Expr>,
 	},
+	Nothing,
 }
 
 struct Chop {
@@ -351,11 +352,7 @@ impl Parser {
 				ParsingData::AssignmentStmt { target, content } => {
 					match self.data_stack.last_mut().unwrap() {
 						ParsingData::BlockLevel { stmts, .. } => {
-							let loc = target.loc() + content.as_ref().unwrap().loc();
-							stmts.push(Node::from(
-								(Stmt::Assign { target, expr: content.unwrap() }),
-								loc,
-							));
+							stmts.push(temporary_assignment_into_ast_stmt(target, content));
 						},
 						_ => panic!(),
 					}
@@ -496,12 +493,16 @@ impl Parser {
 				self.data_stack
 					.push(ParsingData::ExtKw(Node::from(ext_kw, loc)));
 				match ext_descr.content_type {
-					ExtType::None => todo!(),
-					ExtType::Expr => todo!(),
-					ExtType::Targ => todo!(),
+					ExtType::None => {
+						self.data_stack.push(ParsingData::Nothing);
+					},
+					ExtType::Expr => {
+						self.action_stack.push(ParsingAction::ParseExpr);
+					},
 					ExtType::Stmt => {
 						self.action_stack.push(ParsingAction::ParseStmt);
 					},
+					ExtType::Targ => todo!(),
 				}
 			},
 			ParsingAction::SetExt => {
@@ -521,7 +522,15 @@ impl Parser {
 							.content_type,
 						content_data,
 					) {
-						(ExtType::None, _) => panic!(),
+						(ExtType::None, ParsingData::Nothing) => {
+							self.debug.log_deindent(&format!(
+								"Done parsing extention {}",
+								ext_kw.unwrap_ref()
+							));
+							exts.get_mut(ext_kw.unwrap_ref())
+								.unwrap()
+								.push(Node::from(StmtExt::None, ext_kw.loc().clone()));
+						},
 						(ExtType::Stmt, ParsingData::Stmt { kw: kw_, content, exts: exts_ }) => {
 							self.debug.log_deindent("Done parsing statement");
 							self.debug.log_deindent(&format!(
@@ -531,6 +540,27 @@ impl Parser {
 							exts.get_mut(ext_kw.unwrap_ref()).unwrap().push(
 								temporary_into_ast_stmt(kw_, content, exts_).map(StmtExt::Stmt),
 							);
+						},
+						(ExtType::Stmt, ParsingData::AssignmentStmt { target, content }) => {
+							self.debug.log_deindent("Done parsing statement");
+							self.debug.log_deindent(&format!(
+								"Done parsing extention {}",
+								ext_kw.unwrap_ref()
+							));
+							exts.get_mut(ext_kw.unwrap_ref()).unwrap().push(
+								temporary_assignment_into_ast_stmt(target, content)
+									.map(StmtExt::Stmt),
+							);
+						},
+						(ExtType::Expr, ParsingData::Expr { init, chops }) => {
+							self.debug.log_deindent("Done parsing expression");
+							self.debug.log_deindent(&format!(
+								"Done parsing extention {}",
+								ext_kw.unwrap_ref()
+							));
+							exts.get_mut(ext_kw.unwrap_ref())
+								.unwrap()
+								.push(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
 						},
 						_ => unimplemented!(),
 					}
@@ -680,8 +710,8 @@ impl LanguageDescr {
 		stmts.insert(
 			Kw::If,
 			StmtDescr {
-				name_article: "a".to_string(),
-				name: "print".to_string(),
+				name_article: "an".to_string(),
+				name: "if".to_string(),
 				content_type: ExtType::Expr,
 				extentions: {
 					let mut exts = HashMap::new();
@@ -699,6 +729,50 @@ impl LanguageDescr {
 							content_type: ExtType::Stmt,
 							optional: true,
 							can_stack: true,
+						},
+					);
+					exts
+				},
+			},
+		);
+		stmts.insert(
+			Kw::Lp,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "loop".to_string(),
+				content_type: ExtType::None,
+				extentions: {
+					let mut exts = HashMap::new();
+					exts.insert(
+						Kw::Wh,
+						StmtExtDescr {
+							content_type: ExtType::Expr,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					exts.insert(
+						Kw::Bd,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					exts.insert(
+						Kw::Sp,
+						StmtExtDescr {
+							content_type: ExtType::Stmt,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					exts.insert(
+						Kw::Ao,
+						StmtExtDescr {
+							content_type: ExtType::None,
+							optional: true,
+							can_stack: false,
 						},
 					);
 					exts
@@ -782,8 +856,63 @@ fn temporary_into_ast_stmt(
 			},
 			kw_loc,
 		),
+		Kw::Lp => Node::from(
+			Stmt::Loop {
+				wh_exprs: exts
+					.remove(&Kw::Wh)
+					.unwrap()
+					.into_iter()
+					.map(|expr_ext| {
+						let loc = expr_ext.loc().clone();
+						match expr_ext.unwrap() {
+							StmtExt::Expr(expr) => Node::from(expr, loc),
+							_ => panic!(),
+						}
+					})
+					.collect(),
+				bd_stmts: exts
+					.remove(&Kw::Bd)
+					.unwrap()
+					.into_iter()
+					.map(|stmt_ext| {
+						let loc = stmt_ext.loc().clone();
+						match stmt_ext.unwrap() {
+							StmtExt::Stmt(stmt) => Node::from(stmt, loc),
+							_ => panic!(),
+						}
+					})
+					.collect(),
+				sp_stmts: exts
+					.remove(&Kw::Sp)
+					.unwrap()
+					.into_iter()
+					.map(|stmt_ext| {
+						let loc = stmt_ext.loc().clone();
+						match stmt_ext.unwrap() {
+							StmtExt::Stmt(stmt) => Node::from(stmt, loc),
+							_ => panic!(),
+						}
+					})
+					.collect(),
+				ao_flag: exts
+					.remove(&Kw::Ao)
+					.unwrap()
+					.into_iter()
+					.next()
+					.map(|node| node.map(|non_ext| ())),
+			},
+			kw_loc,
+		),
 		_ => unimplemented!(),
 	}
+}
+
+fn temporary_assignment_into_ast_stmt(
+	target: Node<TargetExpr>,
+	content: Option<Node<Expr>>,
+) -> Node<Stmt> {
+	let loc = target.loc() + content.as_ref().unwrap().loc();
+	Node::from((Stmt::Assign { target, expr: content.unwrap() }), loc)
 }
 
 // TODO: Stop having to use `ast::Expr` this early, or maybe at all.

@@ -365,36 +365,50 @@ impl Treeable for Stmt {
 					},
 				],
 			),
-			Stmt::Loop { .. } => {
-				/*
-				StringTree::new_node("loop".to_string(), styles::NORMAL, {
-					let mut vec: Vec<StringTree> = Vec::with_capacity(3);
-					if let Some(expr) = wh_expr {
-						vec.push(StringTree::from(expr));
-					} else {
-						vec.push(StringTree::new_leaf(
-							"no while condition".to_string(),
+			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag } => StringTree::new_node(
+				"loop".to_string(),
+				styles::NORMAL,
+				vec![
+					if !wh_exprs.is_empty() {
+						StringTree::new_node(
+							"while condition".to_string(),
 							styles::NORMAL,
-						));
-					}
-					if let Some(stmt) = bd_stmt {
-						vec.push(StringTree::from(&**stmt));
+							wh_exprs.iter().map(StringTree::from).collect(),
+						)
 					} else {
-						vec.push(StringTree::new_leaf("no body".to_string(), styles::NORMAL));
-					}
-					if let Some(stmt) = sp_stmt {
-						vec.push(StringTree::from(&**stmt));
-					} else {
-						vec.push(StringTree::new_leaf(
-							"no separator".to_string(),
+						StringTree::new_leaf("no while condition".to_string(), styles::NORMAL)
+					},
+					if !bd_stmts.is_empty() {
+						StringTree::new_node(
+							"body".to_string(),
 							styles::NORMAL,
-						));
-					}
-					vec
-				})
-				*/
-				unimplemented!()
-			},
+							bd_stmts.iter().map(StringTree::from).collect(),
+						)
+					} else {
+						StringTree::new_leaf("no body".to_string(), styles::NORMAL)
+					},
+					if !sp_stmts.is_empty() {
+						StringTree::new_node(
+							"separator".to_string(),
+							styles::NORMAL,
+							sp_stmts.iter().map(StringTree::from).collect(),
+						)
+					} else {
+						StringTree::new_leaf("no separator".to_string(), styles::NORMAL)
+					},
+				]
+				.into_iter()
+				.chain(
+					if ao_flag.is_some() {
+						Some(StringTree::new_leaf(
+							"at least once".to_string(),
+							styles::NORMAL,
+						))
+					} else {
+						None
+					},
+				).collect(),
+			),
 			Stmt::RegisterInterceptor { expr } => StringTree::new_node(
 				"register interceptor".to_string(),
 				styles::NORMAL,
