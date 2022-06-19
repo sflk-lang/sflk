@@ -74,6 +74,7 @@ const INDENT_START: &str = "┌";
 const INDENT_END: &str = "└";
 const INDENT_NORMAL: &str = "│";
 const INDENT_WEAK: &str = "╎";
+const INDENT_TAIL: &str = "─";
 
 enum StartOrEnd {
 	Start,
@@ -102,7 +103,7 @@ impl IndentedLogger {
 		for indent in self.indents[..last_important_index].iter() {
 			write!(
 				self.writer,
-				"{}{}{}",
+				"{}{} {}",
 				indent.style.0,
 				if indent.is_important {
 					INDENT_NORMAL
@@ -116,7 +117,7 @@ impl IndentedLogger {
 		for indent in self.indents[last_important_index..].iter() {
 			write!(
 				self.writer,
-				"{}{}{}",
+				"{}{} {}",
 				indent.style.0, INDENT_NORMAL, indent.style.1
 			)
 			.expect("write failure");
@@ -124,8 +125,8 @@ impl IndentedLogger {
 		if let Some((indent, start_or_end)) = added_indent {
 			write!(
 				self.writer,
-				"{}{}{}",
-				indent.style.0, start_or_end.indent_text(), indent.style.1
+				"{}{}{}{}",
+				indent.style.0, start_or_end.indent_text(), INDENT_TAIL, indent.style.1
 			)
 			.expect("write failure");
 		}
