@@ -5,9 +5,11 @@ pub mod styles {
 	pub const NEGATIVE: super::Style = ("\x1b[7m", "\x1b[27m");
 	pub const CYAN: super::Style = ("\x1b[36m", "\x1b[39m");
 	pub const YELLOW: super::Style = ("\x1b[33m", "\x1b[39m");
+	pub const GREEN: super::Style = ("\x1b[32m", "\x1b[39m");
 	pub const BLUE: super::Style = ("\x1b[34m", "\x1b[39m");
 	pub const UNDERLINE: super::Style = ("\x1b[4m", "\x1b[24m");
 	pub const BOLD_LIGHT_RED: super::Style = ("\x1b[91m\x1b[1m", "\x1b[22m\x1b[39m");
+	pub const BOLD: super::Style = ("\x1b[1m", "\x1b[22m");
 }
 
 pub fn escape_string(string: &str, escape_style: &Style) -> String {

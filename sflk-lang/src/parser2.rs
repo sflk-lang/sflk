@@ -27,8 +27,8 @@ enum ParsingData {
 	BlockLevel {
 		stmts: Vec<Node<Stmt>>,
 		expected_terminator: BlockLevelExpectedTerminator,
-		begin: Option<Node<()>>,
-		end: Option<Node<()>>,
+		left_curly: Option<Node<()>>,
+		right_curly: Option<Node<()>>,
 	},
 	Stmt {
 		kw: Node<Kw>,
@@ -41,9 +41,11 @@ enum ParsingData {
 		content: Option<Node<Expr>>,
 	},
 	Expr {
-		init: Node<Expr>,
+		init: Option<Node<Expr>>,
 		chops: Vec<Chop>,
+		left_paren: Option<Node<()>>,
 	},
+	LeftParen(Node<()>),
 	Binop(Node<Binop>),
 	StmtInvalid {
 		error: Node<Expr>,
@@ -86,8 +88,9 @@ enum ParsingAction {
 	ParseExt,          // (stmt -- stmt kw ext)
 	SetExt,            // (stmt kw ext -- stmt)
 	ParseExpr,         // ( -- expr)
-	ParseNonChainExpr, // ( -- expr)
+	ParseNonChainExpr, // ( -- [paren] expr)
 	ParseChopOrStop,
+	ConsumeRightParen,  // (paren expr -- expr)
 	ParseChop,          // ( -- binop expr)
 	AddChop,            // (expr binop expr -- expr)
 	BlockLevelIntoExpr, // (block -- expr)
@@ -110,6 +113,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::ParseExpr => write!(f, "ParseExpr"),
 			ParsingAction::ParseNonChainExpr => write!(f, "ParseNonChainExpr"),
 			ParsingAction::ParseChopOrStop => write!(f, "ParseChopOrStop"),
+			ParsingAction::ConsumeRightParen => write!(f, "ConsumeRightParen"),
 			ParsingAction::ParseChop => write!(f, "ParseChop"),
 			ParsingAction::AddChop => write!(f, "AddChop"),
 			ParsingAction::BlockLevelIntoExpr => write!(f, "BlockLevelIntoExpr"),
@@ -158,7 +162,7 @@ impl ParserDebuggingLogger {
 	fn log_action(&mut self, action: ParsingAction) {
 		if let Some(logger) = &mut self.logger {
 			if self.log_actions {
-				logger.log_string(&format!("Action {}", action), styles::NORMAL);
+				logger.log_string(&format!("Action {}", action), styles::YELLOW);
 			}
 		}
 	}
@@ -182,7 +186,7 @@ impl ParserDebuggingLogger {
 	fn log_consume_token(&mut self, tok: &Tok, loc: &Loc) {
 		self.log_line_number_if_new(loc.line());
 		if let Some(logger) = &mut self.logger {
-			logger.log_string(&format!("Consume {}", tok), styles::NORMAL);
+			logger.log_string(&format!("Consume {}", tok), styles::BOLD);
 		}
 	}
 }
@@ -210,8 +214,8 @@ impl Parser {
 		self.data_stack.push(ParsingData::BlockLevel {
 			stmts: Vec::new(),
 			expected_terminator: BlockLevelExpectedTerminator::Eof,
-			begin: None,
-			end: None,
+			left_curly: None,
+			right_curly: None,
 		});
 		self.action_stack.push(ParsingAction::ParseStmtOrStop);
 		self.parse();
@@ -242,7 +246,7 @@ impl Parser {
 
 	fn consume_tok(&mut self) -> (Tok, Loc) {
 		let (tok, loc) = self.tb.pop();
-		self.debug.log_peek_token(&tok, &loc);
+		self.debug.log_consume_token(&tok, &loc);
 		(tok, loc)
 	}
 
@@ -253,7 +257,7 @@ impl Parser {
 			ParsingAction::Terminate => panic!(),
 			ParsingAction::ParseStmtOrStop => {
 				let (tok, loc) = self.peek_tok();
-				if let ParsingData::BlockLevel { expected_terminator, end, .. } =
+				if let ParsingData::BlockLevel { expected_terminator, right_curly: end, .. } =
 					self.data_stack.last_mut().unwrap()
 				{
 					match tok {
@@ -286,8 +290,10 @@ impl Parser {
 			},
 			ParsingAction::AddRightCurly => {
 				let (tok, loc) = self.consume_tok();
-				if let ParsingData::BlockLevel { end, .. } = self.data_stack.last_mut().unwrap() {
-					end.insert(Node::from((), loc.clone()));
+				if let ParsingData::BlockLevel { right_curly: end, .. } =
+					self.data_stack.last_mut().unwrap()
+				{
+					end.insert(Node::from((), loc));
 				} else {
 					panic!();
 				}
@@ -413,7 +419,7 @@ impl Parser {
 					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
 					match (&stmt_descr.content_type, content_data) {
 						(ExtType::None, _) => panic!(),
-						(ExtType::Expr, ParsingData::Expr { init, chops }) => {
+						(ExtType::Expr, ParsingData::Expr { init, chops, .. }) => {
 							self.debug.log_deindent("Done parsing expression");
 							self.debug.log_deindent("Done parsing main content");
 							content.insert(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
@@ -425,7 +431,7 @@ impl Parser {
 				{
 					self.debug.log_deindent("Done parsing expression");
 					self.debug.log_deindent("Done parsing main content");
-					if let ParsingData::Expr { init, chops } = content_data {
+					if let ParsingData::Expr { init, chops, .. } = content_data {
 						content.insert(temporary_into_ast_expr(init, chops));
 					} else {
 						panic!();
@@ -564,7 +570,7 @@ impl Parser {
 									.map(StmtExt::Stmt),
 							);
 						},
-						(ExtType::Expr, ParsingData::Expr { init, chops }) => {
+						(ExtType::Expr, ParsingData::Expr { init, chops, .. }) => {
 							self.debug.log_deindent("Done parsing expression");
 							self.debug.log_deindent(&format!(
 								"Done parsing extention {}",
@@ -584,33 +590,42 @@ impl Parser {
 				let (tok, loc) = self.consume_tok();
 				match tok {
 					Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
-						init: Node::from(Expr::IntegerLiteral(integer_string), loc),
+						init: Some(Node::from(Expr::IntegerLiteral(integer_string), loc)),
 						chops: Vec::new(),
+						left_paren: None,
 					}),
 					Tok::String { content, .. } => self.data_stack.push(ParsingData::Expr {
-						init: Node::from(Expr::StringLiteral(content), loc),
+						init: Some(Node::from(Expr::StringLiteral(content), loc)),
 						chops: Vec::new(),
+						left_paren: None,
 					}),
 					Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
-						init: Node::from(Expr::VariableName(string), loc),
+						init: Some(Node::from(Expr::VariableName(string), loc)),
 						chops: Vec::new(),
+						left_paren: None,
 					}),
 					Tok::Left(Matched::Curly) => {
 						self.data_stack.push(ParsingData::BlockLevel {
 							stmts: Vec::new(),
 							expected_terminator: BlockLevelExpectedTerminator::RightCurly,
-							begin: Some(Node::from((), loc)),
-							end: None,
+							left_curly: Some(Node::from((), loc)),
+							right_curly: None,
 						});
 						self.action_stack.push(ParsingAction::BlockLevelIntoExpr);
 						self.action_stack.push(ParsingAction::ParseStmtOrStop);
+					},
+					Tok::Left(Matched::Paren) => {
+						self.data_stack
+							.push(ParsingData::LeftParen(Node::from((), loc)));
+						self.action_stack.push(ParsingAction::ConsumeRightParen);
+						self.action_stack.push(ParsingAction::ParseExpr);
 					},
 					_ => {
 						let error_string = format!("Unexpected token {}", tok);
 						self.debug.log_error(&error_string);
 						let error_line_string = format!("{} on line {}", error_string, loc.line());
 						self.data_stack.push(ParsingData::Expr {
-							init: Node::from(
+							init: Some(Node::from(
 								Expr::Invalid {
 									error_expr: Box::new(Node::from(
 										Expr::StringLiteral(error_line_string),
@@ -618,16 +633,31 @@ impl Parser {
 									)),
 								},
 								loc,
-							),
+							)),
 							chops: Vec::new(),
+							left_paren: None,
 						})
 					},
 				}
 			},
 			ParsingAction::ParseExpr => {
+				let (tok, loc) = self.peek_tok();
 				self.debug.log_normal_indent("Parsing expression");
-				self.action_stack.push(ParsingAction::ParseChopOrStop);
-				self.action_stack.push(ParsingAction::ParseNonChainExpr);
+				if matches!(tok, Tok::Right(Matched::Paren)) {
+					if let ParsingData::LeftParen(left) = self.data_stack.last().unwrap() {
+						let left_loc = left.loc().clone();
+						self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(Expr::NothingLiteral, left_loc + loc)),
+							chops: Vec::new(),
+							left_paren: None,
+						});
+					} else {
+						panic!();
+					}
+				} else {
+					self.action_stack.push(ParsingAction::ParseChopOrStop);
+					self.action_stack.push(ParsingAction::ParseNonChainExpr);
+				}
 			},
 			ParsingAction::ParseChopOrStop => {
 				let (tok, loc) = self.peek_tok();
@@ -637,6 +667,14 @@ impl Parser {
 					self.action_stack.push(ParsingAction::AddChop);
 					self.action_stack.push(ParsingAction::ParseChop);
 				}
+			},
+			ParsingAction::ConsumeRightParen => {
+				let (tok, loc) = self.consume_tok();
+				self.debug.log_deindent("Done parsing expression");
+				assert!(matches!(tok, Tok::Right(Matched::Paren)));
+				let expr = self.data_stack.pop().unwrap();
+				let left_paren = self.data_stack.pop().unwrap();
+				self.data_stack.push(expr);
 			},
 			ParsingAction::ParseChop => {
 				self.debug.log_normal_indent("Parsing chain operation");
@@ -651,26 +689,28 @@ impl Parser {
 			},
 			ParsingAction::AddChop => {
 				let expr = match self.data_stack.pop().unwrap() {
-					ParsingData::Expr { init, chops } => temporary_into_ast_expr(init, chops),
+					ParsingData::Expr { init, chops, .. } => temporary_into_ast_expr(init, chops),
 					_ => panic!(),
 				};
 				let binop = match self.data_stack.pop().unwrap() {
 					ParsingData::Binop(binop) => binop,
 					_ => panic!(),
 				};
-				if let ParsingData::Expr { init, chops } = self.data_stack.last_mut().unwrap() {
+				if let ParsingData::Expr { init, chops, .. } = self.data_stack.last_mut().unwrap() {
 					chops.push(Chop { binop, expr })
 				}
 				self.debug.log_deindent("Done parsing chain operation");
 			},
 			ParsingAction::BlockLevelIntoExpr => {
-				if let ParsingData::BlockLevel { stmts, begin, end, .. } =
-					self.data_stack.pop().unwrap()
+				if let ParsingData::BlockLevel {
+					stmts, left_curly: begin, right_curly: end, ..
+				} = self.data_stack.pop().unwrap()
 				{
 					let loc = begin.unwrap().loc() + end.unwrap().loc();
 					self.data_stack.push(ParsingData::Expr {
-						init: Node::from(Expr::BlockLiteral(stmts), loc),
+						init: Some(Node::from(Expr::BlockLiteral(stmts), loc)),
 						chops: Vec::new(),
+						left_paren: None,
 					})
 				} else {
 					panic!();
@@ -1009,7 +1049,8 @@ fn temporary_assignment_into_ast_stmt(
 }
 
 // TODO: Stop having to use `ast::Expr` this early, or maybe at all.
-fn temporary_into_ast_expr(init: Node<Expr>, chops: Vec<Chop>) -> Node<Expr> {
+fn temporary_into_ast_expr(init: Option<Node<Expr>>, chops: Vec<Chop>) -> Node<Expr> {
+	let init = init.unwrap();
 	let init_loc = init.loc().to_owned();
 	if chops.is_empty() {
 		init
