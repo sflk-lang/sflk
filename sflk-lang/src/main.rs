@@ -1,5 +1,3 @@
-#![allow(unused)] // TODO: Remove.
-
 mod ast;
 mod log;
 mod log_indent;
@@ -25,11 +23,13 @@ const HELP_MESSAGE: &str = "\
 	\tsflk [filename.sflk] [options]\n\
 	\n\
 	Options:\n\
-	\t-d --debug         Turns on debug mode\n\
-	\t-h --help          Prints this help message\n\
-	\t-v --version       Prints the interpreter version\n\
-	\t-v --tokens        Prints tokens\n\
-	\t-v --tokens-lines  Prints tokens with their line numbers\n\
+	\t-d --debug     Turns on debug mode\n\
+	\t-h --help      Prints this help message\n\
+	\t-v --version   Prints the interpreter version\n\
+	\t   --tokens    Prints tokens and halts\n\
+	\t   --lines     Prints line numbers in some debug logs\n\
+	\t   --actions   Prints actions in parsing debug logs\n\
+	\t   --sir       Prints the SIR code before running\n\
 	";
 
 const NO_WARRANTY_NOTE: &str = "\
@@ -81,7 +81,7 @@ impl Settings {
 			} else if settings.root_filename.is_none() {
 				settings.root_filename = Some(arg);
 			} else {
-				panic!("unknown command line argument `{}`", arg);
+				panic!("Unknown command line argument `{}`", arg);
 			}
 		}
 		settings
@@ -112,22 +112,19 @@ fn main() {
 		);
 	}
 
-	/*
-	let mut mem = machine::Mem::new(settings.debug);
-	mem.exec_file(settings.root_filename.unwrap());
-	if let Some(debug_mem) = mem.debug_mem_opt {
-		debug_mem.log.print_to_stdout();
-	}
-	*/
-
+	// Get the source code in memory.
 	let scu = Rc::new(SourceCodeUnit::from_filename(
 		&settings.root_filename.unwrap(),
 	));
-	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
+
+	// Get a tokenizer ready.
+	let tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 	if settings.display_tokens {
 		tfr.display_all(settings.debug_lines);
 		return;
 	}
+
+	// Get a parser ready.
 	let parser_logger = if settings.debug {
 		ParserDebuggingLogger {
 			logger: Some(IndentedLogger::new()),
@@ -144,13 +141,19 @@ fn main() {
 		}
 	};
 	let mut parser = Parser::new(tfr, parser_logger);
+
+	// Parse the source code into an AST.
 	let ast = parser.parse_program();
 	if settings.debug {
 		ast.print();
 	}
+
+	// Transform the AST into SIR code.
 	let sir_block = sir::program_to_sir_block(ast.unwrap_ref());
 	if settings.debug_sir {
 		dbg!(&sir_block);
 	}
+
+	// Actually the code.
 	sir::exec_sir_block(sir_block);
 }

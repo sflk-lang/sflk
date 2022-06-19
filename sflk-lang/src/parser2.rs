@@ -1,3 +1,19 @@
+//! This parser consumes one token at a time in a loop, and keeps track
+//! of the context by manipulating two stacks: a data stack and an action stack.
+//! These stacks are in `Parser`.
+//!
+//! At each iteration, an action of the action stack is popped and executed.
+//! One action can either peek on the next token, consume the next token or
+//! don't look at the nect token at all. This restriction allows for the
+//! parsing loop to guarentee that at most one token is consumed or even
+//! considered at each iteration. This makes the parser eaiser to debug,
+//! and will allow for parsing directives to be insertable inbetween any
+//! two consecutive tokens.
+//!
+//! The action stack allows the parser to keep track of its future tasks,
+//! and the data stack allows it to keep track of what has already been
+//! partially parsed.
+
 use crate::{
 	ast::{Chop as AstChop, Expr, Node, Program, Stmt, TargetExpr, Unop as AstUnop},
 	log_indent::IndentedLogger,
@@ -10,18 +26,6 @@ use std::{
 	convert::{TryFrom, TryInto},
 	fmt,
 };
-
-enum BlockLevelExpectedTerminator {
-	Eof,
-	RightCurly,
-}
-
-enum StmtExt {
-	Stmt(Stmt),
-	Expr(Expr),
-	Targ(TargetExpr),
-	None,
-}
 
 enum ParsingData {
 	BlockLevel {
@@ -55,6 +59,13 @@ enum ParsingData {
 	Targ(Node<TargetExpr>),
 }
 
+enum StmtExt {
+	Stmt(Stmt),
+	Expr(Expr),
+	Targ(TargetExpr),
+	None,
+}
+
 struct Chop {
 	binop: Node<Binop>,
 	expr: Node<Expr>,
@@ -78,12 +89,18 @@ enum Unop {
 	File,
 }
 
-/// Each of these should represent one simple action that the parser may perform.
-/// A simple action is popped from the action stack, it can modify the data stack as
+enum BlockLevelExpectedTerminator {
+	Eof,
+	RightCurly,
+}
+
+/// Each of these represents one simple action that the parser may perform.
+/// When an action is popped from the action stack, it can modify the data stack as
 /// it pleases, it can push actions on the action stack, but it can either consume at
-/// most one token or peek at most one token.
-/// This restriction on its sight of the token stream will allow for debugging parsing
-/// directives to be insertable anywhere in between tokens and it will allow the
+/// most one token or peek at most one token or not look at the tokens at all.
+///
+/// The restriction on the way the token stream is consumed will allow for debugging
+/// parsing directives to be insertable anywhere in between tokens and it will allow the
 /// step-by-step verbose parsing to go token-by-token.
 #[derive(Clone, Copy)]
 enum ParsingAction {
@@ -267,6 +284,9 @@ impl Parser {
 		(tok, loc)
 	}
 
+	/// This is the core of the whole parser.
+	/// 
+	/// TODO: Document what goes on in there.
 	fn perform_one_action(&mut self) {
 		let action = self.action_stack.pop().unwrap();
 		self.debug.log_action(action);
@@ -333,8 +353,8 @@ impl Parser {
 							self.action_stack.push(ParsingAction::ParseExtOrStop);
 						}
 						match stmt_descr.content_type {
-							ExtType::None => (),
-							ExtType::Expr => {
+							ContentType::None => (),
+							ContentType::Expr => {
 								self.action_stack.push(ParsingAction::SetContent);
 								self.action_stack.push(ParsingAction::ParseContent);
 							},
@@ -414,8 +434,8 @@ impl Parser {
 				if let ParsingData::Stmt { kw, .. } = self.data_stack.last().unwrap() {
 					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
 					match stmt_descr.content_type {
-						ExtType::None => panic!(),
-						ExtType::Expr => {
+						ContentType::None => panic!(),
+						ContentType::Expr => {
 							self.debug
 								.log_normal_indent("Parsing expression that is the main content");
 							self.action_stack.push(ParsingAction::ParseExpr);
@@ -435,8 +455,8 @@ impl Parser {
 				if let ParsingData::Stmt { kw, content, .. } = self.data_stack.last_mut().unwrap() {
 					let stmt_descr = self.lang.stmts.get(kw.unwrap_ref()).unwrap();
 					match (&stmt_descr.content_type, content_data) {
-						(ExtType::None, _) => panic!(),
-						(ExtType::Expr, ParsingData::Expr { init, chops, .. }) => {
+						(ContentType::None, _) => panic!(),
+						(ContentType::Expr, ParsingData::Expr { init, chops, .. }) => {
 							self.debug.log_deindent("Done parsing expression");
 							self.debug.log_deindent("Done parsing main content");
 							content.insert(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
@@ -528,16 +548,16 @@ impl Parser {
 				self.data_stack
 					.push(ParsingData::ExtKw(Node::from(ext_kw, loc)));
 				match ext_descr.content_type {
-					ExtType::None => {
+					ContentType::None => {
 						self.data_stack.push(ParsingData::Nothing);
 					},
-					ExtType::Expr => {
+					ContentType::Expr => {
 						self.action_stack.push(ParsingAction::ParseExpr);
 					},
-					ExtType::Stmt => {
+					ContentType::Stmt => {
 						self.action_stack.push(ParsingAction::ParseStmt);
 					},
-					ExtType::Targ => {
+					ContentType::Targ => {
 						self.action_stack.push(ParsingAction::ParseTarg);
 					},
 				}
@@ -559,7 +579,7 @@ impl Parser {
 							.content_type,
 						content_data,
 					) {
-						(ExtType::None, ParsingData::Nothing) => {
+						(ContentType::None, ParsingData::Nothing) => {
 							self.debug.log_deindent(&format!(
 								"Done parsing extention {}",
 								ext_kw.unwrap_ref()
@@ -568,7 +588,10 @@ impl Parser {
 								.unwrap()
 								.push(Node::from(StmtExt::None, ext_kw.loc().clone()));
 						},
-						(ExtType::Stmt, ParsingData::Stmt { kw: kw_, content, exts: exts_ }) => {
+						(
+							ContentType::Stmt,
+							ParsingData::Stmt { kw: kw_, content, exts: exts_ },
+						) => {
 							self.debug.log_deindent("Done parsing statement");
 							self.debug.log_deindent(&format!(
 								"Done parsing extention {}",
@@ -578,7 +601,7 @@ impl Parser {
 								temporary_into_ast_stmt(kw_, content, exts_).map(StmtExt::Stmt),
 							);
 						},
-						(ExtType::Stmt, ParsingData::AssignmentStmt { target, content }) => {
+						(ContentType::Stmt, ParsingData::AssignmentStmt { target, content }) => {
 							self.debug.log_deindent("Done parsing statement");
 							self.debug.log_deindent(&format!(
 								"Done parsing extention {}",
@@ -589,7 +612,7 @@ impl Parser {
 									.map(StmtExt::Stmt),
 							);
 						},
-						(ExtType::Expr, ParsingData::Expr { init, chops, .. }) => {
+						(ContentType::Expr, ParsingData::Expr { init, chops, .. }) => {
 							self.debug.log_deindent("Done parsing expression");
 							self.debug.log_deindent(&format!(
 								"Done parsing extention {}",
@@ -599,7 +622,7 @@ impl Parser {
 								.unwrap()
 								.push(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
 						},
-						(ExtType::Targ, ParsingData::Targ(targ)) => {
+						(ContentType::Targ, ParsingData::Targ(targ)) => {
 							self.debug.log_deindent(&format!(
 								"Done parsing extention {}",
 								ext_kw.unwrap_ref()
@@ -808,24 +831,39 @@ impl Parser {
 	}
 }
 
-enum ExtType {
+enum ContentType {
 	Stmt,
 	Expr,
 	Targ,
+	/// An extention may consist of just a keyword without any content,
+	/// for example the at-least-once (`ao`) extention to loop statements.
 	None,
 }
 
+/// Description of one possible extention to a parent statement description.
+/// For example, the if statement can have then branches that are extentions,
+/// so the if statement description should contain one `StmtExtDescr` that
+/// describes the fact that then extentions contain statements, are optional
+/// and stackable.
 struct StmtExtDescr {
-	content_type: ExtType,
+	content_type: ContentType,
 	optional: bool,
 	/// Can this extention be present multiple times in the same statement?
 	can_stack: bool,
 }
 
+/// Description of one type of statement that must begin with a keyword.
+/// For example, an if statement must begin with the `if` keyword, so the
+/// language description should contain one `StmtDescr` that describes the
+/// fact that if statements contain an extention, and can have then and else
+/// extentions, etc.
+///
+/// The assignment statement does not begin with a keyword and thus is not
+/// described by such structure.
 struct StmtDescr {
 	name_article: String,
 	name: String,
-	content_type: ExtType,
+	content_type: ContentType,
 	extentions: HashMap<Kw, StmtExtDescr>,
 }
 
@@ -843,7 +881,7 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "a".to_string(),
 				name: "nop".to_string(),
-				content_type: ExtType::None,
+				content_type: ContentType::None,
 				extentions: HashMap::new(),
 			},
 		);
@@ -852,7 +890,7 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "a".to_string(),
 				name: "newline".to_string(),
-				content_type: ExtType::None,
+				content_type: ContentType::None,
 				extentions: HashMap::new(),
 			},
 		);
@@ -861,7 +899,7 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "a".to_string(),
 				name: "print".to_string(),
-				content_type: ExtType::Expr,
+				content_type: ContentType::Expr,
 				extentions: HashMap::new(),
 			},
 		);
@@ -870,13 +908,13 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "an".to_string(),
 				name: "if".to_string(),
-				content_type: ExtType::Expr,
+				content_type: ContentType::Expr,
 				extentions: {
 					let mut exts = HashMap::new();
 					exts.insert(
 						Kw::Th,
 						StmtExtDescr {
-							content_type: ExtType::Stmt,
+							content_type: ContentType::Stmt,
 							optional: true,
 							can_stack: true,
 						},
@@ -884,7 +922,7 @@ impl LanguageDescr {
 					exts.insert(
 						Kw::El,
 						StmtExtDescr {
-							content_type: ExtType::Stmt,
+							content_type: ContentType::Stmt,
 							optional: true,
 							can_stack: true,
 						},
@@ -898,13 +936,13 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "a".to_string(),
 				name: "loop".to_string(),
-				content_type: ExtType::None,
+				content_type: ContentType::None,
 				extentions: {
 					let mut exts = HashMap::new();
 					exts.insert(
 						Kw::Wh,
 						StmtExtDescr {
-							content_type: ExtType::Expr,
+							content_type: ContentType::Expr,
 							optional: true,
 							can_stack: true,
 						},
@@ -912,7 +950,7 @@ impl LanguageDescr {
 					exts.insert(
 						Kw::Bd,
 						StmtExtDescr {
-							content_type: ExtType::Stmt,
+							content_type: ContentType::Stmt,
 							optional: true,
 							can_stack: true,
 						},
@@ -920,7 +958,7 @@ impl LanguageDescr {
 					exts.insert(
 						Kw::Sp,
 						StmtExtDescr {
-							content_type: ExtType::Stmt,
+							content_type: ContentType::Stmt,
 							optional: true,
 							can_stack: true,
 						},
@@ -928,7 +966,7 @@ impl LanguageDescr {
 					exts.insert(
 						Kw::Ao,
 						StmtExtDescr {
-							content_type: ExtType::None,
+							content_type: ContentType::None,
 							optional: true,
 							can_stack: false,
 						},
@@ -942,7 +980,7 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "a".to_string(),
 				name: "do".to_string(),
-				content_type: ExtType::Expr,
+				content_type: ContentType::Expr,
 				extentions: HashMap::new(),
 			},
 		);
@@ -951,7 +989,7 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "a".to_string(),
 				name: "do here".to_string(),
-				content_type: ExtType::Expr,
+				content_type: ContentType::Expr,
 				extentions: HashMap::new(),
 			},
 		);
@@ -960,7 +998,7 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "an".to_string(),
 				name: "evaluate".to_string(),
-				content_type: ExtType::Expr,
+				content_type: ContentType::Expr,
 				extentions: HashMap::new(),
 			},
 		);
@@ -969,7 +1007,7 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "a".to_string(),
 				name: "register interceptor".to_string(),
-				content_type: ExtType::Expr,
+				content_type: ContentType::Expr,
 				extentions: HashMap::new(),
 			},
 		);
@@ -978,13 +1016,13 @@ impl LanguageDescr {
 			StmtDescr {
 				name_article: "an".to_string(),
 				name: "emit".to_string(),
-				content_type: ExtType::Expr,
+				content_type: ContentType::Expr,
 				extentions: {
 					let mut exts = HashMap::new();
 					exts.insert(
 						Kw::Rs,
 						StmtExtDescr {
-							content_type: ExtType::Targ,
+							content_type: ContentType::Targ,
 							optional: true,
 							can_stack: false,
 						},
@@ -1018,6 +1056,10 @@ impl StmtDescr {
 		exts
 	}
 }
+
+// The current AST is pretty much legacy and will probably change in the future,
+// the code after this point is dedicated to converting code representation
+// manipulated here into pieces of legacy AST.
 
 // TODO: Stop having to use `ast::Stmt` this early, or maybe at all.
 fn temporary_into_ast_stmt(

@@ -1,3 +1,14 @@
+//! SIR stands for Sequential Instruction Representation.
+//! Code represented in SIR is composed of a sequence of
+//! instructions that can be executed sequentially, as opposed
+//! to, say, a tree that would be executed recursively.
+//! 
+//! An adventage of executing code in SIR is that there is
+//! an instruction pointer that can be saved to susped execution
+//! and resume it later, easily.
+//! 
+//! Temporary data is handled via a stack of SFLK objects.
+
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
 	parser::Parser,
@@ -286,6 +297,9 @@ impl Execution {
 		}
 	}
 
+	/// This is the core of the whole SIR machine.
+	/// 
+	/// TODO: Document what goes on in there.
 	fn perform_one_step(&mut self, context_table: &mut ContextTable) {
 		let top_frame_is_done = self.frame_stack.last().unwrap().is_done();
 		if top_frame_is_done {
@@ -697,6 +711,11 @@ pub fn exec_sir_block(sir_block: SirBlock) {
 	machine.run();
 	//dbg!(machine);
 }
+
+// The code that follows is dedicated to transform programs represented
+// as pieces of legacy AST into SIR code.
+//
+// TODO: Document.
 
 pub fn program_to_sir_block(program: &Program) -> SirBlock {
 	let mut sir_instrs = Vec::new();
