@@ -27,6 +27,8 @@ enum ParsingData {
 	BlockLevel {
 		stmts: Vec<Node<Stmt>>,
 		expected_terminator: BlockLevelExpectedTerminator,
+		begin: Option<Node<()>>,
+		end: Option<Node<()>>,
 	},
 	Stmt {
 		kw: Node<Kw>,
@@ -73,6 +75,7 @@ enum Binop {
 enum ParsingAction {
 	Terminate,
 	ParseStmtOrStop,
+	AddRightCurly,
 	ParseStmt,     // ( -- stmt)
 	AddStmt,       // (block stmt -- block)
 	ParseContent,  // (stmt -- stmt content)
@@ -84,8 +87,9 @@ enum ParsingAction {
 	ParseExpr,         // ( -- expr)
 	ParseNonChainExpr, // ( -- expr)
 	ParseChopOrStop,
-	ParseChop, // ( -- binop expr)
-	AddChop,   // (expr binop expr -- expr)
+	ParseChop,          // ( -- binop expr)
+	AddChop,            // (expr binop expr -- expr)
+	BlockLevelIntoExpr, // (block -- expr)
 }
 
 impl fmt::Display for ParsingAction {
@@ -93,6 +97,7 @@ impl fmt::Display for ParsingAction {
 		match self {
 			ParsingAction::Terminate => write!(f, "Terminate"),
 			ParsingAction::ParseStmtOrStop => write!(f, "ParseStmtOrStop"),
+			ParsingAction::AddRightCurly => write!(f, "AddRightCurly"),
 			ParsingAction::ParseStmt => write!(f, "ParseStmt"),
 			ParsingAction::AddStmt => write!(f, "AddStmt"),
 			ParsingAction::ParseContent => write!(f, "ParseContent"),
@@ -106,6 +111,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::ParseChopOrStop => write!(f, "ParseChopOrStop"),
 			ParsingAction::ParseChop => write!(f, "ParseChop"),
 			ParsingAction::AddChop => write!(f, "AddChop"),
+			ParsingAction::BlockLevelIntoExpr => write!(f, "BlockLevelIntoExpr"),
 		}
 	}
 }
@@ -203,6 +209,8 @@ impl Parser {
 		self.data_stack.push(ParsingData::BlockLevel {
 			stmts: Vec::new(),
 			expected_terminator: BlockLevelExpectedTerminator::Eof,
+			begin: None,
+			end: None,
 		});
 		self.action_stack.push(ParsingAction::ParseStmtOrStop);
 		self.parse();
@@ -229,11 +237,12 @@ impl Parser {
 		let action = self.action_stack.pop().unwrap();
 		self.debug.log_action(action);
 		match action {
+			ParsingAction::Terminate => panic!(),
 			ParsingAction::ParseStmtOrStop => {
 				let (tok, loc) = self.tb.peek(0);
 				self.debug.log_peek_token(tok, loc);
-				if let ParsingData::BlockLevel { expected_terminator, .. } =
-					self.data_stack.last().unwrap()
+				if let ParsingData::BlockLevel { expected_terminator, end, .. } =
+					self.data_stack.last_mut().unwrap()
 				{
 					match tok {
 						Tok::Eof => {
@@ -248,13 +257,9 @@ impl Parser {
 								expected_terminator,
 								BlockLevelExpectedTerminator::RightCurly
 							) {
+								self.action_stack.push(ParsingAction::AddRightCurly);
 							} else {
-								//panic!("Unexpected right curly at line {}", loc.line());
-								self.debug
-									.log_normal("TODO: error for unmached right curly");
-								self.action_stack.push(ParsingAction::ParseStmtOrStop);
-								self.action_stack.push(ParsingAction::AddStmt);
-								self.action_stack.push(ParsingAction::ParseStmt);
+								panic!("Unexpected right curly at line {}", loc.line());
 							}
 						},
 						_ => {
@@ -265,6 +270,15 @@ impl Parser {
 					}
 				} else {
 					panic!()
+				}
+			},
+			ParsingAction::AddRightCurly => {
+				let (tok, loc) = self.tb.pop();
+				self.debug.log_consume_token(&tok, &loc);
+				if let ParsingData::BlockLevel { end, .. } = self.data_stack.last_mut().unwrap() {
+					end.insert(Node::from((), loc.clone()));
+				} else {
+					panic!();
 				}
 			},
 			ParsingAction::ParseStmt => {
@@ -575,6 +589,16 @@ impl Parser {
 						init: Node::from(Expr::VariableName(string), loc),
 						chops: Vec::new(),
 					}),
+					Tok::Left(Matched::Curly) => {
+						self.data_stack.push(ParsingData::BlockLevel {
+							stmts: Vec::new(),
+							expected_terminator: BlockLevelExpectedTerminator::RightCurly,
+							begin: Some(Node::from((), loc)),
+							end: None,
+						});
+						self.action_stack.push(ParsingAction::BlockLevelIntoExpr);
+						self.action_stack.push(ParsingAction::ParseStmtOrStop);
+					},
 					_ => {
 						let error_string = format!("Unexpected token {}", tok);
 						self.debug.log_error(&error_string);
@@ -635,8 +659,18 @@ impl Parser {
 				}
 				self.debug.log_deindent("Done parsing chain operation");
 			},
-			_ => {
-				unimplemented!();
+			ParsingAction::BlockLevelIntoExpr => {
+				if let ParsingData::BlockLevel { stmts, begin, end, .. } =
+					self.data_stack.pop().unwrap()
+				{
+					let loc = begin.unwrap().loc() + end.unwrap().loc();
+					self.data_stack.push(ParsingData::Expr {
+						init: Node::from(Expr::BlockLiteral(stmts), loc),
+						chops: Vec::new(),
+					})
+				} else {
+					panic!();
+				}
 			},
 		}
 	}
