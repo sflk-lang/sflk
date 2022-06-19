@@ -96,7 +96,7 @@ fn main() {
 		let version_name = "indev";
 		println!(
 			"SFLK reference interpreter, version {}.{}.{} ({})",
-			0, 1, 0, version_name
+			0, 2, 0, version_name
 		);
 		println!("{}", NO_WARRANTY_NOTE);
 		did_something = true;
