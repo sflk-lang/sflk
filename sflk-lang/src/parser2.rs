@@ -702,10 +702,7 @@ impl Parser {
 				let expr_loc = expr.loc().clone();
 				self.data_stack.push(ParsingData::Expr {
 					init: Some(Node::from(
-						Expr::Unop(match unop {
-							Unop::Minus => AstUnop::Negate(Box::new(expr)),
-							Unop::File => AstUnop::ReadFile(Box::new(expr)),
-						}),
+						temporary_unop_into_ast_expr(unop, expr),
 						unop_loc + expr_loc,
 					)),
 					chops: Vec::new(),
@@ -1103,6 +1100,7 @@ fn temporary_into_ast_stmt(
 	}
 }
 
+// TODO: Stop having to use `ast::Stmt` this early, or maybe at all.
 fn temporary_assignment_into_ast_stmt(
 	target: Node<TargetExpr>,
 	content: Option<Node<Expr>>,
@@ -1137,4 +1135,12 @@ fn temporary_into_ast_expr(init: Option<Node<Expr>>, chops: Vec<Chop>) -> Node<E
 		let loc = chops.last().map_or(init_loc, |node| node.loc().clone());
 		Node::from(Expr::Chain { init: Box::new(init), chops }, loc)
 	}
+}
+
+// TODO: Stop having to use `ast::Expr` this early, or maybe at all.
+fn temporary_unop_into_ast_expr(unop: Unop, expr: Node<Expr>) -> Expr {
+	Expr::Unop(match unop {
+		Unop::Minus => AstUnop::Negate(Box::new(expr)),
+		Unop::File => AstUnop::ReadFile(Box::new(expr)),
+	})
 }
