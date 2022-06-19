@@ -172,8 +172,8 @@ Does nothing on a Sunday morning. Also does nothing any other day.
 
 ```sflk
 if x
-th then
-el else
+th pr "then"
+el pr "else"
 ```
 
 Here goes your if-then-else statement. Except SFLK wants to be special, so then and else branches are optional, there can be multiples of them, and they can be given in any order and even interleaved. The condition `x` is required though.
