@@ -1,0 +1,3 @@
+fh "sflk-std/std.sflk"
+
+prnl < "test for io"
