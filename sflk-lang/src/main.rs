@@ -17,7 +17,9 @@ use crate::{
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
 };
+
 use std::rc::Rc;
+use std::env;
 
 const HELP_MESSAGE: &str = "\
 	Usage:\n\
@@ -38,6 +40,7 @@ const NO_WARRANTY_NOTE: &str = "\
 	not even for MERCHANTABILITY or \
 	FITNESS FOR A PARTICULAR PURPOSE.";
 
+#[derive(Debug)]
 struct Settings {
 	path: String,
 	root_filename: Option<String>,
@@ -51,10 +54,13 @@ struct Settings {
 }
 
 impl Settings {
-	fn from_args() -> Settings {
-		let mut args = std::env::args();
-		let mut settings = Settings {
-			path: args.next().unwrap_or_else(|| "sflk".to_string()),
+	/// Creates a new `Settings` object filled with default values.
+	///
+	/// Everything is set as `None`, `false`, except `path` that it set from
+	/// parameters
+	fn new(path: String) -> Self {
+		Self {
+			path,
 			root_filename: None,
 			debug: false,
 			debug_lines: false,
@@ -63,28 +69,49 @@ impl Settings {
 			wants_help: false,
 			wants_version: false,
 			display_tokens: false,
-		};
+		}
+	}
+
+	/// Retrieves command line arguments to create the settings according to 
+	/// them
+	fn from_args() -> Self {
+		let mut args = env::args(); // retrieved command line arguments
+		let mut settings = Self::new(args.next().unwrap_or_else(|| "sflk".to_string()));
+
 		for arg in args {
-			if arg == "-d" || arg == "--debug" {
-				settings.debug = true;
-			} else if arg == "-h" || arg == "--help" {
-				settings.wants_help = true;
-			} else if arg == "-v" || arg == "--version" {
-				settings.wants_version = true;
-			} else if arg == "--tokens" {
-				settings.display_tokens = true;
-			} else if arg == "--lines" {
-				settings.debug_lines = true;
-			} else if arg == "--actions" {
-				settings.debug_actions = true;
-			} else if arg == "--sir" {
-				settings.debug_sir = true;
-			} else if settings.root_filename.is_none() {
-				settings.root_filename = Some(arg);
-			} else {
-				panic!("Unknown command line argument `{}`", arg);
+			match arg.as_str() {
+				"-d" | "--debug" => {
+					settings.debug = true;
+				}
+				"-h" | "--help" => {
+					settings.wants_help = true;
+				}
+				"-v" | "--version" => {
+					settings.wants_version = true;
+				}
+				"--tokens" => {
+					settings.display_tokens = true;
+				}
+				"--lines" => {
+					settings.debug_lines = true;
+				}
+				"--actions" => {
+					settings.debug_actions = true;
+				}
+				"--sir" => {
+					settings.debug_sir = true;
+				}
+				arg => {
+					if settings.root_filename.is_none() {
+						settings.root_filename = Some(arg.to_string());
+					}
+					panic!("Unknown command line argument `{}`", arg);
+				}
 			}
 		}
+
+		println!("{:?}", settings);
+
 		settings
 	}
 }
