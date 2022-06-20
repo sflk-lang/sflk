@@ -27,6 +27,11 @@ use std::{
 	fmt,
 };
 
+#[derive(Debug)]
+pub struct ParsingWarning {
+	// TODO
+}
+
 enum ParsingData {
 	BlockLevel {
 		stmts: Vec<Node<Stmt>>,

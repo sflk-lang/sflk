@@ -1,5 +1,5 @@
 use crate::object::Obj;
-use crate::parser::ParsingWarning;
+use crate::parser2::ParsingWarning;
 use crate::program;
 use crate::scu::Loc;
 use crate::stringtree::StringTree;

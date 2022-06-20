@@ -3,11 +3,6 @@ use crate::scu::{Loc};
 use crate::tokenizer::{Kw, Matched, Op, Tok, TokBuffer};
 use std::collections::HashMap;
 
-#[derive(Debug)]
-pub struct ParsingWarning {
-	// TODO
-}
-
 pub struct Parser {}
 
 impl Parser {
