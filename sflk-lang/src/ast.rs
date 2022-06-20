@@ -1,9 +1,11 @@
-use crate::object::Obj;
-use crate::parser::ParsingWarning;
-use crate::program;
-use crate::scu::Loc;
-use crate::stringtree::StringTree;
-use crate::utils::{escape_string, styles};
+use crate::{
+	object::Obj,
+	parser::ParsingWarning,
+	program,
+	scu::Loc,
+	stringtree::StringTree,
+	utils::{escape_string, styles},
+};
 
 // TODO:
 // - move Loc here, or not ?

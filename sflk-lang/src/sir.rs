@@ -2,20 +2,21 @@
 //! Code represented in SIR is composed of a sequence of
 //! instructions that can be executed sequentially, as opposed
 //! to, say, a tree that would be executed recursively.
-//! 
+//!
 //! An adventage of executing code in SIR is that there is
 //! an instruction pointer that can be saved to susped execution
 //! and resume it later, easily.
-//! 
+//!
 //! Temporary data is handled via a stack of SFLK objects.
 
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
 	parser::Parser,
-	ParserDebuggingLogger,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
+	ParserDebuggingLogger,
 };
+
 use std::{collections::HashMap, rc::Rc};
 
 #[derive(Debug, Clone)]
@@ -242,13 +243,16 @@ fn string_to_sir(string: String, name: String) -> SirBlock {
 	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 
 	// This temporary solution is using a `ParserDebuggingLogger` that does not
-	// take care about the settings and without logging 
-	let mut parser = Parser::new(tfr, ParserDebuggingLogger {
-		logger: None,
-		log_lines: false,
-		log_actions: false,
-		last_line: 0,
-	});
+	// take care about the settings and without logging
+	let mut parser = Parser::new(
+		tfr,
+		ParserDebuggingLogger {
+			logger: None,
+			log_lines: false,
+			log_actions: false,
+			last_line: 0,
+		},
+	);
 
 	let ast = parser.parse_program();
 	let sir_block = program_to_sir_block(ast.unwrap_ref());
@@ -308,7 +312,7 @@ impl Execution {
 	}
 
 	/// This is the core of the whole SIR machine.
-	/// 
+	///
 	/// TODO: Document what goes on in there.
 	fn perform_one_step(&mut self, context_table: &mut ContextTable) {
 		let top_frame_is_done = self.frame_stack.last().unwrap().is_done();

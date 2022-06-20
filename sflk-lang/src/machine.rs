@@ -1,9 +1,9 @@
 use crate::{
 	log::IndentedLog,
 	object::Obj,
+	parser::Parser,
 	program::{Block, Chain, Chop, Expr, Stmt},
 	utils::{styles, Style},
-	parser::Parser,
 	ParserDebuggingLogger,
 };
 
@@ -164,13 +164,16 @@ impl Mem {
 			crate::tokenizer::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
 
 		// This temporary solution is using a `ParserDebuggingLogger` that does not
-		// take care about the settings and without logging 
-		let mut parser = Parser::new(tfr, ParserDebuggingLogger {
-			logger: None,
-			log_lines: false,
-			log_actions: false,
-			last_line: 0,
-		});
+		// take care about the settings and without logging
+		let mut parser = Parser::new(
+			tfr,
+			ParserDebuggingLogger {
+				logger: None,
+				log_lines: false,
+				log_actions: false,
+				last_line: 0,
+			},
+		);
 
 		let ast = parser.parse_program();
 

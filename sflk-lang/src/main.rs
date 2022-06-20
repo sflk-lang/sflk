@@ -11,10 +11,12 @@ mod stringtree;
 mod tokenizer;
 mod utils;
 
-use crate::log_indent::IndentedLogger;
-use crate::parser::{Parser, ParserDebuggingLogger};
-use crate::scu::SourceCodeUnit;
-use crate::tokenizer::{CharReadingHead, TokBuffer};
+use crate::{
+	log_indent::IndentedLogger,
+	parser::{Parser, ParserDebuggingLogger},
+	scu::SourceCodeUnit,
+	tokenizer::{CharReadingHead, TokBuffer},
+};
 use std::rc::Rc;
 
 const HELP_MESSAGE: &str = "\

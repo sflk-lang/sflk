@@ -1,6 +1,8 @@
-use crate::program::Block;
-use crate::stringtree::StringTree;
-use crate::utils::{escape_string, styles};
+use crate::{
+	program::Block,
+	stringtree::StringTree,
+	utils::{escape_string, styles},
+};
 
 #[derive(Debug, Clone)]
 pub enum Obj {

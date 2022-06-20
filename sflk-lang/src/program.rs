@@ -1,6 +1,8 @@
-use crate::object::Obj;
-use crate::stringtree::StringTree;
-use crate::utils::styles;
+use crate::{
+	object::Obj,
+	stringtree::StringTree,
+	utils::styles,
+};
 
 #[derive(Debug, Clone)]
 pub struct Block {
