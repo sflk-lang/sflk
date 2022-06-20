@@ -3,7 +3,7 @@ use crate::{
 	object::Obj,
 	program::{Block, Chain, Chop, Expr, Stmt},
 	utils::{styles, Style},
-	parser2::Parser,
+	parser::Parser,
 	ParserDebuggingLogger,
 };
 

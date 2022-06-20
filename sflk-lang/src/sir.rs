@@ -11,7 +11,7 @@
 
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
-	parser2::Parser,
+	parser::Parser,
 	ParserDebuggingLogger,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
