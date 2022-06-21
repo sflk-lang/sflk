@@ -377,7 +377,7 @@ impl Treeable for Stmt {
 			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag } => StringTree::new_node(
 				"loop".to_string(),
 				styles::NORMAL,
-				vec![
+				[
 					if !wh_exprs.is_empty() {
 						StringTree::new_node(
 							"while condition".to_string(),
