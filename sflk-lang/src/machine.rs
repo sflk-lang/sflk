@@ -45,16 +45,6 @@ enum Flow {
 	End,
 }
 
-pub struct DebugMem {
-	pub log: IndentedLog,
-}
-
-impl DebugMem {
-	pub fn new() -> DebugMem {
-		DebugMem { log: IndentedLog::new() }
-	}
-}
-
 pub struct Mem {
 	excx_stack: Vec<ExCx>,
 	pub debug_mem_opt: Option<DebugMem>,
@@ -73,19 +63,7 @@ impl Mem {
 	}
 }
 
-impl DebugMem {
-	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
-		self.log.indent(string, is_context, style);
-	}
 
-	fn log_deindent(&mut self) {
-		self.log.deindent();
-	}
-
-	fn log_line(&mut self, string: String, style: Style) {
-		self.log.log_line(string, style);
-	}
-}
 
 impl Mem {
 	fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
