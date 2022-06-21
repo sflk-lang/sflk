@@ -1,7 +1,12 @@
-use crate::log::IndentedLog;
-use crate::object::Obj;
-use crate::program::{Block, Chain, Chop, Expr, Stmt};
-use crate::utils::{styles, Style};
+use crate::{
+	log::IndentedLog,
+	object::Obj,
+	program::{Block, Chain, Chop, Expr, Stmt},
+	utils::{styles, Style},
+	parser::Parser,
+	ParserDebuggingLogger,
+};
+
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -158,8 +163,17 @@ impl Mem {
 		let mut tfr =
 			crate::tokenizer::TokBuffer::from(crate::tokenizer::CharReadingHead::from_scu(scu));
 
-		let mut parser = crate::parser::Parser::new();
-		let ast = parser.parse_program(&mut tfr);
+		// This temporary solution is using a `ParserDebuggingLogger` that does not
+		// take care about the settings and without logging 
+		let mut parser = Parser::new(tfr, ParserDebuggingLogger {
+			logger: None,
+			log_lines: false,
+			log_actions: false,
+			last_line: 0,
+		});
+
+		let ast = parser.parse_program();
+
 		if let Some(debug_mem) = &mut self.debug_mem_opt {
 			debug_mem
 				.log

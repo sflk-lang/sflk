@@ -1,0 +1,8 @@
+dh fi "sflk-std/std.sflk"
+
+# Tests about mathematics #
+
+pr "--> pow tests" nl
+
+x < (), 5, 3, 10
+pr x > pow nl

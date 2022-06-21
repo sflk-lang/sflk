@@ -12,6 +12,7 @@
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
 	parser::Parser,
+	ParserDebuggingLogger,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
 };
@@ -239,8 +240,17 @@ impl Machine {
 fn string_to_sir(string: String, name: String) -> SirBlock {
 	let scu = Rc::new(SourceCodeUnit::from_str(string, name));
 	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
-	let mut parser = Parser::new();
-	let ast = parser.parse_program(&mut tfr);
+
+	// This temporary solution is using a `ParserDebuggingLogger` that does not
+	// take care about the settings and without logging 
+	let mut parser = Parser::new(tfr, ParserDebuggingLogger {
+		logger: None,
+		log_lines: false,
+		log_actions: false,
+		last_line: 0,
+	});
+
+	let ast = parser.parse_program();
 	let sir_block = program_to_sir_block(ast.unwrap_ref());
 	sir_block
 }

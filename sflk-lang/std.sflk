@@ -1,7 +1,0 @@
-
-# SFLK Standard Library, version 0.0.0 #
-
-# Prints the input followed by a newline.
-| Returns the input.
-| NOTE: May be removed in future versions. #
-prnl < {pr v nl}

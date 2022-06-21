@@ -70,7 +70,7 @@ ri semicolons do "pr \"int y\" nl" ri ()
 fun < "v < \"v < \\\"np\\\" \" + v"
 lp wh fun>{pr v nl}-"np" bd fun < fun > fun
 pr ((8)) nl
-dh fi "sflk-lang/std.sflk"
+dh fi "sflk-std/std.sflk"
 ev "jej" >prnl
 ri {
 	type < v ix 0

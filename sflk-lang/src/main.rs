@@ -4,7 +4,6 @@ mod log_indent;
 mod machine;
 mod object;
 mod parser;
-mod parser2;
 mod program;
 mod scu;
 mod sir;
@@ -13,7 +12,7 @@ mod tokenizer;
 mod utils;
 
 use crate::log_indent::IndentedLogger;
-use crate::parser2::{Parser, ParserDebuggingLogger};
+use crate::parser::{Parser, ParserDebuggingLogger};
 use crate::scu::SourceCodeUnit;
 use crate::tokenizer::{CharReadingHead, TokBuffer};
 use std::rc::Rc;
