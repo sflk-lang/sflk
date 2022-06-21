@@ -43,7 +43,9 @@ That would print `8` and then `2`. Here there would only be 2 variables called `
 
 Imho, this is so much more better than python's `global x`, `nonlocal x`, and wierd behavior in which reading a variable in a function reads the global variable but only if it was not written to before in the function iirc.
 
-Note: In `ev 8 > {v < v*2}`, `v < v*2` is run in a sub-context in which `v` is declared and assigned `8`, so that `>` keeps working as intended.
+#### Note about `>`
+
+In `ev 8 > {v < v*2}`, `v < v*2` is run in a sub-context in which `v` is declared and assigned `8`, so that `>` keeps working as intended.
 
 ### Comparisons
 
@@ -147,6 +149,10 @@ So, in the example with **A** and **B**, it would go as follows:
 
 With this, the initial problem is solved. Even with 50 levels of nesting of block literals, these wierd expressions can capture whatever we want in arbitrary outer layers (by placing declarations like `marker! < ()` in the layers of the contexts we want to capture stuff from). Even more: the expressions marked with `~name` things can be more rich than just variable names (although stuff like `(1+2)~marker` kind of misses the point).
 
+In the example, if `marker! < ()` was out of the big block literal, then the replacing attempt during the evaluation of the big block literal would have been successful and the final printed value would have been `8` instead of `42`.
+
+#### Note about the evaluation of a non-replaced thing
+
 ```sflk
 do {
 	ev 8~owo
@@ -154,3 +160,9 @@ do {
 ```
 
 The above piece of code produces an error if executed as-is, as the evaluation of the block literal cannot replace its `8~owo`, which is then evaluated without having been replaced by a normal expression (and that is illegal for now).
+
+#### Note about the implementation
+
+If could make things simpler if a code block object would separate code from data, for example the literals could be like *Constant 17*, and there would be a table of constants coming with the code.
+
+An entry in this table could either be a normal SFLK object, or a marked expression (like the SIR code that evaluates the expression, no need to store the AST in there) coupled with the marker name.
