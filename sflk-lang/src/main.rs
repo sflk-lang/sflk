@@ -1,10 +1,7 @@
 mod ast;
 mod log;
 mod log_indent;
-mod machine;
-mod object;
 mod parser;
-mod program;
 mod scu;
 mod sir;
 mod stringtree;
