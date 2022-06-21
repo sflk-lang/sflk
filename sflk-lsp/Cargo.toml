@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["arthur correnson <arthur.correnson@ens-rennes.fr>"]
 edition = "2018"
 readme = "README.md"
-repository = "https://github.com/anima-libera/sflk"
+repository = "https://github.com/sflk-lang/sflk"
 description = "SFLK language server"
 
 [dependencies]

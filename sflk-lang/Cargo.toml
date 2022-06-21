@@ -1,11 +1,11 @@
 [package]
 name = "sflk"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["anima-libera <anim.libera@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-repository = "https://github.com/anima-libera/sflk"
-description = "SFLK programming language"
+repository = "https://github.com/sflk-lang/sflk"
+description = "SFLK programming language reference interpreter"
 default-run = "sflk"
 
 [dependencies]
