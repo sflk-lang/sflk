@@ -72,6 +72,10 @@ contexts:
       scope: keyword.other.sflk
     - match: '\b(v)\b'
       scope: variable.parameter.sflk
+    - match: '({{name}})\s*(\!)'
+      captures:
+        1: entity.name.function.sflk
+        2: punctuation.definition.variable.end.sflk
     - match: '{{name}}'
       scope: variable.sflk
 
