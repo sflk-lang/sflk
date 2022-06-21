@@ -32,7 +32,7 @@ stoi < {
     v < 1
 }
 
-# Section : mathematics (mt.sflk)
+# Section : mathematics (mt.sflk) #
 
 # Power function
 | Arguments : (n, pow, base) #
