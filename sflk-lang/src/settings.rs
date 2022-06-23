@@ -90,8 +90,9 @@ impl Settings {
 				arg => {
 					if settings.root_filename.is_none() {
 						settings.root_filename = Some(arg.to_string());
+					} else {
+						panic!("Unknown command line argument `{}`", arg);
 					}
-					panic!("Unknown command line argument `{}`", arg);
 				}
 			}
 		}
