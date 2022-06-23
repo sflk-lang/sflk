@@ -3,7 +3,7 @@
 
 Here are listed ideas of ameliorations to SFLK.
 
-## Language features
+## Big language features
 
 ### Variables and contexts
 
@@ -166,3 +166,81 @@ The above piece of code produces an error if executed as-is, as the evaluation o
 If could make things simpler if a code block object would separate code from data, for example the literals could be like *Constant 17*, and there would be a table of constants coming with the code.
 
 An entry in this table could either be a normal SFLK object, or a marked expression (like the SIR code that evaluates the expression, no need to store the AST in there) coupled with the marker name.
+
+### Identifier-name-to-anything map type
+
+This would allow to get structured data, to enhance the signal handling experience and to offer more possibilities. It is an essential feature of all modern interpreted languages.
+
+However, since this is SFLK and not some Python clone, this feature should be made available in an intresting or at least original way, but still usable. In this regard, here is the idea:
+
+```sflk
+point! < () > {
+	x! < 3
+	y! < 8
+	v < cx
+}
+```
+
+Here the new thing is the keyword `cx` (stands for ConteXte) that is an expression that evaluates to a map containing the current context variable table (a copy of it I think).
+
+```sflk
+ev point > {
+	cy v
+	pr "x = " pr x nl
+	pr "y = " pr y nl
+}
+```
+
+Here the other new thing is the keyword `cy` (doesn't stand for anything, it is like an anti-`cx`). It starts a statement that takes an expression as the content, and that is expected to evaluate to a map (previously given by a `cx` evaluation). This all the entries of the map then become variable declarations and assignments in the current context.
+
+For example, the concatenation of the two pieces of code given as examples above do behave as we expect: the `cy v` statement declares and initializes `x` and `y` to their corresponding values before the `v < cx` statement from earlier.
+
+In practive this seem pretty usable. Since it is easy and quick to open new sub-contextes in SFLK, containing the name pollution does not seem like a challenge. Variable declarations and read and write signals also seem to provide for nice ways to extract data form such maps:
+
+```sflk
+pointx! < ()
+do {
+	cy point
+	pointx < x
+}
+```
+
+#### Contexts vs general maps
+
+It could also be nice to have maps from anything to anything, it is highly probable that SFLK will get some in one way or another. To avoid confusion between these types, we could call the type discussed in this entry by the name of *context*, and the for futur general-purpose maps *dictionaries*.
+
+## Small language features
+
+### Send error signals instead of panicking
+
+Do that.
+
+### Have a signal formatdedicated to errors
+
+That, and print them in red in stderr or something.
+
+## Interpreter
+
+### Execution time debugging
+
+With a verbosity similar to the parsing in debug mode, the execution in debug mode should log everything worthy of notice, and everything else, in a colorful and indented way.
+
+### Rust tests
+
+Rust-level tests should cover most of the interpreter logic.
+
+### Reduce the number of warnings to 0
+
+The 50+ warnings at each `cargo run` are pretty annoying.
+
+### Code readability
+
+The code shoud be made more readable and more commented.
+
+### Error messages in panics
+
+No more empty `unimplemented!`s and dangerous `unwrap`s. When the interpreted explodes for some reason, the reason should try its best to be clear to whoever is using the interpreter.
+
+## Logo
+
+GitHub project embeds seem to work best when given a 1280×640px image to illustrate the repo. One should be drawn with Inkscape or something to fit the size requirement while still being vector graphics. Why not putting the SFLK logo on the left, and writing SFLK on the center and right ?
