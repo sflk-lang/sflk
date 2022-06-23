@@ -1,11 +1,10 @@
-use crate::{
-	object::Obj,
-	parser::ParsingWarning,
-	program,
-	scu::Loc,
-	stringtree::StringTree,
-	utils::{escape_string, styles},
-};
+use crate::log::IndentedLog;
+//use crate::object::Obj;
+use crate::parser::ParsingWarning;
+//use crate::program;
+use crate::scu::Loc;
+use crate::stringtree::StringTree;
+use crate::utils::{escape_string, styles, Style};
 
 // TODO:
 // - move Loc here, or not ?
@@ -379,7 +378,7 @@ impl Treeable for Stmt {
 			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag } => StringTree::new_node(
 				"loop".to_string(),
 				styles::NORMAL,
-				vec![
+				[
 					if !wh_exprs.is_empty() {
 						StringTree::new_node(
 							"while condition".to_string(),
@@ -455,18 +454,6 @@ impl Treeable for Program {
 	}
 }
 
-impl Program {
-	pub fn to_machine_block(&self) -> program::Block {
-		program::Block {
-			stmts: self
-				.stmts
-				.iter()
-				.map(|stmt_node| stmt_node.content.to_machine_stmt())
-				.collect(),
-		}
-	}
-}
-
 impl Stmt {
 	fn is_invalid(&self) -> bool {
 		match self {
@@ -516,52 +503,6 @@ impl Stmt {
 			Stmt::Invalid { .. } => true,
 		}
 	}
-
-	fn to_machine_stmt(&self) -> program::Stmt {
-		match self {
-			Stmt::Nop => program::Stmt::Nop,
-			Stmt::Print { expr } => program::Stmt::Print { expr: expr.content.to_machine_expr() },
-			Stmt::Newline => program::Stmt::Newline,
-			Stmt::Assign { target, expr } => program::Stmt::Assign {
-				varname: match &target.content {
-					TargetExpr::VariableName(varname) => varname.to_string(),
-					TargetExpr::Invalid => todo!(),
-				},
-				expr: expr.content.to_machine_expr(),
-			},
-			Stmt::Evaluate { expr } => {
-				program::Stmt::Evaluate { expr: expr.content.to_machine_expr() }
-			},
-			Stmt::Do { expr } => program::Stmt::Do { expr: expr.content.to_machine_expr() },
-			Stmt::DoHere { expr } => program::Stmt::DoHere { expr: expr.content.to_machine_expr() },
-			Stmt::DoFileHere { expr } => {
-				program::Stmt::DoFileHere { expr: expr.content.to_machine_expr() }
-			},
-			Stmt::If { .. } => unimplemented!(), /* program::Stmt::If {
-			cond_expr: cond_expr.content.to_machine_expr(),
-			th_stmt: th_stmt
-			.as_ref()
-			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-			el_stmt: el_stmt
-			.as_ref()
-			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-			}, */
-			Stmt::Loop { .. } => unimplemented!(), /* program::Stmt::Loop {
-			wh_expr: wh_expr
-			.as_ref()
-			.map(|expr| ((*expr).content.to_machine_expr())),
-			bd_stmt: bd_stmt
-			.as_ref()
-			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-			sp_stmt: sp_stmt
-			.as_ref()
-			.map(|stmt| Box::new((*stmt).content.to_machine_stmt())),
-			}, */
-			Stmt::RegisterInterceptor { .. } => unimplemented!(),
-			Stmt::Emit { .. } => unimplemented!(),
-			Stmt::Invalid { .. } => program::Stmt::Invalid,
-		}
-	}
 }
 
 impl TargetExpr {
@@ -590,37 +531,6 @@ impl Expr {
 			Expr::Invalid { .. } => true,
 		}
 	}
-
-	fn to_machine_expr(&self) -> program::Expr {
-		match self {
-			Expr::VariableName(varname) => program::Expr::Var { varname: varname.to_string() },
-			Expr::NothingLiteral => unimplemented!(),
-			Expr::IntegerLiteral(integer_string) => program::Expr::Const {
-				val: Obj::Integer(str::parse(integer_string).expect("TODO: bigints")),
-			},
-			Expr::StringLiteral(string_string) => {
-				program::Expr::Const { val: Obj::String(string_string.clone()) }
-			},
-			Expr::BlockLiteral(stmts) => program::Expr::Const {
-				val: Obj::Block(program::Block {
-					stmts: stmts
-						.iter()
-						.map(|stmt_node| stmt_node.content.to_machine_stmt())
-						.collect(),
-				}),
-			},
-			Expr::Input => unimplemented!(),
-			Expr::Unop(_) => unimplemented!(),
-			Expr::Chain { init, chops } => program::Expr::Chain(program::Chain {
-				init_expr: Box::new(init.content.to_machine_expr()),
-				chops: chops
-					.iter()
-					.map(|chop_node| chop_node.content.to_machine_chop())
-					.collect(),
-			}),
-			Expr::Invalid { .. } => unreachable!(),
-		}
-	}
 }
 
 impl Chop {
@@ -637,26 +547,37 @@ impl Chop {
 			Chop::Invalid => true,
 		}
 	}
-
-	fn to_machine_chop(&self) -> program::Chop {
-		match self {
-			Chop::Plus(expr) => program::Chop::Plus(expr.content.to_machine_expr()),
-			Chop::Minus(expr) => program::Chop::Minus(expr.content.to_machine_expr()),
-			Chop::Star(expr) => program::Chop::Star(expr.content.to_machine_expr()),
-			Chop::Slash(expr) => program::Chop::Slash(expr.content.to_machine_expr()),
-			Chop::ToRight(expr) => program::Chop::ToRight(expr.content.to_machine_expr()),
-			Chop::Comma(expr) => unimplemented!(),
-			Chop::DoubleComma(expr) => unimplemented!(),
-			Chop::Index(expr) => unimplemented!(),
-			Chop::Invalid => unreachable!(),
-		}
-	}
 }
 
 impl Node<Program> {
 	pub fn print(&self) {
 		// TODO: Clean this old wird stuff.
-		let mut debug_mem = crate::machine::DebugMem::new();
+
+		pub struct DebugMem {
+			pub log: IndentedLog,
+		}
+
+		impl DebugMem {
+			pub fn new() -> DebugMem {
+				DebugMem { log: IndentedLog::new() }
+			}
+		}
+
+		impl DebugMem {
+			fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
+				self.log.indent(string, is_context, style);
+			}
+
+			fn log_deindent(&mut self) {
+				self.log.deindent();
+			}
+
+			fn log_line(&mut self, string: String, style: Style) {
+				self.log.log_line(string, style);
+			}
+		}
+
+		let mut debug_mem = DebugMem::new();
 		debug_mem
 			.log
 			.log_line("Program tree".to_string(), crate::utils::styles::NEGATIVE);

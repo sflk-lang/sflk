@@ -338,3 +338,7 @@ This is not an [esolang](https://esolangs.org), but it is not a serious C/Python
 ### Implemented in Rust huh?
 
 Rust blah blah you know already.
+
+### Is there a roadmap?
+
+Mmm, there is a [TODO](TODO.md) list, which is better than nothing.
