@@ -5,15 +5,21 @@ use std::env;
 const HELP_MESSAGE: &str = "\
 	Usage:\n\
 	\tsflk [filename.sflk] [options]\n\
+	\tsflk [-c \"some SFLK source code\"] [options]\n\
 	\n\
 	Options:\n\
-	\t-d --debug     Turns on debug mode\n\
 	\t-h --help      Prints this help message\n\
 	\t-v --version   Prints the interpreter version\n\
+	\t-c --code      Next argument is the source code to run\n\
+	\t-d --debug     Turns on debug mode\n\
 	\t   --tokens    Prints tokens and halts\n\
 	\t   --lines     Prints line numbers in some debug logs\n\
 	\t   --actions   Prints actions in parsing debug logs\n\
 	\t   --sir       Prints the SIR code before running\n\
+	\n\
+	Examples:\n\
+	\tsflk tests/test6.sflk\n\
+	\tsflk -c \"pr 8 nl\"\n\
 	";
 
 const NO_WARRANTY_NOTE: &str = "\
@@ -24,7 +30,7 @@ const NO_WARRANTY_NOTE: &str = "\
 #[derive(Debug)]
 pub struct Settings {
 	path: String,
-	pub root_filename: Option<String>,
+	pub src: Option<Source>,
 	debug: bool,
 	debug_lines: bool,
 	debug_actions: bool,
@@ -32,6 +38,12 @@ pub struct Settings {
 	wants_help: bool,
 	wants_version: bool,
 	display_tokens: bool,
+}
+
+#[derive(Debug)]
+pub enum Source {
+	FilePath(String),
+	Code(String),
 }
 
 impl Settings {
@@ -42,7 +54,7 @@ impl Settings {
 	pub fn new(path: String) -> Self {
 		Self {
 			path,
-			root_filename: None,
+			src: None,
 			debug: false,
 			debug_lines: false,
 			debug_actions: false,
@@ -59,35 +71,62 @@ impl Settings {
 		let mut args = env::args(); // retrieved command line arguments
 		let mut settings = Self::new(args.next().unwrap_or_else(|| "sflk".to_string()));
 
+		enum Mode {
+			None,
+			SourceCode,
+		}
+		let mut mode = Mode::None;
+
 		for arg in args {
-			match arg.as_str() {
-				"-d" | "--debug" => {
-					settings.debug = true;
+			match mode {
+				Mode::None => match arg.as_str() {
+					"-h" | "--help" => {
+						settings.wants_help = true;
+					},
+					"-v" | "--version" => {
+						settings.wants_version = true;
+					},
+					"-c" | "--code" => {
+						if settings.src.is_some() {
+							panic!("Multiple source codes are given at the same time");
+						}
+						mode = Mode::SourceCode;
+					},
+					"-d" | "--debug" => {
+						settings.debug = true;
+					},
+					"--tokens" => {
+						settings.display_tokens = true;
+					},
+					"--lines" => {
+						settings.debug_lines = true;
+					},
+					"--actions" => {
+						settings.debug_actions = true;
+					},
+					"--sir" => {
+						settings.debug_sir = true;
+					},
+					arg => {
+						if settings.src.is_none() {
+							settings.src = Some(Source::FilePath(arg.to_string()));
+						} else {
+							panic!(
+								"Unknown command line argument `{}` \
+								(it cannot be the source code file path because \
+								a source code was already provided)",
+								arg
+							);
+						}
+					},
 				},
-				"-h" | "--help" => {
-					settings.wants_help = true;
-				},
-				"-v" | "--version" => {
-					settings.wants_version = true;
-				},
-				"--tokens" => {
-					settings.display_tokens = true;
-				},
-				"--lines" => {
-					settings.debug_lines = true;
-				},
-				"--actions" => {
-					settings.debug_actions = true;
-				},
-				"--sir" => {
-					settings.debug_sir = true;
-				},
-				arg => {
-					if settings.root_filename.is_none() {
-						settings.root_filename = Some(arg.to_string());
+				Mode::SourceCode => {
+					if settings.src.is_none() {
+						settings.src = Some(Source::Code(arg.to_string()));
 					} else {
-						panic!("Unknown command line argument `{}`", arg);
+						panic!();
 					}
+					mode = Mode::None;
 				},
 			}
 		}
@@ -117,17 +156,17 @@ impl Settings {
 			did_something = true;
 		}
 
-		if self.root_filename.is_none() {
+		if self.src.is_none() {
 			if !did_something {
 				println!(
-					"No filename provided, nothing to do. Try `{} --help` for usage.",
+					"No source code provided, nothing to do. Try `{} --help` for usage.",
 					self.path
 				);
 			}
 			return true;
 		}
 
-		return false;
+		false
 	}
 
 	pub fn parser_debugging_logger(&self) -> ParserDebuggingLogger {
