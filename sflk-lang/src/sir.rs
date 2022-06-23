@@ -445,9 +445,18 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
+						let non_integer = vec.iter().find(|obj| !matches!(obj, Object::Integer(_)));
+						if let Some(obj) = non_integer {
+							unimplemented!(
+								"Is ordered operation on a list that is not \
+								exclusively composed of integers (at least one \
+								object if type {} is in the list)",
+								obj.type_name()
+							);
+						}
 						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
 							[Object::Integer(left), Object::Integer(right)] => left <= right,
-							[_, _] => false,
+							[_, _] => panic!(),
 							_ => panic!(),
 						});
 						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
@@ -462,9 +471,18 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
+						let non_integer = vec.iter().find(|obj| !matches!(obj, Object::Integer(_)));
+						if let Some(obj) = non_integer {
+							unimplemented!(
+								"Is ordered strictly operation on a list that is not \
+								exclusively composed of integers (at least one \
+								object if type {} is in the list)",
+								obj.type_name()
+							);
+						}
 						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
 							[Object::Integer(left), Object::Integer(right)] => left < right,
-							[_, _] => false,
+							[_, _] => panic!(),
 							_ => panic!(),
 						});
 						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
