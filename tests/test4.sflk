@@ -96,3 +96,4 @@ ri ()
 pr -1 nl
 pr -1+1+1 nl
 pr -1+1.+1 nl
+pr 3 > ("a",, "b", "c", "d", "e") nl

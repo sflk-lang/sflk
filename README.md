@@ -281,6 +281,7 @@ Coming soon!
 | left type  | right type | behavior
 |:----------:|:----------:| --------
 | any type   | code block | Execute right with left as `v`, evaluates to `v`
+| integer    | list       | Same as `right ix left`
 
 #### Comma `,`
 

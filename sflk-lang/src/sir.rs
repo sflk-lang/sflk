@@ -522,8 +522,8 @@ impl Execution {
 			SirInstr::ToRight => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match right {
-					Object::Block(block) => {
+				match (left, right) {
+					(left, Object::Block(block)) => {
 						let sub_context = context_table.create_context(Some(self.cx_id()));
 						context_table
 							.get_mut(sub_context)
@@ -534,7 +534,7 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
 					},
-					Object::String(string) => {
+					(left, Object::String(string)) => {
 						let sub_context = context_table.create_context(Some(self.cx_id()));
 						context_table
 							.get_mut(sub_context)
@@ -545,6 +545,21 @@ impl Execution {
 						sub_frame.push_v = true; // Will push v.
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
+					},
+					(Object::Integer(index), Object::List(list)) => {
+						self.push_obj(
+							list.get(index as usize)
+								.unwrap_or_else(|| {
+									panic!(
+										"List index {} out of range {}-{}",
+										index,
+										0,
+										list.len() - 1
+									)
+								})
+								.clone(),
+						);
+						self.advance_instr_index();
 					},
 					_ => unimplemented!(),
 				}
