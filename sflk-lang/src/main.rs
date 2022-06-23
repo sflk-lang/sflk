@@ -10,7 +10,6 @@ mod tokenizer;
 mod utils;
 
 use crate::{
-	log_indent::IndentedLogger,
 	parser::{Parser, ParserDebuggingLogger},
 	scu::SourceCodeUnit,
 	settings::Settings,
@@ -21,13 +20,13 @@ use std::rc::Rc;
 
 fn main() {
 	let settings = Settings::from_args();
-	if settings.execute_wants() { 
-		return; 
+	if settings.execute_wants() {
+		return;
 	}
 
 	// Get the source code in memory.
 	let scu = Rc::new(SourceCodeUnit::from_filename(
-		&settings.root_filename.as_ref().unwrap(),
+		settings.root_filename.as_ref().unwrap(),
 	));
 
 	// Get a tokenizer ready.

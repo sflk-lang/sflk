@@ -1,9 +1,4 @@
-use crate::{
-	log_indent::IndentedLogger,
-	parser::{Parser, ParserDebuggingLogger},
-	scu::SourceCodeUnit,
-	tokenizer::{CharReadingHead, TokBuffer},
-};
+use crate::{log_indent::IndentedLogger, parser::ParserDebuggingLogger};
 
 use std::env;
 
@@ -58,7 +53,7 @@ impl Settings {
 		}
 	}
 
-	/// Retrieves command line arguments to create the settings according to 
+	/// Retrieves command line arguments to create the settings according to
 	/// them
 	pub fn from_args() -> Self {
 		let mut args = env::args(); // retrieved command line arguments
@@ -68,32 +63,32 @@ impl Settings {
 			match arg.as_str() {
 				"-d" | "--debug" => {
 					settings.debug = true;
-				}
+				},
 				"-h" | "--help" => {
 					settings.wants_help = true;
-				}
+				},
 				"-v" | "--version" => {
 					settings.wants_version = true;
-				}
+				},
 				"--tokens" => {
 					settings.display_tokens = true;
-				}
+				},
 				"--lines" => {
 					settings.debug_lines = true;
-				}
+				},
 				"--actions" => {
 					settings.debug_actions = true;
-				}
+				},
 				"--sir" => {
 					settings.debug_sir = true;
-				}
+				},
 				arg => {
 					if settings.root_filename.is_none() {
 						settings.root_filename = Some(arg.to_string());
 					} else {
 						panic!("Unknown command line argument `{}`", arg);
 					}
-				}
+				},
 			}
 		}
 
@@ -105,7 +100,7 @@ impl Settings {
 	/// Also, checks for input file
 	pub fn execute_wants(&self) -> bool {
 		let mut did_something = false;
-		
+
 		if self.wants_version {
 			let version_name = "indev";
 			println!(
@@ -121,7 +116,7 @@ impl Settings {
 			println!("{}", HELP_MESSAGE);
 			did_something = true;
 		}
-		
+
 		if self.root_filename.is_none() {
 			if !did_something {
 				println!(
@@ -149,19 +144,19 @@ impl Settings {
 		}
 	}
 
-    pub fn display_tokens(&self) -> bool {
-        self.display_tokens
-    }
+	pub fn display_tokens(&self) -> bool {
+		self.display_tokens
+	}
 
-    pub fn debug_lines(&self) -> bool {
-        self.debug_lines
-    }
+	pub fn debug_lines(&self) -> bool {
+		self.debug_lines
+	}
 
-    pub fn debug(&self) -> bool {
-        self.debug
-    }
+	pub fn debug(&self) -> bool {
+		self.debug
+	}
 
-    pub fn debug_sir(&self) -> bool {
-        self.debug_sir
-    }
+	pub fn debug_sir(&self) -> bool {
+		self.debug_sir
+	}
 }

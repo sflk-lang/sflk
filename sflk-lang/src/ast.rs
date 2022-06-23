@@ -1,10 +1,10 @@
-use crate::log::IndentedLog;
-//use crate::object::Obj;
-use crate::parser::ParsingWarning;
-//use crate::program;
-use crate::scu::Loc;
-use crate::stringtree::StringTree;
-use crate::utils::{escape_string, styles, Style};
+use crate::{
+	log::IndentedLog,
+	parser::ParsingWarning,
+	scu::Loc,
+	stringtree::StringTree,
+	utils::{escape_string, styles, Style},
+};
 
 // TODO:
 // - move Loc here, or not ?

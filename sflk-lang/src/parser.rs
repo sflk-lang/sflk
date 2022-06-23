@@ -21,12 +21,7 @@ use crate::{
 	tokenizer::{Kw, Matched, Op, SimpleTok, Tok, TokBuffer},
 	utils::styles,
 };
-
-use std::{
-	collections::HashMap,
-	convert::{TryFrom, TryInto},
-	fmt,
-};
+use std::{collections::HashMap, convert::TryFrom, fmt};
 
 #[derive(Debug)]
 pub struct ParsingWarning {

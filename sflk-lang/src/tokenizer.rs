@@ -2,7 +2,6 @@ use crate::{
 	scu::{Loc, SourceCodeUnit},
 	utils::{escape_string, styles},
 };
-
 use std::{collections::VecDeque, convert::TryFrom, fmt, rc::Rc};
 
 #[derive(Debug)]
