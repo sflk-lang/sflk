@@ -72,14 +72,14 @@ impl Settings {
 		let mut settings = Self::new(args.next().unwrap_or_else(|| "sflk".to_string()));
 
 		enum Mode {
-			None,
+			Normal,
 			SourceCode,
 		}
-		let mut mode = Mode::None;
+		let mut mode = Mode::Normal;
 
 		for arg in args {
 			match mode {
-				Mode::None => match arg.as_str() {
+				Mode::Normal => match arg.as_str() {
 					"-h" | "--help" => {
 						settings.wants_help = true;
 					},
@@ -126,7 +126,7 @@ impl Settings {
 					} else {
 						panic!();
 					}
-					mode = Mode::None;
+					mode = Mode::Normal;
 				},
 			}
 		}
