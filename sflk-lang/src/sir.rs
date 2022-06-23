@@ -56,7 +56,7 @@ enum SirInstr {
 	Slash,       // (l r -- (l / r))
 	Comma,       // (l r -- (l , r))
 	DoubleComma, // (l r -- (l ,, r))
-	Dot,         // (l r -- (l . r))
+	Index,       // (l r -- (l . r))
 	ToRight,     // (l r -- (l > r))
 
 	// Other operations
@@ -151,6 +151,18 @@ enum Object {
 	List(Vec<Object>),
 }
 
+impl Object {
+	fn type_name(&self) -> &str {
+		match self {
+			Object::Nothing => "nothing",
+			Object::Integer(_) => "integer",
+			Object::String(_) => "string",
+			Object::Block(_) => "block",
+			Object::List(_) => "list",
+		}
+	}
+}
+
 type ContextId = usize;
 
 #[derive(Debug)]
@@ -240,7 +252,7 @@ impl Machine {
 
 fn string_to_sir(string: String, name: String) -> SirBlock {
 	let scu = Rc::new(SourceCodeUnit::from_str(string, name));
-	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
+	let tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 
 	// This temporary solution is using a `ParserDebuggingLogger` that does not
 	// take care about the settings and without logging
@@ -393,12 +405,15 @@ impl Execution {
 				}
 			},
 			SirInstr::LogicalNot => {
-				let right = self.pop_obj();
-				match right {
+				let value = self.pop_obj();
+				match value {
 					Object::Integer(value) => {
 						self.push_obj(Object::Integer(if value == 0 { 1 } else { 0 }));
 					},
-					_ => unimplemented!(),
+					obj => unimplemented!(
+						"Logical not operation on object of type {}",
+						obj.type_name(),
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -414,7 +429,11 @@ impl Execution {
 						};
 						self.push_obj(Object::Integer(value));
 					},
-					_ => unimplemented!(),
+					(left, right) => unimplemented!(
+						"Logical and operation on objects of type {} and {}",
+						left.type_name(),
+						right.type_name()
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -431,7 +450,11 @@ impl Execution {
 					(Object::Block(left_block), Object::Block(right_block)) => {
 						self.push_obj(Object::Block(left_block.concat(right_block)))
 					},
-					_ => unimplemented!(),
+					(left, right) => unimplemented!(
+						"Plus operation on objects of type {} and {}",
+						left.type_name(),
+						right.type_name()
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -446,7 +469,11 @@ impl Execution {
 						let value = if left_string == right_string { 0 } else { 1 };
 						self.push_obj(Object::Integer(value));
 					},
-					_ => unimplemented!(),
+					(left, right) => unimplemented!(
+						"Minus operation on objects of type {} and {}",
+						left.type_name(),
+						right.type_name()
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -467,7 +494,11 @@ impl Execution {
 						}
 						self.push_obj(Object::Block(block));
 					},
-					_ => unimplemented!(),
+					(left, right) => unimplemented!(
+						"Star operation on objects of type {} and {}",
+						left.type_name(),
+						right.type_name()
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -483,7 +514,11 @@ impl Execution {
 							left_string.matches(right_string.as_str()).count() as i64,
 						));
 					},
-					_ => unimplemented!(),
+					(left, right) => unimplemented!(
+						"Slash operation on objects of type {} and {}",
+						left.type_name(),
+						right.type_name()
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -498,7 +533,10 @@ impl Execution {
 						vec.push(right);
 						self.push_obj(Object::List(vec));
 					},
-					_ => unimplemented!(),
+					(left, _) => unimplemented!(
+						"Comma operation with the left object of type {}",
+						left.type_name(),
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -508,22 +546,26 @@ impl Execution {
 				self.push_obj(Object::List(vec![left, right]));
 				self.advance_instr_index();
 			},
-			SirInstr::Dot => {
+			SirInstr::Index => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::List(vec), Object::Integer(index)) => {
 						self.push_obj(vec.get(index as usize).unwrap().clone());
 					},
-					_ => unimplemented!(),
+					(left, right) => unimplemented!(
+						"Index operation on objects of type {} and {}",
+						left.type_name(),
+						right.type_name()
+					),
 				}
 				self.advance_instr_index();
 			},
 			SirInstr::ToRight => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match right {
-					Object::Block(block) => {
+				match (left, right) {
+					(left, Object::Block(block)) => {
 						let sub_context = context_table.create_context(Some(self.cx_id()));
 						context_table
 							.get_mut(sub_context)
@@ -534,7 +576,7 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
 					},
-					Object::String(string) => {
+					(left, Object::String(string)) => {
 						let sub_context = context_table.create_context(Some(self.cx_id()));
 						context_table
 							.get_mut(sub_context)
@@ -546,7 +588,26 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
 					},
-					_ => unimplemented!(),
+					(Object::Integer(index), Object::List(list)) => {
+						self.push_obj(
+							list.get(index as usize)
+								.unwrap_or_else(|| {
+									panic!(
+										"List index {} out of range {}-{}",
+										index,
+										0,
+										list.len() - 1
+									)
+								})
+								.clone(),
+						);
+						self.advance_instr_index();
+					},
+					(left, right) => unimplemented!(
+						"To right operation on objects of type {} and {}",
+						left.type_name(),
+						right.type_name()
+					),
 				}
 			},
 			SirInstr::DoHere => {
@@ -563,7 +624,9 @@ impl Execution {
 						self.frame_stack
 							.push(Frame::for_sir_block(sir_block, self.cx_id()));
 					},
-					_ => unimplemented!(),
+					obj => {
+						unimplemented!("Do here operation on an object of type {}", obj.type_name())
+					},
 				}
 			},
 			SirInstr::Do => {
@@ -584,7 +647,7 @@ impl Execution {
 							context_table.create_context(Some(self.cx_id())),
 						));
 					},
-					_ => unimplemented!(),
+					obj => unimplemented!("Do operation on an object of type {}", obj.type_name()),
 				}
 			},
 			SirInstr::RegisterInterceptor => {
@@ -599,7 +662,10 @@ impl Execution {
 					Object::Nothing => {
 						context_table.get_mut(self.cx_id()).unwrap().interceptor = None;
 					},
-					_ => unimplemented!(),
+					obj => unimplemented!(
+						"Register interceptor operation on an object of type {}",
+						obj.type_name()
+					),
 				}
 				self.advance_instr_index();
 			},
@@ -645,7 +711,10 @@ impl Execution {
 									self.frame_stack.push(sub_frame);
 									break;
 								},
-								Some(_) => unimplemented!(),
+								Some(interceptor) => unimplemented!(
+									"Interception with an interceptor of type {}",
+									interceptor.type_name()
+								),
 							}
 						},
 					}
@@ -689,7 +758,8 @@ fn peform_signal(signal: Object) -> Object {
 					Object::Nothing
 				},
 				Some(Object::Nothing) => Object::Nothing,
-				_ => unimplemented!(),
+				Some(obj) => unimplemented!("Print signal on object of type {}", obj.type_name()),
+				None => unimplemented!("Print signal but without any object"),
 			},
 			Some(Object::String(sig_name)) if sig_name == "newline" => {
 				println!();
@@ -707,11 +777,16 @@ fn peform_signal(signal: Object) -> Object {
 					let file_content = std::fs::read_to_string(filename).unwrap();
 					Object::String(file_content)
 				},
-				_ => unimplemented!(),
+				Some(obj) => {
+					unimplemented!("Read file signal on object of type {}", obj.type_name())
+				},
+				None => unimplemented!("Read file signal but without any object"),
 			},
-			_ => unimplemented!(),
+			Some(Object::String(sig_name)) => unimplemented!("Signal named \"{}\"", sig_name),
+			Some(obj) => unimplemented!("Signal named by an object of type {}", obj.type_name()),
+			None => unimplemented!("Signal described by an empty list"),
 		},
-		_ => unimplemented!(),
+		obj => unimplemented!("Signal described by an object of type {}", obj.type_name()),
 	}
 }
 
@@ -958,7 +1033,7 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 					},
 					Chop::Index(right) => {
 						expr_to_sir_instrs(right.unwrap_ref(), sir_instrs);
-						sir_instrs.push(SirInstr::Dot);
+						sir_instrs.push(SirInstr::Index);
 					},
 					Chop::ToRight(right) => {
 						expr_to_sir_instrs(right.unwrap_ref(), sir_instrs);
@@ -978,6 +1053,5 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::Discard);
 			sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing });
 		},
-		_ => unimplemented!(),
 	}
 }
