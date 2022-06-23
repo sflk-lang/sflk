@@ -9,12 +9,11 @@ mod stringtree;
 mod tokenizer;
 mod utils;
 
-use crate::{
-	parser::{Parser, ParserDebuggingLogger},
-	scu::SourceCodeUnit,
-	settings::Settings,
-	tokenizer::{CharReadingHead, TokBuffer},
-};
+use parser::{Parser, ParserDebuggingLogger};
+use scu::SourceCodeUnit;
+use settings::Settings;
+use settings::Source;
+use tokenizer::{CharReadingHead, TokBuffer};
 
 use std::rc::Rc;
 
@@ -25,9 +24,11 @@ fn main() {
 	}
 
 	// Get the source code in memory.
-	let scu = Rc::new(SourceCodeUnit::from_filename(
-		settings.root_filename.as_ref().unwrap(),
-	));
+	let scu = Rc::new(match &settings.src {
+		Some(Source::FilePath(file_path)) => SourceCodeUnit::from_filename(file_path),
+		Some(Source::Code(code)) => SourceCodeUnit::from_str(code.to_string(), "input".to_string()),
+		None => panic!(),
+	});
 
 	// Get a tokenizer ready.
 	let tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
