@@ -49,6 +49,10 @@ enum SirInstr {
 	LogicalNot, // (a -- not_a)
 	LogicalAnd, // (a b -- (a && b))
 
+	// Unary operations
+	IsOrdered,         // (list -- bool)
+	IsOrderedStrictly, // (list -- bool)
+
 	// Binary operators
 	Plus,        // (l r -- (l + r))
 	Minus,       // (l r -- (l - r))
@@ -240,7 +244,7 @@ impl Machine {
 
 fn string_to_sir(string: String, name: String) -> SirBlock {
 	let scu = Rc::new(SourceCodeUnit::from_str(string, name));
-	let mut tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
+	let tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 
 	// This temporary solution is using a `ParserDebuggingLogger` that does not
 	// take care about the settings and without logging
@@ -413,6 +417,36 @@ impl Execution {
 							0
 						};
 						self.push_obj(Object::Integer(value));
+					},
+					_ => unimplemented!(),
+				}
+				self.advance_instr_index();
+			},
+			SirInstr::IsOrdered => {
+				let obj = self.pop_obj();
+				match obj {
+					Object::List(vec) => {
+						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
+							[Object::Integer(left), Object::Integer(right)] => left <= right,
+							[_, _] => false,
+							_ => panic!(),
+						});
+						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
+					},
+					_ => unimplemented!(),
+				}
+				self.advance_instr_index();
+			},
+			SirInstr::IsOrderedStrictly => {
+				let obj = self.pop_obj();
+				match obj {
+					Object::List(vec) => {
+						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
+							[Object::Integer(left), Object::Integer(right)] => left < right,
+							[_, _] => false,
+							_ => panic!(),
+						});
+						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
 					},
 					_ => unimplemented!(),
 				}
@@ -932,15 +966,23 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::EmitSignal);
 		},
 		Expr::Unop(unop) => match unop {
+			Unop::Negate(expr) => {
+				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(-1) });
+				sir_instrs.push(SirInstr::Star);
+			},
 			Unop::ReadFile(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
 				sir_instrs.push(SirInstr::IntoReadFileSignal);
 				sir_instrs.push(SirInstr::EmitSignal);
 			},
-			Unop::Negate(expr) => {
+			Unop::Ordered(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
-				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(-1) });
-				sir_instrs.push(SirInstr::Star);
+				sir_instrs.push(SirInstr::IsOrdered);
+			},
+			Unop::OrderedStrictly(expr) => {
+				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::IsOrderedStrictly);
 			},
 		},
 		Expr::Chain { init, chops } => {
@@ -993,6 +1035,5 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::Discard);
 			sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing });
 		},
-		_ => unimplemented!(),
 	}
 }

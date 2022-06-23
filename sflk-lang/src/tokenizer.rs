@@ -134,6 +134,8 @@ pub enum Kw {
 	Fi,
 	In,
 	Ix,
+	Od,
+	Os,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -287,6 +289,8 @@ impl Tokenizer {
 			"fi" => Tok::Kw(Kw::Fi),
 			"in" => Tok::Kw(Kw::In),
 			"ix" => Tok::Kw(Kw::Ix),
+			"od" => Tok::Kw(Kw::Od),
+			"os" => Tok::Kw(Kw::Os),
 			_ => {
 				let len = word.len();
 				Tok::Name { string: word, unstable_warning: len == 2 }
@@ -721,6 +725,8 @@ impl fmt::Display for Kw {
 			Kw::Fi => write!(f, "fi"),
 			Kw::In => write!(f, "in"),
 			Kw::Ix => write!(f, "ix"),
+			Kw::Od => write!(f, "od"),
+			Kw::Os => write!(f, "os"),
 		}
 	}
 }

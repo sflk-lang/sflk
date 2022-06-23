@@ -178,8 +178,10 @@ pub enum Expr {
 
 #[derive(Debug)]
 pub enum Unop {
-	ReadFile(Box<Node<Expr>>),
 	Negate(Box<Node<Expr>>),
+	ReadFile(Box<Node<Expr>>),
+	Ordered(Box<Node<Expr>>),
+	OrderedStrictly(Box<Node<Expr>>),
 }
 
 #[derive(Debug)]
@@ -283,6 +285,16 @@ impl Treeable for Expr {
 			),
 			Expr::Unop(Unop::ReadFile(expr)) => StringTree::new_node(
 				"unary read file".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(&**expr)],
+			),
+			Expr::Unop(Unop::Ordered(expr)) => StringTree::new_node(
+				"unary ordered".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(&**expr)],
+			),
+			Expr::Unop(Unop::OrderedStrictly(expr)) => StringTree::new_node(
+				"unary ordered strictly".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(&**expr)],
 			),

@@ -88,6 +88,8 @@ enum Binop {
 enum Unop {
 	Minus,
 	File,
+	Ordered,
+	OrderedStrictly,
 }
 
 enum BlockLevelExpectedTerminator {
@@ -331,7 +333,7 @@ impl Parser {
 				if let ParsingData::BlockLevel { right_curly: end, .. } =
 					self.data_stack.last_mut().unwrap()
 				{
-					end.insert(Node::from((), loc));
+					*end = Some(Node::from((), loc));
 				} else {
 					panic!();
 				}
@@ -460,7 +462,8 @@ impl Parser {
 						(ContentType::Expr, ParsingData::Expr { init, chops, .. }) => {
 							self.debug.log_deindent("Done parsing expression");
 							self.debug.log_deindent("Done parsing main content");
-							content.insert(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
+							*content =
+								Some(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
 						},
 						_ => unimplemented!(),
 					}
@@ -470,7 +473,7 @@ impl Parser {
 					self.debug.log_deindent("Done parsing expression");
 					self.debug.log_deindent("Done parsing main content");
 					if let ParsingData::Expr { init, chops, .. } = content_data {
-						content.insert(temporary_into_ast_expr(init, chops));
+						*content = Some(temporary_into_ast_expr(init, chops));
 					} else {
 						panic!();
 					}
@@ -798,7 +801,7 @@ impl Parser {
 					ParsingData::Binop(binop) => binop,
 					_ => panic!(),
 				};
-				if let ParsingData::Expr { init, chops, .. } = self.data_stack.last_mut().unwrap() {
+				if let ParsingData::Expr { chops, .. } = self.data_stack.last_mut().unwrap() {
 					chops.push(Chop { binop, expr })
 				}
 				self.debug.log_deindent("Done parsing chain operation");
@@ -1044,6 +1047,8 @@ impl LanguageDescr {
 		let mut unops = HashMap::new();
 		unops.insert(SimpleTok::Op(Op::Minus), Unop::Minus);
 		unops.insert(SimpleTok::Kw(Kw::Fi), Unop::File);
+		unops.insert(SimpleTok::Kw(Kw::Od), Unop::Ordered);
+		unops.insert(SimpleTok::Kw(Kw::Os), Unop::OrderedStrictly);
 		LanguageDescr { stmts, binops, unops }
 	}
 }
@@ -1163,7 +1168,7 @@ fn temporary_into_ast_stmt(
 					.unwrap()
 					.into_iter()
 					.next()
-					.map(|node| node.map(|non_ext| ())),
+					.map(|node| node.map(|_none_ext| ())),
 			},
 			kw_loc,
 		),
@@ -1249,7 +1254,7 @@ fn temporary_assignment_into_ast_stmt(
 	content: Option<Node<Expr>>,
 ) -> Node<Stmt> {
 	let loc = target.loc() + content.as_ref().unwrap().loc();
-	Node::from((Stmt::Assign { target, expr: content.unwrap() }), loc)
+	Node::from(Stmt::Assign { target, expr: content.unwrap() }, loc)
 }
 
 // TODO: Stop having to use `ast::Expr` this early, or maybe at all.
@@ -1288,5 +1293,7 @@ fn temporary_unop_into_ast_expr(unop: Unop, expr: Node<Expr>) -> Expr {
 	Expr::Unop(match unop {
 		Unop::Minus => AstUnop::Negate(Box::new(expr)),
 		Unop::File => AstUnop::ReadFile(Box::new(expr)),
+		Unop::Ordered => AstUnop::Ordered(Box::new(expr)),
+		Unop::OrderedStrictly => AstUnop::OrderedStrictly(Box::new(expr)),
 	})
 }

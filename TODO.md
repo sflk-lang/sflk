@@ -55,11 +55,11 @@ Instead of having comparions operators like `<` and `>` (which are already taken
 if od 4,, x, 8
 th pr "x is in {4, 5, 6, 7, 8}" th nl
 
-if so 4,, x, 8
+if os 4,, x, 8
 th pr "x is in {5, 6, 7}" th nl
 ```
 
-The new things here would be the unary operators `od` and `so`. `od` would expect a list and evaluate to a value whose truthyness is true iff the list is OrdereD (duplicates allowed) and `so` would be the same but with duplicates disallowed (Strictly Ordered).
+The new things here would be the unary operators `od` and `os`. `od` would expect a list and evaluate to a value whose truthyness is true iff the list is OrdereD (duplicates allowed) and `os` would be the same but with duplicates disallowed (Ordered but Strictly).
 
 ### "Lambda captures"
 
