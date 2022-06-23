@@ -316,6 +316,18 @@ Coming soon!
 |:----------:| --------
 | string     | Read file at path right
 
+#### Ordered `od`
+
+| right type | result
+|:----------:| ------
+| list       | if the list is ordered then `1` else `0`
+
+#### Ordered but strictly `os`
+
+| right type | result
+|:----------:| ------
+| list       | if the list is strictly ordered then `1` else `0`
+
 ## Contribute
 
 If you want to contribute in any way, please feel free to do so ^^.
