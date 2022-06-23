@@ -15,10 +15,7 @@ impl IndentedLog {
 
 	pub fn indent(&mut self, string: String, is_context: bool, style: Style) {
 		assert!(!string.contains('\n'));
-		self.push(Item::IndentAdd {
-			string,
-			indent: Indent { is_context, style },
-		});
+		self.push(Item::IndentAdd { string, indent: Indent { is_context, style } });
 	}
 
 	pub fn deindent(&mut self) {
@@ -27,19 +24,11 @@ impl IndentedLog {
 
 	pub fn log_line(&mut self, string: String, style: Style) {
 		assert!(!string.contains('\n'));
-		self.push(Item::String {
-			string,
-			is_line: true,
-			style,
-		});
+		self.push(Item::String { string, is_line: true, style });
 	}
 
 	pub fn log_string(&mut self, string: String, style: Style) {
-		self.push(Item::String {
-			string,
-			is_line: false,
-			style,
-		});
+		self.push(Item::String { string, is_line: false, style });
 	}
 }
 
@@ -58,16 +47,9 @@ impl IndentedLog {
 
 #[derive(Debug)]
 enum Item {
-	IndentAdd {
-		string: String,
-		indent: Indent,
-	},
+	IndentAdd { string: String, indent: Indent },
 	IndentRemove,
-	String {
-		string: String,
-		is_line: bool,
-		style: Style,
-	},
+	String { string: String, is_line: bool, style: Style },
 }
 
 #[derive(Debug, Clone)]
@@ -92,26 +74,18 @@ impl IndentedLog {
 						.expect("TODO");
 					is_newline = true;
 					indents.push(indent.clone());
-				}
+				},
 				Item::IndentRemove => {
 					indents.pop().expect("bug");
-				}
-				Item::String {
-					string,
-					is_line: true,
-					style,
-				} => {
+				},
+				Item::String { string, is_line: true, style } => {
 					if is_newline {
 						print_indents(writer, &indents, None);
 					}
 					writeln!(writer, "{}{}{}", style.0, string, style.1).expect("TODO");
 					is_newline = true;
-				}
-				Item::String {
-					string,
-					is_line: false,
-					style,
-				} => {
+				},
+				Item::String { string, is_line: false, style } => {
 					let formatted_string = string.to_string();
 					let fragments: Vec<&str> = formatted_string.split('\n').collect();
 					if let Some((end, lines)) = fragments.split_last() {
@@ -130,7 +104,7 @@ impl IndentedLog {
 							is_newline = false;
 						}
 					}
-				}
+				},
 			}
 		}
 	}

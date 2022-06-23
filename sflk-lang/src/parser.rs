@@ -21,6 +21,7 @@ use crate::{
 	tokenizer::{Kw, Matched, Op, SimpleTok, Tok, TokBuffer},
 	utils::styles,
 };
+
 use std::{
 	collections::HashMap,
 	convert::{TryFrom, TryInto},
@@ -290,7 +291,7 @@ impl Parser {
 	}
 
 	/// This is the core of the whole parser.
-	/// 
+	///
 	/// TODO: Document what goes on in there.
 	fn perform_one_action(&mut self) {
 		let action = self.action_stack.pop().unwrap();

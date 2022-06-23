@@ -126,7 +126,10 @@ impl IndentedLogger {
 			write!(
 				self.writer,
 				"{}{}{}{}",
-				indent.style.0, start_or_end.indent_text(), INDENT_TAIL, indent.style.1
+				indent.style.0,
+				start_or_end.indent_text(),
+				INDENT_TAIL,
+				indent.style.1
 			)
 			.expect("write failure");
 		}
