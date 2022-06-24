@@ -371,12 +371,25 @@ impl Execution {
 			},
 			SirInstr::PopToVar { var_name } => {
 				let value = self.pop_obj();
-				context_table
-					.table
-					.get_mut(&self.cx_id())
+				if context_table
+					.get(self.cx_id())
 					.unwrap()
-					.set_var(var_name, value);
-				self.advance_instr_index();
+					.is_var_decl(&var_name)
+				{
+					context_table
+						.table
+						.get_mut(&self.cx_id())
+						.unwrap()
+						.set_var(var_name, value);
+					self.advance_instr_index();
+				} else {
+					let signal = Object::List(vec![
+						Object::String("writevar".to_string()),
+						Object::String(var_name),
+						value,
+					]);
+					self.emit_signal_and_advance(context_table, signal, false);
+				}
 			},
 			SirInstr::VarToPush { var_name } => {
 				let value = if var_name == "v"
@@ -804,22 +817,38 @@ enum SignalPassingResult {
 fn perform_signal_passing_context(signal: &Object, context: &mut Context) -> SignalPassingResult {
 	match signal {
 		Object::List(ref vec) => match vec.get(0) {
-			Some(Object::String(sig_name)) => match sig_name.as_str() {
-				"readvar" => match vec.get(1) {
-					Some(Object::String(var_name)) => {
-						if context.is_var_decl(var_name) {
-							SignalPassingResult::Result(context.var_value_cloned(var_name).unwrap())
-						} else {
-							SignalPassingResult::KeepGoing
-						}
-					},
-					Some(obj) => unimplemented!(
-						"Read variable signal on object of type {} passing context",
-						obj.type_name()
-					),
-					None => unimplemented!("Print signal but without any object passing context"),
+			Some(Object::String(sig_name)) if sig_name == "readvar" => match vec.get(1) {
+				Some(Object::String(var_name)) => {
+					if context.is_var_decl(var_name) {
+						SignalPassingResult::Result(context.var_value_cloned(var_name).unwrap())
+					} else {
+						SignalPassingResult::KeepGoing
+					}
 				},
-				_ => SignalPassingResult::KeepGoing,
+				Some(obj) => unimplemented!(
+					"Read variable signal on object of type {} passing context",
+					obj.type_name()
+				),
+				None => {
+					unimplemented!("Read variable signal but without any object passing context")
+				},
+			},
+			Some(Object::String(sig_name)) if sig_name == "writevar" => match vec.get(1) {
+				Some(Object::String(var_name)) => {
+					if context.is_var_decl(var_name) {
+						context.set_var(var_name.to_string(), vec.get(2).unwrap().clone());
+						SignalPassingResult::Result(Object::Nothing)
+					} else {
+						SignalPassingResult::KeepGoing
+					}
+				},
+				Some(obj) => unimplemented!(
+					"Write variable signal on object of type {} passing context",
+					obj.type_name()
+				),
+				None => {
+					unimplemented!("Write variable signal but without any object passing context")
+				},
 			},
 			Some(_) | None => SignalPassingResult::KeepGoing,
 		},
@@ -872,10 +901,7 @@ fn perform_signal_past_root(signal: Object) -> Object {
 			},
 			Some(Object::String(sig_name)) if sig_name == "readvar" => match vec.get(1) {
 				Some(Object::String(var_name)) => {
-					unimplemented!(
-						"Read variable signal on name {} past root",
-						var_name
-					)
+					unimplemented!("Read variable signal on name {} past root", var_name)
 				},
 				Some(_) | None => unimplemented!("Read variable signal past root"),
 			},

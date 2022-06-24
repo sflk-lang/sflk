@@ -2,7 +2,10 @@
 x! < 8
 do {
 	pr x nl
+	x < 42
 	x! < 13
+	pr x nl
+	x < 0
 	pr x nl
 }
 pr x nl
