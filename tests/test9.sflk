@@ -9,3 +9,5 @@ do {
 	pr x nl
 }
 pr x nl
+
+pr 69-42 > {v < v + x} nl

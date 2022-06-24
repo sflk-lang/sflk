@@ -612,6 +612,10 @@ impl Execution {
 						context_table
 							.get_mut(sub_context)
 							.unwrap()
+							.decl_var("v".to_string());
+						context_table
+							.get_mut(sub_context)
+							.unwrap()
 							.set_var("v".to_string(), left);
 						let mut sub_frame = Frame::for_sir_block(block.sir_block, sub_context);
 						sub_frame.push_v = true; // Will push v.
@@ -620,6 +624,10 @@ impl Execution {
 					},
 					(left, Object::String(string)) => {
 						let sub_context = context_table.create_context(Some(self.cx_id()));
+						context_table
+							.get_mut(sub_context)
+							.unwrap()
+							.decl_var("v".to_string());
 						context_table
 							.get_mut(sub_context)
 							.unwrap()
