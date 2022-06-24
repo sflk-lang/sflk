@@ -8,19 +8,11 @@ pub struct StringTree {
 
 impl StringTree {
 	pub fn new_leaf(string: String, style: Style) -> StringTree {
-		StringTree {
-			string,
-			style,
-			sub_trees: Vec::new(),
-		}
+		StringTree { string, style, sub_trees: Vec::new() }
 	}
 
 	pub fn new_node(string: String, style: Style, sub_trees: Vec<StringTree>) -> StringTree {
-		StringTree {
-			string,
-			style,
-			sub_trees,
-		}
+		StringTree { string, style, sub_trees }
 	}
 }
 

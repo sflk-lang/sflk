@@ -11,7 +11,7 @@ indent < {
 }
 
 ri {
-	type < v .0
+	type < v ix 0
 	handled < 0
 	# Intercepted signals #
 	if type -"newline" el dh {
@@ -21,7 +21,7 @@ ri {
 	}
 	if type -"print" el dh {
 		if indented el dh indent
-		pr v .1
+		pr v ix 1
 		indented < 1
 		handled < 1
 	}

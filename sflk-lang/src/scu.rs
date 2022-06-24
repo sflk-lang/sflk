@@ -1,5 +1,7 @@
-use std::ops::{Add, AddAssign};
-use std::rc::Rc;
+use std::{
+	ops::{Add, AddAssign},
+	rc::Rc,
+};
 
 #[derive(Debug)]
 pub struct SourceCodeUnit {
@@ -31,11 +33,7 @@ impl SourceCodeUnit {
 			line_offsets.push(content.len());
 			// If the content didn't end by a `\n`, then now it does.
 		}
-		SourceCodeUnit {
-			name,
-			content,
-			line_offsets,
-		}
+		SourceCodeUnit { name, content, line_offsets }
 	}
 }
 
