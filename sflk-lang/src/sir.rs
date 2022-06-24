@@ -30,6 +30,7 @@ enum SirInstr {
 	Discard,   // (a -- )
 
 	// Variable operations
+	DeclVar { var_name: String },   // ( -- )
 	PopToVar { var_name: String },  // (value -- )
 	VarToPush { var_name: String }, // ( -- value)
 
@@ -181,7 +182,14 @@ impl Context {
 		}
 	}
 
+	fn decl_var(&mut self, var_name: String) {
+		self.var_table.insert(var_name, Object::Nothing);
+	}
+
 	fn set_var(&mut self, var_name: String, value: Object) {
+		if !self.is_var_decl(&var_name) {
+			panic!("Setting undeclared variable");
+		}
 		self.var_table.insert(var_name, value);
 	}
 
@@ -189,11 +197,11 @@ impl Context {
 		self.var_table.get(var_name).cloned()
 	}
 
-	fn is_var_defined(&self, var_name: &str) -> bool {
+	fn is_var_decl(&self, var_name: &str) -> bool {
 		self.var_table.contains_key(var_name)
 	}
 
-	fn undefine_var(&mut self, var_name: &str) {
+	fn undecl_var(&mut self, var_name: &str) {
 		self.var_table.remove(var_name);
 	}
 }
@@ -315,7 +323,7 @@ impl Execution {
 		if popped_frame.push_v {
 			if let Some(v_value) = context_table.get(cx_id).unwrap().var_value_cloned("v") {
 				// Is undefining v really necessary? Or even a good idea?
-				context_table.get_mut(cx_id).unwrap().undefine_var("v");
+				context_table.get_mut(cx_id).unwrap().undecl_var("v");
 				self.push_obj(v_value);
 			} else {
 				self.push_obj(Object::Nothing);
@@ -353,6 +361,14 @@ impl Execution {
 				self.push_obj(a);
 				self.advance_instr_index();
 			},
+			SirInstr::DeclVar { var_name } => {
+				context_table
+					.table
+					.get_mut(&self.cx_id())
+					.unwrap()
+					.decl_var(var_name);
+				self.advance_instr_index();
+			},
 			SirInstr::PopToVar { var_name } => {
 				let value = self.pop_obj();
 				context_table
@@ -364,7 +380,7 @@ impl Execution {
 			},
 			SirInstr::VarToPush { var_name } => {
 				let value = if var_name == "v"
-					&& !context_table.get(self.cx_id()).unwrap().is_var_defined("v")
+					&& !context_table.get(self.cx_id()).unwrap().is_var_decl("v")
 				{
 					let mut frame_index = self.frame_stack.len() - 1;
 					loop {
@@ -827,6 +843,10 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
 			match target.unwrap_ref() {
 				TargetExpr::VariableName(var_name) => {
+					sir_instrs.push(SirInstr::PopToVar { var_name: var_name.clone() });
+				},
+				TargetExpr::DeclVariableName(var_name) => {
+					sir_instrs.push(SirInstr::DeclVar { var_name: var_name.clone() });
 					sir_instrs.push(SirInstr::PopToVar { var_name: var_name.clone() });
 				},
 				_ => unimplemented!(),

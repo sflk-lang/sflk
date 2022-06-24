@@ -113,6 +113,7 @@ enum ParsingAction {
 	ParseContent,  // (stmt -- stmt content)
 	SetContent,    // (stmt content -- stmt)
 	ConfirmToLeft, // (stmt -- stmt)
+	BangOrToLeft,  // (stmt -- stmt)
 	ParseExtOrStop,
 	ParseExt,          // (stmt -- stmt kw ext)
 	SetExt,            // (stmt kw ext -- stmt)
@@ -139,6 +140,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::ParseContent => write!(f, "ParseContent"),
 			ParsingAction::SetContent => write!(f, "SetContent"),
 			ParsingAction::ConfirmToLeft => write!(f, "ConfirmToLeft"),
+			ParsingAction::BangOrToLeft => write!(f, "BangOrToLeft"),
 			ParsingAction::ParseExtOrStop => write!(f, "ParseExtOrStop"),
 			ParsingAction::ParseExt => write!(f, "ParseExt"),
 			ParsingAction::SetExt => write!(f, "SetExt"),
@@ -378,7 +380,7 @@ impl Parser {
 					});
 					self.action_stack.push(ParsingAction::SetContent);
 					self.action_stack.push(ParsingAction::ParseContent);
-					self.action_stack.push(ParsingAction::ConfirmToLeft);
+					self.action_stack.push(ParsingAction::BangOrToLeft);
 				} else {
 					let error_string = format!("Unexpected token {}", tok);
 					let error_line_string = format!("{} on line {}", error_string, loc.line());
@@ -478,9 +480,38 @@ impl Parser {
 					panic!();
 				}
 			},
+			ParsingAction::BangOrToLeft => {
+				let (tok, loc) = self.consume_tok();
+				if let Tok::Op(Op::ToLeft) = tok {
+					// ToLeft confirmed, nothing else to do.
+				} else if let Tok::Op(Op::Bang) = tok {
+					if let ParsingData::AssignmentStmt { target, .. } =
+						self.data_stack.last_mut().unwrap()
+					{
+						let loc = target.loc().clone();
+						let name = if let TargetExpr::VariableName(name) = target.unwrap_ref() {
+							name.clone()
+						} else {
+							panic!()
+						};
+						*target = Node::from(TargetExpr::DeclVariableName(name), loc);
+					} else {
+						panic!();
+					}
+					self.action_stack.push(ParsingAction::ConfirmToLeft);
+				} else {
+					self.debug.log_error(&format!(
+						"Expected {} for assignment statement but got {} at line {}",
+						Tok::Op(Op::ToLeft),
+						tok,
+						loc.line()
+					));
+				}
+			},
 			ParsingAction::ConfirmToLeft => {
 				let (tok, loc) = self.consume_tok();
 				if let Tok::Op(Op::ToLeft) = tok {
+					// ToLeft confirmed, nothing else to do.
 				} else {
 					self.debug.log_error(&format!(
 						"Expected {} for assignment statement but got {} at line {}",
@@ -798,7 +829,7 @@ impl Parser {
 					ParsingData::Binop(binop) => binop,
 					_ => panic!(),
 				};
-				if let ParsingData::Expr { init, chops, .. } = self.data_stack.last_mut().unwrap() {
+				if let ParsingData::Expr { chops, .. } = self.data_stack.last_mut().unwrap() {
 					chops.push(Chop { binop, expr })
 				}
 				self.debug.log_deindent("Done parsing chain operation");

@@ -160,6 +160,7 @@ pub enum Stmt {
 #[derive(Debug)]
 pub enum TargetExpr {
 	VariableName(String),
+	DeclVariableName(String),
 	Invalid, // TODO: Add error details
 }
 
@@ -307,6 +308,9 @@ impl Treeable for TargetExpr {
 		match self {
 			TargetExpr::VariableName(name) => {
 				StringTree::new_leaf(format!("target variable {}", name), styles::NORMAL)
+			},
+			TargetExpr::DeclVariableName(name) => {
+				StringTree::new_leaf(format!("target declare variable {}", name), styles::NORMAL)
 			},
 			TargetExpr::Invalid => {
 				StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED)
@@ -509,6 +513,7 @@ impl TargetExpr {
 	fn is_invalid(&self) -> bool {
 		match self {
 			TargetExpr::VariableName(_) => false,
+			TargetExpr::DeclVariableName(_) => false,
 			TargetExpr::Invalid => true,
 		}
 	}
