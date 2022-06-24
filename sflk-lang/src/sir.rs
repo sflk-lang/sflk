@@ -398,15 +398,28 @@ impl Execution {
 				} else {
 					None
 				};
-				let value = value.unwrap_or_else(|| {
-					context_table
+				if value.is_some()
+					|| context_table
 						.get(self.cx_id())
 						.unwrap()
-						.var_value_cloned(&var_name)
-						.unwrap()
-				});
-				self.push_obj(value);
-				self.advance_instr_index();
+						.is_var_decl(&var_name)
+				{
+					let value = value.unwrap_or_else(|| {
+						context_table
+							.get(self.cx_id())
+							.unwrap()
+							.var_value_cloned(&var_name)
+							.unwrap()
+					});
+					self.push_obj(value);
+					self.advance_instr_index();
+				} else {
+					let signal = Object::List(vec![
+						Object::String("readvar".to_string()),
+						Object::String(var_name),
+					]);
+					self.emit_signal_and_advance(context_table, signal, true);
+				}
 			},
 			SirInstr::RelativeJump { offset } => {
 				self.add_to_instr_index(offset);
@@ -687,54 +700,7 @@ impl Execution {
 			},
 			SirInstr::EmitSignal => {
 				let signal = self.pop_obj();
-				let mut cx_id = self.cx_id();
-				loop {
-					let parent_context = context_table.get(cx_id).unwrap().parent_context;
-					match parent_context {
-						None => {
-							let result = peform_signal(signal);
-							self.push_obj(result);
-							self.advance_instr_index();
-							break;
-						},
-						Some(parent_context) => {
-							let interceptor = context_table
-								.get(parent_context)
-								.unwrap()
-								.interceptor
-								.clone();
-							match interceptor {
-								None => {
-									cx_id = parent_context;
-								},
-								Some(Object::Block(block)) => {
-									self.advance_instr_index();
-									let mut sub_frame =
-										Frame::for_sir_block(block.sir_block, parent_context);
-									sub_frame.signal = Some(signal);
-									sub_frame.push_v = true; // Will push the result of the signal.
-									self.frame_stack.push(sub_frame);
-									break;
-								},
-								Some(Object::String(string)) => {
-									self.advance_instr_index();
-									let sir_block =
-										string_to_sir(string, "some string".to_string());
-									let mut sub_frame =
-										Frame::for_sir_block(sir_block, parent_context);
-									sub_frame.signal = Some(signal);
-									sub_frame.push_v = true; // Will push the result of the signal.
-									self.frame_stack.push(sub_frame);
-									break;
-								},
-								Some(interceptor) => unimplemented!(
-									"Interception with an interceptor of type {}",
-									interceptor.type_name()
-								),
-							}
-						},
-					}
-				}
+				self.emit_signal_and_advance(context_table, signal, true);
 			},
 			SirInstr::IntoPrintSignal => {
 				let obj = self.pop_obj();
@@ -759,9 +725,109 @@ impl Execution {
 			},
 		}
 	}
+
+	fn emit_signal_and_advance(
+		&mut self,
+		context_table: &mut ContextTable,
+		signal: Object,
+		push_result: bool,
+	) {
+		let mut cx_id = self.cx_id();
+		loop {
+			let parent_context = context_table.get(cx_id).unwrap().parent_context;
+			match parent_context {
+				None => {
+					let result = perform_signal_past_root(signal);
+					if push_result {
+						self.push_obj(result);
+					}
+					self.advance_instr_index();
+					break;
+				},
+				Some(parent_context) => {
+					let interceptor = context_table
+						.get(parent_context)
+						.unwrap()
+						.interceptor
+						.clone();
+					match interceptor {
+						None => {
+							match perform_signal_passing_context(
+								&signal,
+								context_table.get_mut(parent_context).unwrap(),
+							) {
+								SignalPassingResult::KeepGoing => (),
+								SignalPassingResult::Result(result) => {
+									if push_result {
+										self.push_obj(result);
+									}
+									self.advance_instr_index();
+									break;
+								},
+							}
+							cx_id = parent_context;
+						},
+						Some(Object::Block(block)) => {
+							self.advance_instr_index();
+							let mut sub_frame =
+								Frame::for_sir_block(block.sir_block, parent_context);
+							sub_frame.signal = Some(signal);
+							sub_frame.push_v = push_result;
+							self.frame_stack.push(sub_frame);
+							break;
+						},
+						Some(Object::String(string)) => {
+							self.advance_instr_index();
+							let sir_block = string_to_sir(string, "some string".to_string());
+							let mut sub_frame = Frame::for_sir_block(sir_block, parent_context);
+							sub_frame.signal = Some(signal);
+							sub_frame.push_v = push_result;
+							self.frame_stack.push(sub_frame);
+							break;
+						},
+						Some(interceptor) => unimplemented!(
+							"Interception with an interceptor of type {}",
+							interceptor.type_name()
+						),
+					}
+				},
+			}
+		}
+	}
 }
 
-fn peform_signal(signal: Object) -> Object {
+enum SignalPassingResult {
+	KeepGoing,
+	Result(Object),
+}
+
+fn perform_signal_passing_context(signal: &Object, context: &mut Context) -> SignalPassingResult {
+	match signal {
+		Object::List(ref vec) => match vec.get(0) {
+			Some(Object::String(sig_name)) => match sig_name.as_str() {
+				"readvar" => match vec.get(1) {
+					Some(Object::String(var_name)) => {
+						if context.is_var_decl(var_name) {
+							SignalPassingResult::Result(context.var_value_cloned(var_name).unwrap())
+						} else {
+							SignalPassingResult::KeepGoing
+						}
+					},
+					Some(obj) => unimplemented!(
+						"Read variable signal on object of type {} passing context",
+						obj.type_name()
+					),
+					None => unimplemented!("Print signal but without any object passing context"),
+				},
+				_ => SignalPassingResult::KeepGoing,
+			},
+			Some(_) | None => SignalPassingResult::KeepGoing,
+		},
+		_ => SignalPassingResult::KeepGoing,
+	}
+}
+
+fn perform_signal_past_root(signal: Object) -> Object {
 	match signal {
 		Object::List(vec) => match vec.get(0) {
 			Some(Object::String(sig_name)) if sig_name == "print" => match vec.get(1) {
@@ -774,8 +840,11 @@ fn peform_signal(signal: Object) -> Object {
 					Object::Nothing
 				},
 				Some(Object::Nothing) => Object::Nothing,
-				Some(obj) => unimplemented!("Print signal on object of type {}", obj.type_name()),
-				None => unimplemented!("Print signal but without any object"),
+				Some(obj) => unimplemented!(
+					"Print signal on object of type {} past root",
+					obj.type_name()
+				),
+				None => unimplemented!("Print signal but without any object past root"),
 			},
 			Some(Object::String(sig_name)) if sig_name == "newline" => {
 				println!();
@@ -794,15 +863,35 @@ fn peform_signal(signal: Object) -> Object {
 					Object::String(file_content)
 				},
 				Some(obj) => {
-					unimplemented!("Read file signal on object of type {}", obj.type_name())
+					unimplemented!(
+						"Read file signal on object of type {} past root",
+						obj.type_name()
+					)
 				},
-				None => unimplemented!("Read file signal but without any object"),
+				None => unimplemented!("Read file signal but without any object past root"),
 			},
-			Some(Object::String(sig_name)) => unimplemented!("Signal named \"{}\"", sig_name),
-			Some(obj) => unimplemented!("Signal named by an object of type {}", obj.type_name()),
-			None => unimplemented!("Signal described by an empty list"),
+			Some(Object::String(sig_name)) if sig_name == "readvar" => match vec.get(1) {
+				Some(Object::String(var_name)) => {
+					unimplemented!(
+						"Read variable signal on name {} past root",
+						var_name
+					)
+				},
+				Some(_) | None => unimplemented!("Read variable signal past root"),
+			},
+			Some(Object::String(sig_name)) => {
+				unimplemented!("Signal named \"{}\" past root", sig_name)
+			},
+			Some(obj) => unimplemented!(
+				"Signal named by an object of type {} past root",
+				obj.type_name()
+			),
+			None => unimplemented!("Signal described by an empty list past root"),
 		},
-		obj => unimplemented!("Signal described by an object of type {}", obj.type_name()),
+		obj => unimplemented!(
+			"Signal described by an object of type {} past root",
+			obj.type_name()
+		),
 	}
 }
 

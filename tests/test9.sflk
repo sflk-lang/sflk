@@ -1,4 +1,8 @@
 
 x! < 8
-x < 9
+do {
+	pr x nl
+	x! < 13
+	pr x nl
+}
 pr x nl
