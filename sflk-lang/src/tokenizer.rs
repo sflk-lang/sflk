@@ -147,6 +147,7 @@ pub enum Op {
 	Dot,
 	ToRight,
 	ToLeft,
+	Bang,
 }
 
 #[derive(Debug, Clone)]
@@ -239,6 +240,10 @@ impl Tokenizer {
 			Some('<') => {
 				crh.disc();
 				(Tok::Op(Op::ToLeft), loc)
+			},
+			Some('!') => {
+				crh.disc();
+				(Tok::Op(Op::Bang), loc)
 			},
 			Some('#') => self.pop_comment_tok(crh),
 			Some(ch) => {
@@ -678,6 +683,7 @@ impl fmt::Display for Tok {
 			Tok::Op(Op::DoubleComma) => write!(f, "operator ,,"),
 			Tok::Op(Op::Dot) => write!(f, "operator ."),
 			Tok::Op(Op::ToLeft) => write!(f, "operator <"),
+			Tok::Op(Op::Bang) => write!(f, "operator !"),
 			Tok::Left(Matched::Paren) => write!(f, "left parenthesis"),
 			Tok::Left(Matched::Curly) => write!(f, "left curly bracket"),
 			Tok::Left(Matched::Bracket) => write!(f, "left bracket"),
