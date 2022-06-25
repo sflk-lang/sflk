@@ -34,6 +34,10 @@ enum SirInstr {
 	PopToVar { var_name: String },  // (value -- )
 	VarToPush { var_name: String }, // ( -- value)
 
+	// Context operations
+	PushContextVars, // ( -- cx)
+	DeployContext,   // (cx -- )
+
 	// Control flow operations
 	RelativeJump { offset: isize },   // ( -- )
 	RelativeJumpIf { offset: isize }, // (cond -- )
@@ -150,6 +154,7 @@ enum Object {
 	String(String),
 	Block(Block),
 	List(Vec<Object>),
+	Context(HashMap<String, Object>),
 }
 
 impl Object {
@@ -160,6 +165,7 @@ impl Object {
 			Object::String(_) => "string",
 			Object::Block(_) => "block",
 			Object::List(_) => "list",
+			Object::Context(_) => "context",
 		}
 	}
 }
@@ -433,6 +439,35 @@ impl Execution {
 					]);
 					self.emit_signal_and_advance(context_table, signal, true);
 				}
+			},
+			SirInstr::PushContextVars => {
+				let var_table = context_table.get(self.cx_id()).unwrap().var_table.clone();
+				self.push_obj(Object::Context(var_table));
+				self.advance_instr_index();
+			},
+			SirInstr::DeployContext => {
+				let obj = self.pop_obj();
+				match obj {
+					Object::Context(new_vars) => {
+						for (var_name, value) in new_vars {
+							context_table
+								.table
+								.get_mut(&self.cx_id())
+								.unwrap()
+								.decl_var(var_name.clone());
+							context_table
+								.table
+								.get_mut(&self.cx_id())
+								.unwrap()
+								.set_var(var_name, value);
+						}
+					},
+					obj => unimplemented!(
+						"Deploy context operation on object of type {}",
+						obj.type_name()
+					),
+				}
+				self.advance_instr_index();
 			},
 			SirInstr::RelativeJump { offset } => {
 				self.add_to_instr_index(offset);
@@ -1096,6 +1131,10 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				sir_instrs.push(SirInstr::Discard);
 			}
 		},
+		Stmt::DeployContext { expr } => {
+			expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+			sir_instrs.push(SirInstr::DeployContext);
+		},
 		Stmt::Invalid { error_expr } => {
 			expr_to_sir_instrs(error_expr.unwrap_ref(), sir_instrs);
 			sir_instrs.push(SirInstr::IntoPrintSignal);
@@ -1133,6 +1172,9 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 		Expr::Input => {
 			sir_instrs.push(SirInstr::PushInputSignal);
 			sir_instrs.push(SirInstr::EmitSignal);
+		},
+		Expr::Context => {
+			sir_instrs.push(SirInstr::PushContextVars);
 		},
 		Expr::Unop(unop) => match unop {
 			Unop::ReadFile(expr) => {

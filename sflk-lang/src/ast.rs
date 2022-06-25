@@ -152,6 +152,9 @@ pub enum Stmt {
 		expr: Node<Expr>,
 		target: Option<Node<TargetExpr>>,
 	},
+	DeployContext {
+		expr: Node<Expr>,
+	},
 	Invalid {
 		error_expr: Node<Expr>,
 	},
@@ -172,6 +175,7 @@ pub enum Expr {
 	StringLiteral(String),
 	BlockLiteral(Vec<Node<Stmt>>),
 	Input,
+	Context,
 	Unop(Unop),
 	Chain { init: Box<Node<Expr>>, chops: Vec<Node<Chop>> },
 	Invalid { error_expr: Box<Node<Expr>> },
@@ -277,6 +281,7 @@ impl Treeable for Expr {
 				stmts.iter().map(StringTree::from).collect(),
 			),
 			Expr::Input => StringTree::new_leaf("input".to_string(), styles::NORMAL),
+			Expr::Context => StringTree::new_leaf("context".to_string(), styles::NORMAL),
 			Expr::Unop(Unop::Negate(expr)) => StringTree::new_node(
 				"unary minus".to_string(),
 				styles::NORMAL,
@@ -439,6 +444,11 @@ impl Treeable for Stmt {
 					},
 				],
 			),
+			Stmt::DeployContext { expr } => StringTree::new_node(
+				"deploy context".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(expr)],
+			),
 			Stmt::Invalid { error_expr } => StringTree::new_node(
 				"invalid".to_string(),
 				styles::BOLD_LIGHT_RED,
@@ -504,6 +514,7 @@ impl Stmt {
 					.map(|target_expr| (*target_expr).content.is_invalid())
 					.unwrap_or(false)
 			},
+			Stmt::DeployContext { expr } => expr.content.is_invalid(),
 			Stmt::Invalid { .. } => true,
 		}
 	}
@@ -528,6 +539,7 @@ impl Expr {
 			Expr::StringLiteral(_string_string) => false,
 			Expr::BlockLiteral(_stmts) => false,
 			Expr::Input => false,
+			Expr::Context => false,
 			Expr::Unop(_stmts) => false,
 			Expr::Chain { init, chops } => {
 				(*init).content.is_invalid()

@@ -1,4 +1,5 @@
 
+# Test the ! syntax #
 x! < 8
 do {
 	pr x nl
@@ -10,4 +11,20 @@ do {
 }
 pr x nl
 
+# Test the v declaration #
 pr 69-42 > {v < v + x} nl
+
+# Test the cx/cy keywords #
+map! < ()>{
+	uwu! < "u"
+	owo! < "o"
+	awa! < "a"
+	v < cx
+}
+do {
+	cy map
+	vwv! < {v < v + "w" + v}
+	pr uwu > vwv pr " "
+	pr owo > vwv pr " "
+	pr awa > vwv nl
+}

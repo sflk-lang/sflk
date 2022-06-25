@@ -688,6 +688,11 @@ impl Parser {
 							chops: Vec::new(),
 							left_paren: None,
 						}),
+						Tok::Kw(Kw::Cx) => self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(Expr::Context, loc)),
+							chops: Vec::new(),
+							left_paren: None,
+						}),
 						Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::IntegerLiteral(integer_string), loc)),
 							chops: Vec::new(),
@@ -1063,6 +1068,15 @@ impl LanguageDescr {
 				},
 			},
 		);
+		stmts.insert(
+			Kw::Cy,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "context deployment".to_string(),
+				content_type: ContentType::Expr,
+				extentions: HashMap::new(),
+			},
+		);
 		let mut binops = HashMap::new();
 		binops.insert(SimpleTok::Op(Op::Plus), Binop::Plus);
 		binops.insert(SimpleTok::Op(Op::Minus), Binop::Minus);
@@ -1267,6 +1281,18 @@ fn temporary_into_ast_stmt(
 							_ => panic!(),
 						}
 					}),
+			},
+			kw_loc,
+		),
+		Kw::Cy => Node::from(
+			Stmt::DeployContext {
+				expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
 			},
 			kw_loc,
 		),
