@@ -948,6 +948,12 @@ fn perform_signal_past_root(signal: Object) -> Object {
 				},
 				Some(_) | None => unimplemented!("Read variable signal past root"),
 			},
+			Some(Object::String(sig_name)) if sig_name == "writevar" => match vec.get(1) {
+				Some(Object::String(var_name)) => {
+					unimplemented!("Wrire variable signal on name {} past root", var_name)
+				},
+				Some(_) | None => unimplemented!("Write variable signal past root"),
+			},
 			Some(Object::String(sig_name)) => {
 				unimplemented!("Signal named \"{}\" past root", sig_name)
 			},
