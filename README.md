@@ -50,14 +50,14 @@ of successive #s ####
 #### Variables
 
 ```sflk
-x < "So long"
+x! < "So long"
 x < x + " gay "
 pr x + "Bowser" nl
 ```
 
 Here, `x` is a variable that is being assigned a string object, and again, to finally be used in an expression that is printed.
 
-The `name < expression` syntax is the one of the assignment statement. The expression is evaluated and the result is stored in the variable of the given name.
+The `name < expression` syntax is the one of the assignment statement. The expression is evaluated and the result is stored in the variable of the given name. The `name! < expression` (note the `!`) declares the variable before doing the assignment, which is convenient for a first assignment since variables must be declared before being assigned values.
 
 To discard the expression final value instead of storing it, the evaluation statement can be used instead with the syntax `ev expression`.
 
@@ -70,7 +70,7 @@ do {pr "uwu" nl}
 This piece of code prints `uwu` as one might expect. The code block `{pr "uwu" nl}` is actually a code block literal that is an expression, as code blocks are objects just as integers and strings.
 
 ```sflk
-x < {pr "uwu"}
+x! < {pr "uwu"}
 x < x + {nl}
 do x
 ```
@@ -84,7 +84,7 @@ One might think of code blocks as functions or procedures or whatever. They are 
 #### `>` operator
 
 ```sflk
-double < {v < v *2}
+double! < {v < v *2}
 ```
 
 Here, `double` is a code block that only consists of the statement `v < v *2`. The variable `v` is special: it is the variable used to pass arguments to a code block, as well as to return a value.
@@ -98,7 +98,7 @@ The evaluation of `4 >double` goes like this: the value `double` is evaluated, a
 Now for a demonstration of how deranged is SFLK's dynamism, consider the following:
 
 ```sflk
-quad < double >double
+quad! < double >double
 pr 4 >quad nl
 ```
 
@@ -131,14 +131,14 @@ dh fi "file.sflk"
 ##### What are contexts
 
 ```sflk
-x < "hey"
-do {x < "uwu"}
+x! < "hey"
+do {x! < "uwu"}
 pr x nl
 dh {x < "owo"}
 pr x nl
 ```
 
-The do statement executes its code in a new context. Code always runs in a context, and it interacts with the context via statements like the assignment statements (variables are part of a context) or by reading variables' values when evaluating expressions. With that said, one can predict that the first print statement will print `hey` and not `uwu` (as the "big" context still sees `x` as having the value `"hey"`, it has not been influenced by the `x < "uwu"` statement executed in a "smaller" other context).
+The do statement executes its code in a new context. Code always runs in a context, and it interacts with the context via statements like the assignment statements (variables are part of a context) or by reading variables' values when evaluating expressions. With that said, one can predict that the first print statement will print `hey` and not `uwu` (as the "big" context still sees `x` as having the value `"hey"`, it has not been influenced by the `x! < "uwu"` statement executed in a "smaller" other context).
 
 The do-here statement runs its code in the current context, thus the last print statement prints `owo`.
 
