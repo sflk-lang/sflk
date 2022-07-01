@@ -1018,7 +1018,18 @@ impl LanguageDescr {
 				name_article: "a".to_string(),
 				name: "do".to_string(),
 				content_type: ContentType::Expr,
-				extentions: HashMap::new(),
+				extentions: {
+					let mut exts = HashMap::new();
+					exts.insert(
+						Kw::Wi,
+						StmtExtDescr {
+							content_type: ContentType::Expr,
+							optional: true,
+							can_stack: false,
+						},
+					);
+					exts
+				},
 			},
 		);
 		stmts.insert(
@@ -1208,7 +1219,7 @@ fn temporary_into_ast_stmt(
 					.unwrap()
 					.into_iter()
 					.next()
-					.map(|node| node.map(|non_ext| ())),
+					.map(|node| node.map(|_non_ext| ())),
 			},
 			kw_loc,
 		),
@@ -1221,6 +1232,18 @@ fn temporary_into_ast_stmt(
 						_ => panic!(),
 					})
 				},
+				wi_expr: exts
+					.remove(&Kw::Wi)
+					.unwrap()
+					.into_iter()
+					.next()
+					.map(|expr_ext| {
+						let loc = expr_ext.loc().clone();
+						match expr_ext.unwrap() {
+							StmtExt::Expr(expr) => Node::from(expr, loc),
+							_ => panic!(),
+						}
+					}),
 			},
 			kw_loc,
 		),

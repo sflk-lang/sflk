@@ -127,6 +127,7 @@ pub enum Stmt {
 	},
 	Do {
 		expr: Node<Expr>,
+		wi_expr: Option<Node<Expr>>,
 	},
 	DoHere {
 		expr: Node<Expr>,
@@ -344,10 +345,17 @@ impl Treeable for Stmt {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
-			Stmt::Do { expr } => StringTree::new_node(
+			Stmt::Do { expr, wi_expr } => StringTree::new_node(
 				"do".to_string(),
 				styles::NORMAL,
-				vec![StringTree::from(expr)],
+				vec![
+					StringTree::from(expr),
+					if let Some(wi_expr) = wi_expr {
+						StringTree::from(wi_expr)
+					} else {
+						StringTree::new_leaf("no interceptor".to_string(), styles::NORMAL)
+					},
+				],
 			),
 			Stmt::DoHere { expr } => StringTree::new_node(
 				"do here".to_string(),
@@ -478,7 +486,12 @@ impl Stmt {
 				target.content.is_invalid() || expr.content.is_invalid()
 			},
 			Stmt::Evaluate { expr } => expr.content.is_invalid(),
-			Stmt::Do { expr } => expr.content.is_invalid(),
+			Stmt::Do { expr, wi_expr } => {
+				expr.content.is_invalid()
+					|| wi_expr
+						.as_ref()
+						.map_or(false, |expr| expr.content.is_invalid())
+			},
 			Stmt::DoHere { expr } => expr.content.is_invalid(),
 			Stmt::DoFileHere { expr } => expr.content.is_invalid(),
 			#[rustfmt::skip]

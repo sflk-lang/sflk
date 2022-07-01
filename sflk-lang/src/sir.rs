@@ -65,7 +65,7 @@ enum SirInstr {
 	ToRight,     // (l r -- (l > r))
 
 	// Other operations
-	Do,     // (block -- )
+	Do,     // (block intercepror -- )
 	DoHere, // (block -- )
 }
 
@@ -90,6 +90,7 @@ struct Frame {
 	instr_index: usize,
 	object_stack: Vec<Object>,
 	cx_id: ContextId,
+	interceptor: Option<Object>,
 	/// If true, then the value of the v variable will be pushed
 	/// on the oject stack of the frame below when this one is popped.
 	// TODO: Find a more elegant solution.
@@ -101,12 +102,13 @@ struct Frame {
 }
 
 impl Frame {
-	fn for_sir_block(sir_block: SirBlock, cx_id: ContextId) -> Frame {
+	fn for_sir_block(sir_block: SirBlock, cx_id: ContextId, interceptor: Option<Object>) -> Frame {
 		Frame {
 			sir_block,
 			instr_index: 0,
 			object_stack: Vec::new(),
 			cx_id,
+			interceptor,
 			push_v: false,
 			signal: None,
 		}
@@ -652,7 +654,8 @@ impl Execution {
 							.get_mut(sub_context)
 							.unwrap()
 							.set_var("v".to_string(), left);
-						let mut sub_frame = Frame::for_sir_block(block.sir_block, sub_context);
+						let mut sub_frame =
+							Frame::for_sir_block(block.sir_block, sub_context, None);
 						sub_frame.push_v = true; // Will push v.
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
@@ -668,7 +671,7 @@ impl Execution {
 							.unwrap()
 							.set_var("v".to_string(), left);
 						let sir_block = string_to_sir(string, "some string".to_string());
-						let mut sub_frame = Frame::for_sir_block(sir_block, sub_context);
+						let mut sub_frame = Frame::for_sir_block(sir_block, sub_context, None);
 						sub_frame.push_v = true; // Will push v.
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
@@ -700,14 +703,17 @@ impl Execution {
 				match obj {
 					Object::Block(block) => {
 						self.advance_instr_index();
-						self.frame_stack
-							.push(Frame::for_sir_block(block.sir_block, self.cx_id()));
+						self.frame_stack.push(Frame::for_sir_block(
+							block.sir_block,
+							self.cx_id(),
+							None,
+						));
 					},
 					Object::String(string) => {
 						self.advance_instr_index();
 						let sir_block = string_to_sir(string, "some string".to_string());
 						self.frame_stack
-							.push(Frame::for_sir_block(sir_block, self.cx_id()));
+							.push(Frame::for_sir_block(sir_block, self.cx_id(), None));
 					},
 					obj => {
 						unimplemented!("Do here operation on an object of type {}", obj.type_name())
@@ -715,6 +721,7 @@ impl Execution {
 				}
 			},
 			SirInstr::Do => {
+				let interceptor = self.pop_obj();
 				let obj = self.pop_obj();
 				match obj {
 					Object::Block(block) => {
@@ -722,6 +729,7 @@ impl Execution {
 						self.frame_stack.push(Frame::for_sir_block(
 							block.sir_block,
 							context_table.create_context(Some(self.cx_id())),
+							Some(interceptor),
 						));
 					},
 					Object::String(string) => {
@@ -730,6 +738,7 @@ impl Execution {
 						self.frame_stack.push(Frame::for_sir_block(
 							sir_block,
 							context_table.create_context(Some(self.cx_id())),
+							Some(interceptor),
 						));
 					},
 					obj => unimplemented!("Do operation on an object of type {}", obj.type_name()),
@@ -826,7 +835,7 @@ impl Execution {
 						Some(Object::Block(block)) => {
 							self.advance_instr_index();
 							let mut sub_frame =
-								Frame::for_sir_block(block.sir_block, parent_context);
+								Frame::for_sir_block(block.sir_block, parent_context, None);
 							sub_frame.signal = Some(signal);
 							sub_frame.push_v = push_result;
 							self.frame_stack.push(sub_frame);
@@ -835,7 +844,8 @@ impl Execution {
 						Some(Object::String(string)) => {
 							self.advance_instr_index();
 							let sir_block = string_to_sir(string, "some string".to_string());
-							let mut sub_frame = Frame::for_sir_block(sir_block, parent_context);
+							let mut sub_frame =
+								Frame::for_sir_block(sir_block, parent_context, None);
 							sub_frame.signal = Some(signal);
 							sub_frame.push_v = push_result;
 							self.frame_stack.push(sub_frame);
@@ -973,7 +983,7 @@ fn perform_signal_past_root(signal: Object) -> Object {
 pub fn exec_sir_block(sir_block: SirBlock) {
 	let mut machine = Machine::new();
 	let root_cx_id = machine.context_table.create_context(None);
-	let first_frame = Frame::for_sir_block(sir_block, root_cx_id);
+	let first_frame = Frame::for_sir_block(sir_block, root_cx_id, None);
 	let mut execuion = Execution::new();
 	execuion.frame_stack.push(first_frame);
 	machine.executions.push(execuion);
@@ -1104,8 +1114,13 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
 			sir_instrs.push(SirInstr::DoHere);
 		},
-		Stmt::Do { expr } => {
+		Stmt::Do { expr, wi_expr } => {
 			expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+			if let Some(wi_expr) = wi_expr {
+				expr_to_sir_instrs(wi_expr.unwrap_ref(), sir_instrs);
+			} else {
+				sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing });
+			}
 			sir_instrs.push(SirInstr::Do);
 		},
 		Stmt::Newline => {

@@ -28,3 +28,11 @@ do {
 	pr owo > vwv pr " "
 	pr awa > vwv nl
 }
+
+# Test wi extention #
+do {
+	pr "jej" nl
+} wi {
+	pr "[" pr v ix 0 pr "]"
+	em v rs v
+}
