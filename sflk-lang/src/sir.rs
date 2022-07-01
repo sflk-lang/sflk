@@ -397,11 +397,11 @@ impl Execution {
 						.set_var(var_name, value);
 					self.advance_instr_index();
 				} else {
-					let signal = Object::List(vec![
-						Object::String("writevar".to_string()),
-						Object::String(var_name),
-						value,
-					]);
+					let mut var_table = HashMap::new();
+					var_table.insert("name".to_string(), Object::String("writevar".to_string()));
+					var_table.insert("varname".to_string(), Object::String(var_name));
+					var_table.insert("value".to_string(), value);
+					let signal = Object::Context(var_table);
 					self.emit_signal_and_advance(context_table, signal, false);
 				}
 			},
@@ -419,10 +419,10 @@ impl Execution {
 					self.push_obj(value);
 					self.advance_instr_index();
 				} else {
-					let signal = Object::List(vec![
-						Object::String("readvar".to_string()),
-						Object::String(var_name),
-					]);
+					let mut var_table = HashMap::new();
+					var_table.insert("name".to_string(), Object::String("readvar".to_string()));
+					var_table.insert("varname".to_string(), Object::String(var_name));
+					let signal = Object::Context(var_table);
 					self.emit_signal_and_advance(context_table, signal, true);
 				}
 			},
@@ -740,19 +740,23 @@ impl Execution {
 				self.advance_instr_index();
 			},
 			SirInstr::PushNewlineSignal => {
-				self.push_obj(Object::List(vec![Object::String("newline".to_string())]));
+				let mut var_table = HashMap::new();
+				var_table.insert("name".to_string(), Object::String("newline".to_string()));
+				self.push_obj(Object::Context(var_table));
 				self.advance_instr_index();
 			},
 			SirInstr::PushInputSignal => {
-				self.push_obj(Object::List(vec![Object::String("input".to_string())]));
+				let mut var_table = HashMap::new();
+				var_table.insert("name".to_string(), Object::String("input".to_string()));
+				self.push_obj(Object::Context(var_table));
 				self.advance_instr_index();
 			},
 			SirInstr::IntoReadFileSignal => {
 				let obj = self.pop_obj();
-				self.push_obj(Object::List(vec![
-					Object::String("readfile".to_string()),
-					obj,
-				]));
+				let mut var_table = HashMap::new();
+				var_table.insert("name".to_string(), Object::String("readfile".to_string()));
+				var_table.insert("value".to_string(), obj);
+				self.push_obj(Object::Context(var_table));
 				self.advance_instr_index();
 			},
 		}
@@ -849,6 +853,49 @@ enum SignalPassingResult {
 
 fn perform_signal_passing_context(signal: &Object, context: &mut Context) -> SignalPassingResult {
 	match signal {
+		Object::Context(var_table) => match var_table.get("name") {
+			Some(Object::String(sig_name)) if sig_name == "readvar" => match var_table
+				.get("varname")
+			{
+				Some(Object::String(var_name)) => {
+					if context.is_var_decl(var_name) {
+						SignalPassingResult::Result(context.var_value_cloned(var_name).unwrap())
+					} else {
+						SignalPassingResult::KeepGoing
+					}
+				},
+				Some(obj) => unimplemented!(
+					"Read variable signal on object of type {} passing context",
+					obj.type_name()
+				),
+				None => {
+					unimplemented!("Read variable signal but without any object passing context")
+				},
+			},
+			Some(Object::String(sig_name)) if sig_name == "writevar" => match var_table
+				.get("varname")
+			{
+				Some(Object::String(var_name)) => {
+					if context.is_var_decl(var_name) {
+						context.set_var(
+							var_name.to_string(),
+							var_table.get("value").unwrap().clone(),
+						);
+						SignalPassingResult::Result(Object::Nothing)
+					} else {
+						SignalPassingResult::KeepGoing
+					}
+				},
+				Some(obj) => unimplemented!(
+					"Write variable signal on object of type {} passing context",
+					obj.type_name()
+				),
+				None => {
+					unimplemented!("Write variable signal but without any object passing context")
+				},
+			},
+			Some(_) | None => SignalPassingResult::KeepGoing,
+		},
 		Object::List(ref vec) => match vec.get(0) {
 			Some(Object::String(sig_name)) if sig_name == "readvar" => match vec.get(1) {
 				Some(Object::String(var_name)) => {
@@ -907,6 +954,48 @@ fn perform_signal_past_root(signal: Object) -> Object {
 					obj.type_name()
 				),
 				None => unimplemented!("Print signal without any value past root"),
+			},
+			Some(Object::String(sig_name)) if sig_name == "newline" => {
+				println!();
+				Object::Nothing
+			},
+			Some(Object::String(sig_name)) if sig_name == "input" => {
+				use std::io::Write;
+				std::io::stdout().flush().ok();
+				let mut input = String::new();
+				std::io::stdin().read_line(&mut input).expect("h");
+				Object::String(input)
+			},
+			Some(Object::String(sig_name)) if sig_name == "readfile" => {
+				match var_table.get("value") {
+					Some(Object::String(filename)) => {
+						let file_content = std::fs::read_to_string(filename).unwrap();
+						Object::String(file_content)
+					},
+					Some(obj) => {
+						unimplemented!(
+							"Read file signal on object of type {} past root",
+							obj.type_name()
+						)
+					},
+					None => unimplemented!("Read file signal but without any value past root"),
+				}
+			},
+			Some(Object::String(sig_name)) if sig_name == "readvar" => {
+				match var_table.get("varname") {
+					Some(Object::String(var_name)) => {
+						unimplemented!("Read variable signal on name {} past root", var_name)
+					},
+					Some(_) | None => unimplemented!("Read variable signal past root"),
+				}
+			},
+			Some(Object::String(sig_name)) if sig_name == "writevar" => {
+				match var_table.get("varname") {
+					Some(Object::String(var_name)) => {
+						unimplemented!("Wrire variable signal on name {} past root", var_name)
+					},
+					Some(_) | None => unimplemented!("Write variable signal past root"),
+				}
 			},
 			Some(Object::String(sig_name)) => {
 				unimplemented!("Signal named \"{}\" past root", sig_name)

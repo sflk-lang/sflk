@@ -1,8 +1,32 @@
+uwu! < "owo"
 do {
-	pr "jej"
+	pr "jej" nl
+	pr uwu nl
 } wi {
 	cy v
-	pr "[" pr name pr "]"
-	em v rs v
+	newline! < 0
+	reemit! < 1
+	if name - "readvar" el dh {
+		pr "[read var " pr varname pr "]"
+	} th
+	if name - "writevar" el dh {
+		pr "[write " pr value " in var " pr varname pr "]"
+	} th
+	if name - "print" el dh {
+		pr "[print " pr value pr "]"
+		reemit < 0
+	} th
+	if name - "newline" el dh {
+		pr "[newline]"
+		v < () > {name! < "print" value! < "" v! < cx}
+		newline < 1
+	} th
+	dh {
+		pr "[" pr name pr "]"
+	}
+	if reemit th dh {
+		em v rs v
+		pr "(" pr v pr ")"
+	}
+	if newline th nl
 }
-nl
