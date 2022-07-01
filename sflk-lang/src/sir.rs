@@ -998,42 +998,6 @@ fn perform_signal_passing_context(signal: &Object, context: &mut Context) -> Sig
 			},
 			Some(_) | None => SignalPassingResult::KeepGoing,
 		},
-		Object::List(ref vec) => match vec.get(0) {
-			Some(Object::String(sig_name)) if sig_name == "readvar" => match vec.get(1) {
-				Some(Object::String(var_name)) => {
-					if context.is_var_decl(var_name) {
-						SignalPassingResult::Result(context.var_value_cloned(var_name).unwrap())
-					} else {
-						SignalPassingResult::KeepGoing
-					}
-				},
-				Some(obj) => unimplemented!(
-					"Read variable signal on object of type {} passing context",
-					obj.type_name()
-				),
-				None => {
-					unimplemented!("Read variable signal but without any object passing context")
-				},
-			},
-			Some(Object::String(sig_name)) if sig_name == "writevar" => match vec.get(1) {
-				Some(Object::String(var_name)) => {
-					if context.is_var_decl(var_name) {
-						context.set_var(var_name.to_string(), vec.get(2).unwrap().clone());
-						SignalPassingResult::Result(Object::Nothing)
-					} else {
-						SignalPassingResult::KeepGoing
-					}
-				},
-				Some(obj) => unimplemented!(
-					"Write variable signal on object of type {} passing context",
-					obj.type_name()
-				),
-				None => {
-					unimplemented!("Write variable signal but without any object passing context")
-				},
-			},
-			Some(_) | None => SignalPassingResult::KeepGoing,
-		},
 		_ => SignalPassingResult::KeepGoing,
 	}
 }
@@ -1109,68 +1073,6 @@ fn perform_signal_past_root(signal: Object) -> Object {
 			None => unimplemented!(
 				"Signal described by a context not containing a name variable past root"
 			),
-		},
-		Object::List(vec) => match vec.get(0) {
-			Some(Object::String(sig_name)) if sig_name == "print" => match vec.get(1) {
-				Some(Object::Integer(value)) => {
-					print!("{}", value);
-					Object::Nothing
-				},
-				Some(Object::String(string)) => {
-					print!("{}", string);
-					Object::Nothing
-				},
-				Some(Object::Nothing) => Object::Nothing,
-				Some(obj) => unimplemented!(
-					"Print signal on object of type {} past root",
-					obj.type_name()
-				),
-				None => unimplemented!("Print signal but without any object past root"),
-			},
-			Some(Object::String(sig_name)) if sig_name == "newline" => {
-				println!();
-				Object::Nothing
-			},
-			Some(Object::String(sig_name)) if sig_name == "input" => {
-				use std::io::Write;
-				std::io::stdout().flush().ok();
-				let mut input = String::new();
-				std::io::stdin().read_line(&mut input).expect("h");
-				Object::String(input)
-			},
-			Some(Object::String(sig_name)) if sig_name == "readfile" => match vec.get(1) {
-				Some(Object::String(filename)) => {
-					let file_content = std::fs::read_to_string(filename).unwrap();
-					Object::String(file_content)
-				},
-				Some(obj) => {
-					unimplemented!(
-						"Read file signal on object of type {} past root",
-						obj.type_name()
-					)
-				},
-				None => unimplemented!("Read file signal but without any object past root"),
-			},
-			Some(Object::String(sig_name)) if sig_name == "readvar" => match vec.get(1) {
-				Some(Object::String(var_name)) => {
-					unimplemented!("Read variable signal on name {} past root", var_name)
-				},
-				Some(_) | None => unimplemented!("Read variable signal past root"),
-			},
-			Some(Object::String(sig_name)) if sig_name == "writevar" => match vec.get(1) {
-				Some(Object::String(var_name)) => {
-					unimplemented!("Wrire variable signal on name {} past root", var_name)
-				},
-				Some(_) | None => unimplemented!("Write variable signal past root"),
-			},
-			Some(Object::String(sig_name)) => {
-				unimplemented!("Signal named \"{}\" past root", sig_name)
-			},
-			Some(obj) => unimplemented!(
-				"Signal named by an object of type {} past root",
-				obj.type_name()
-			),
-			None => unimplemented!("Signal described by an empty list past root"),
 		},
 		obj => unimplemented!(
 			"Signal described by an object of type {} past root",
