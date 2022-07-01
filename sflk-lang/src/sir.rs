@@ -503,6 +503,9 @@ impl Execution {
 					Object::List(vec) => {
 						self.push_obj(Object::Integer(vec.len() as i64));
 					},
+					Object::String(string) => {
+						self.push_obj(Object::Integer(string.chars().count() as i64));
+					},
 					obj => {
 						unimplemented!(
 							"Length operation on object of type {}",
