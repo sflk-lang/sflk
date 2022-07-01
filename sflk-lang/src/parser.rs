@@ -90,6 +90,7 @@ enum Unop {
 	File,
 	Ordered,
 	OrderedStrictly,
+	Length,
 }
 
 enum BlockLevelExpectedTerminator {
@@ -1049,6 +1050,7 @@ impl LanguageDescr {
 		unops.insert(SimpleTok::Kw(Kw::Fi), Unop::File);
 		unops.insert(SimpleTok::Kw(Kw::Od), Unop::Ordered);
 		unops.insert(SimpleTok::Kw(Kw::Os), Unop::OrderedStrictly);
+		unops.insert(SimpleTok::Kw(Kw::Ln), Unop::Length);
 		LanguageDescr { stmts, binops, unops }
 	}
 }
@@ -1295,5 +1297,6 @@ fn temporary_unop_into_ast_expr(unop: Unop, expr: Node<Expr>) -> Expr {
 		Unop::File => AstUnop::ReadFile(Box::new(expr)),
 		Unop::Ordered => AstUnop::Ordered(Box::new(expr)),
 		Unop::OrderedStrictly => AstUnop::OrderedStrictly(Box::new(expr)),
+		Unop::Length => AstUnop::Length(Box::new(expr)),
 	})
 }

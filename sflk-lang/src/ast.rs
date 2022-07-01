@@ -182,6 +182,7 @@ pub enum Unop {
 	ReadFile(Box<Node<Expr>>),
 	Ordered(Box<Node<Expr>>),
 	OrderedStrictly(Box<Node<Expr>>),
+	Length(Box<Node<Expr>>),
 }
 
 #[derive(Debug)]
@@ -295,6 +296,11 @@ impl Treeable for Expr {
 			),
 			Expr::Unop(Unop::OrderedStrictly(expr)) => StringTree::new_node(
 				"unary ordered strictly".to_string(),
+				styles::NORMAL,
+				vec![StringTree::from(&**expr)],
+			),
+			Expr::Unop(Unop::Length(expr)) => StringTree::new_node(
+				"unary length".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(&**expr)],
 			),

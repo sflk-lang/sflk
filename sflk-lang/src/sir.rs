@@ -52,6 +52,7 @@ enum SirInstr {
 	// Unary operations
 	IsOrdered,         // (list -- bool)
 	IsOrderedStrictly, // (list -- bool)
+	Length,            // (thing -- length)
 
 	// Binary operators
 	Plus,        // (l r -- (l + r))
@@ -490,6 +491,21 @@ impl Execution {
 					obj => {
 						unimplemented!(
 							"Is ordered strictly operation on object of type {}",
+							obj.type_name()
+						)
+					},
+				}
+				self.advance_instr_index();
+			},
+			SirInstr::Length => {
+				let obj = self.pop_obj();
+				match obj {
+					Object::List(vec) => {
+						self.push_obj(Object::Integer(vec.len() as i64));
+					},
+					obj => {
+						unimplemented!(
+							"Length operation on object of type {}",
 							obj.type_name()
 						)
 					},
@@ -1068,6 +1084,10 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 			Unop::OrderedStrictly(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
 				sir_instrs.push(SirInstr::IsOrderedStrictly);
+			},
+			Unop::Length(expr) => {
+				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::Length);
 			},
 		},
 		Expr::Chain { init, chops } => {
