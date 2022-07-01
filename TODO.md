@@ -111,10 +111,29 @@ If could make things simpler if a code block object would separate code from dat
 
 An entry in this table could either be a normal SFLK object, or a marked expression (like the SIR code that evaluates the expression, no need to store the AST in there) coupled with the marker name.
 
+#### Note on a simpler alternative
 
-#### Contexts vs general maps
+Instead of `expression~marker`, we could simply make `variable~` read the variable of the given name in the first context to contain it.
+
+**This looks like it is the better decision.**
+
+#### Note on more explicit handling of this feature
+
+Instead of attempting replacements implicitely like proposed previously, we could provide an unary operator that attemps the replacements.
+
+**This looks like it is the better decision.**
+
+### Contexts vs general maps
 
 It could also be nice to have maps from anything to anything, it is highly probable that SFLK will get some in one way or another. To avoid confusion between these types, we could call the type discussed in this entry by the name of *context*, and the for futur general-purpose maps *dictionaries*.
+
+### Big ints
+
+Have every number be a normalized big int able to store arbitraly big integer values.
+
+### Big fractions
+
+Have every number be a normalized fraction of big ints so that we can manipulate arbitraly precise rational numbers.
 
 ## Small language features
 
@@ -147,6 +166,14 @@ The code shoud be made more readable and more commented.
 ### Error messages in panics
 
 No more empty `unimplemented!`s and dangerous `unwrap`s. When the interpreted explodes for some reason, the reason should try its best to be clear to whoever is using the interpreter.
+
+## Standard library
+
+### PDF creation
+
+A PDF creation feature should be provided as an interceptor that intercepts print statements and adapt them to alter an output PDF document containing the formated content of the intercepted print signals.
+
+Not that it should replace LaTeX, but it could be kinda cool to have that in the stdlib, like this is so random yet so facinating.
 
 ## Logo
 
