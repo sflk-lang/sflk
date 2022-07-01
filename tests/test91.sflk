@@ -1,0 +1,8 @@
+do {
+	pr "jej"
+} wi {
+	cy v
+	pr "[" pr name pr "]"
+	r! < () em v rs r v! < r
+}
+nl

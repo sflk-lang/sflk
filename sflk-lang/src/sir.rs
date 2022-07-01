@@ -760,7 +760,10 @@ impl Execution {
 			},
 			SirInstr::IntoPrintSignal => {
 				let obj = self.pop_obj();
-				self.push_obj(Object::List(vec![Object::String("print".to_string()), obj]));
+				let mut var_table = HashMap::new();
+				var_table.insert("name".to_string(), Object::String("print".to_string()));
+				var_table.insert("value".to_string(), obj);
+				self.push_obj(Object::Context(var_table));
 				self.advance_instr_index();
 			},
 			SirInstr::PushNewlineSignal => {
@@ -905,6 +908,34 @@ fn perform_signal_passing_context(signal: &Object, context: &mut Context) -> Sig
 
 fn perform_signal_past_root(signal: Object) -> Object {
 	match signal {
+		Object::Context(var_table) => match var_table.get("name") {
+			Some(Object::String(sig_name)) if sig_name == "print" => match var_table.get("value") {
+				Some(Object::Integer(value)) => {
+					print!("{}", value);
+					Object::Nothing
+				},
+				Some(Object::String(string)) => {
+					print!("{}", string);
+					Object::Nothing
+				},
+				Some(Object::Nothing) => Object::Nothing,
+				Some(obj) => unimplemented!(
+					"Print signal on object of type {} past root",
+					obj.type_name()
+				),
+				None => unimplemented!("Print signal without any value past root"),
+			},
+			Some(Object::String(sig_name)) => {
+				unimplemented!("Signal named \"{}\" past root", sig_name)
+			},
+			Some(obj) => unimplemented!(
+				"Signal named by an object of type {} past root",
+				obj.type_name()
+			),
+			None => unimplemented!(
+				"Signal described by a context not containing a name variable past root"
+			),
+		},
 		Object::List(vec) => match vec.get(0) {
 			Some(Object::String(sig_name)) if sig_name == "print" => match vec.get(1) {
 				Some(Object::Integer(value)) => {
