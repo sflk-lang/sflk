@@ -88,6 +88,9 @@ enum Binop {
 enum Unop {
 	Minus,
 	File,
+	Ordered,
+	OrderedStrictly,
+	Length,
 }
 
 enum BlockLevelExpectedTerminator {
@@ -120,6 +123,7 @@ enum ParsingAction {
 	ParseExpr,         // ( -- expr)
 	AddUnop,           // (unop expr -- expr)
 	ParseNonChainExpr, // ( -- [paren] expr)
+	ParseDottedString, // ( -- expr)
 	ParseChopOrStop,
 	ConsumeDot,
 	ConsumeRightParen,  // (paren expr -- expr)
@@ -147,6 +151,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::ParseExpr => write!(f, "ParseExpr"),
 			ParsingAction::AddUnop => write!(f, "AddUnop"),
 			ParsingAction::ParseNonChainExpr => write!(f, "ParseNonChainExpr"),
+			ParsingAction::ParseDottedString => write!(f, "ParseDottedString"),
 			ParsingAction::ParseChopOrStop => write!(f, "ParseChopOrStop"),
 			ParsingAction::ConsumeDot => write!(f, "ConsumeDot"),
 			ParsingAction::ConsumeRightParen => write!(f, "ConsumeRightParen"),
@@ -333,7 +338,7 @@ impl Parser {
 				if let ParsingData::BlockLevel { right_curly: end, .. } =
 					self.data_stack.last_mut().unwrap()
 				{
-					end.insert(Node::from((), loc));
+					*end = Some(Node::from((), loc));
 				} else {
 					panic!();
 				}
@@ -462,7 +467,8 @@ impl Parser {
 						(ContentType::Expr, ParsingData::Expr { init, chops, .. }) => {
 							self.debug.log_deindent("Done parsing expression");
 							self.debug.log_deindent("Done parsing main content");
-							content.insert(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
+							*content =
+								Some(temporary_into_ast_expr(init, chops).map(StmtExt::Expr));
 						},
 						_ => unimplemented!(),
 					}
@@ -472,7 +478,7 @@ impl Parser {
 					self.debug.log_deindent("Done parsing expression");
 					self.debug.log_deindent("Done parsing main content");
 					if let ParsingData::Expr { init, chops, .. } = content_data {
-						content.insert(temporary_into_ast_expr(init, chops));
+						*content = Some(temporary_into_ast_expr(init, chops));
 					} else {
 						panic!();
 					}
@@ -703,6 +709,9 @@ impl Parser {
 							chops: Vec::new(),
 							left_paren: None,
 						}),
+						Tok::Op(Op::Dot) => {
+							self.action_stack.push(ParsingAction::ParseDottedString);
+						},
 						Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::VariableName(string), loc)),
 							chops: Vec::new(),
@@ -744,6 +753,39 @@ impl Parser {
 							})
 						},
 					}
+				}
+			},
+			ParsingAction::ParseDottedString => {
+				let (tok, loc) = self.consume_tok();
+				match tok {
+					Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
+						init: Some(Node::from(Expr::StringLiteral(string), loc)),
+						chops: Vec::new(),
+						left_paren: None,
+					}),
+					Tok::Kw(kw) => self.data_stack.push(ParsingData::Expr {
+						init: Some(Node::from(Expr::StringLiteral(kw.to_string()), loc)),
+						chops: Vec::new(),
+						left_paren: None,
+					}),
+					_ => {
+						let error_string = format!("Unexpected token {} for dotted string", tok);
+						self.debug.log_error(&error_string);
+						let error_line_string = format!("{} on line {}", error_string, loc.line());
+						self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(
+								Expr::Invalid {
+									error_expr: Box::new(Node::from(
+										Expr::StringLiteral(error_line_string),
+										loc.clone(),
+									)),
+								},
+								loc,
+							)),
+							chops: Vec::new(),
+							left_paren: None,
+						})
+					},
 				}
 			},
 			ParsingAction::ParseExpr => {
@@ -1100,6 +1142,9 @@ impl LanguageDescr {
 		let mut unops = HashMap::new();
 		unops.insert(SimpleTok::Op(Op::Minus), Unop::Minus);
 		unops.insert(SimpleTok::Kw(Kw::Fi), Unop::File);
+		unops.insert(SimpleTok::Kw(Kw::Od), Unop::Ordered);
+		unops.insert(SimpleTok::Kw(Kw::Os), Unop::OrderedStrictly);
+		unops.insert(SimpleTok::Kw(Kw::Ln), Unop::Length);
 		LanguageDescr { stmts, binops, unops }
 	}
 }
@@ -1219,7 +1264,7 @@ fn temporary_into_ast_stmt(
 					.unwrap()
 					.into_iter()
 					.next()
-					.map(|node| node.map(|_non_ext| ())),
+					.map(|node| node.map(|_none_ext| ())),
 			},
 			kw_loc,
 		),
@@ -1329,7 +1374,7 @@ fn temporary_assignment_into_ast_stmt(
 	content: Option<Node<Expr>>,
 ) -> Node<Stmt> {
 	let loc = target.loc() + content.as_ref().unwrap().loc();
-	Node::from((Stmt::Assign { target, expr: content.unwrap() }), loc)
+	Node::from(Stmt::Assign { target, expr: content.unwrap() }, loc)
 }
 
 // TODO: Stop having to use `ast::Expr` this early, or maybe at all.
@@ -1368,5 +1413,8 @@ fn temporary_unop_into_ast_expr(unop: Unop, expr: Node<Expr>) -> Expr {
 	Expr::Unop(match unop {
 		Unop::Minus => AstUnop::Negate(Box::new(expr)),
 		Unop::File => AstUnop::ReadFile(Box::new(expr)),
+		Unop::Ordered => AstUnop::Ordered(Box::new(expr)),
+		Unop::OrderedStrictly => AstUnop::OrderedStrictly(Box::new(expr)),
+		Unop::Length => AstUnop::Length(Box::new(expr)),
 	})
 }

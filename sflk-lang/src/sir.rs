@@ -54,6 +54,11 @@ enum SirInstr {
 	LogicalNot, // (a -- not_a)
 	LogicalAnd, // (a b -- (a && b))
 
+	// Unary operations
+	IsOrdered,         // (list -- bool)
+	IsOrderedStrictly, // (list -- bool)
+	Length,            // (thing -- length)
+
 	// Binary operators
 	Plus,        // (l r -- (l + r))
 	Minus,       // (l r -- (l - r))
@@ -500,6 +505,76 @@ impl Execution {
 				}
 				self.advance_instr_index();
 			},
+			SirInstr::IsOrdered => {
+				let obj = self.pop_obj();
+				match obj {
+					Object::List(vec) => {
+						let non_integer = vec.iter().find(|obj| !matches!(obj, Object::Integer(_)));
+						if let Some(obj) = non_integer {
+							unimplemented!(
+								"Is ordered operation on a list that is not \
+								exclusively composed of integers (at least one \
+								object if type {} is in the list)",
+								obj.type_name()
+							);
+						}
+						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
+							[Object::Integer(left), Object::Integer(right)] => left <= right,
+							[_, _] => panic!(),
+							_ => panic!(),
+						});
+						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
+					},
+					obj => {
+						unimplemented!("Is ordered operation on object of type {}", obj.type_name())
+					},
+				}
+				self.advance_instr_index();
+			},
+			SirInstr::IsOrderedStrictly => {
+				let obj = self.pop_obj();
+				match obj {
+					Object::List(vec) => {
+						let non_integer = vec.iter().find(|obj| !matches!(obj, Object::Integer(_)));
+						if let Some(obj) = non_integer {
+							unimplemented!(
+								"Is ordered strictly operation on a list that is not \
+								exclusively composed of integers (at least one \
+								object if type {} is in the list)",
+								obj.type_name()
+							);
+						}
+						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
+							[Object::Integer(left), Object::Integer(right)] => left < right,
+							[_, _] => panic!(),
+							_ => panic!(),
+						});
+						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
+					},
+					obj => {
+						unimplemented!(
+							"Is ordered strictly operation on object of type {}",
+							obj.type_name()
+						)
+					},
+				}
+				self.advance_instr_index();
+			},
+			SirInstr::Length => {
+				let obj = self.pop_obj();
+				match obj {
+					Object::List(vec) => {
+						self.push_obj(Object::Integer(vec.len() as i64));
+					},
+					Object::String(string) => {
+						self.push_obj(Object::Integer(string.chars().count() as i64));
+					},
+					obj => {
+						unimplemented!("Length operation on object of type {}", obj.type_name())
+					},
+				}
+				self.advance_instr_index();
+			},
 			SirInstr::Plus => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
@@ -614,7 +689,34 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::List(vec), Object::Integer(index)) => {
-						self.push_obj(vec.get(index as usize).unwrap().clone());
+						self.push_obj(
+							vec.get(index as usize)
+								.unwrap_or_else(|| {
+									panic!(
+										"List index {} out of range {}-{}",
+										index,
+										0,
+										vec.len() - 1
+									)
+								})
+								.clone(),
+						);
+					},
+					(Object::String(string), Object::Integer(index)) => {
+						self.push_obj(Object::String(
+							string
+								.chars()
+								.nth(index as usize)
+								.unwrap_or_else(|| {
+									panic!(
+										"String index {} out of range {}-{}",
+										index,
+										0,
+										string.chars().count() - 1
+									)
+								})
+								.to_string(),
+						));
 					},
 					(left, right) => unimplemented!(
 						"Index operation on objects of type {} and {}",
@@ -659,15 +761,15 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
 					},
-					(Object::Integer(index), Object::List(list)) => {
+					(Object::Integer(index), Object::List(vec)) => {
 						self.push_obj(
-							list.get(index as usize)
+							vec.get(index as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
 										index,
 										0,
-										list.len() - 1
+										vec.len() - 1
 									)
 								})
 								.clone(),
@@ -1295,15 +1397,27 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::PushContextVars);
 		},
 		Expr::Unop(unop) => match unop {
+			Unop::Negate(expr) => {
+				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(-1) });
+				sir_instrs.push(SirInstr::Star);
+			},
 			Unop::ReadFile(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
 				sir_instrs.push(SirInstr::IntoReadFileSignal);
 				sir_instrs.push(SirInstr::EmitSignal);
 			},
-			Unop::Negate(expr) => {
+			Unop::Ordered(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
-				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(-1) });
-				sir_instrs.push(SirInstr::Star);
+				sir_instrs.push(SirInstr::IsOrdered);
+			},
+			Unop::OrderedStrictly(expr) => {
+				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::IsOrderedStrictly);
+			},
+			Unop::Length(expr) => {
+				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::Length);
 			},
 		},
 		Expr::Chain { init, chops } => {

@@ -281,6 +281,7 @@ Coming soon!
 | left type  | right type | behavior
 |:----------:|:----------:| --------
 | any type   | code block | Execute right with left as `v`, evaluates to `v`
+| integer    | list       | Same as `right ix left`
 
 #### Comma `,`
 
@@ -300,6 +301,7 @@ Coming soon!
 | left type  | right type | result
 |:----------:|:----------:| ------
 | list       | integer    | The right-th element of left
+| string     | integer    | The right-th character of string
 
 ### Unary operators behaviors
 
@@ -314,6 +316,25 @@ Coming soon!
 | right type | behavior
 |:----------:| --------
 | string     | Read file at path right
+
+#### Ordered `od`
+
+| right type | result
+|:----------:| ------
+| list       | if the list is ordered then `1` else `0`
+
+#### Ordered but strictly `os`
+
+| right type | result
+|:----------:| ------
+| list       | if the list is strictly ordered then `1` else `0`
+
+#### Length `ln`
+
+| right type | result
+|:----------:| ------
+| list       | number of elements
+| string     | number of characters
 
 ## Contribute
 

@@ -96,3 +96,12 @@ ri ()
 pr -1 nl
 pr -1+1+1 nl
 pr -1+1.+1 nl
+pr 3 > ("a",, "b", "c", "d", "e") nl
+inf < 3 sup < 6
+x<0 lp wh x-10 bd if od inf,,x,sup th pr x el pr"_"sp pr", "bd x<x+1 nl
+x<0 lp wh x-10 bd if os inf,,x,sup th pr x el pr"_"sp pr", "bd x<x+1 nl
+pr ln 1,, 2, 3, 4 nl
+pr ln "1234" nl
+prspchrs < {x < 0 lp wh x - ln v bd pr v ix x sp pr ", " bd x < x + 1}
+ev "01234" > prspchrs nl
+pr .a nl

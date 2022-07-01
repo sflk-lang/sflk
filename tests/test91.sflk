@@ -9,17 +9,17 @@ do {
 	newline! < 0
 	reemit! < 1
 	pr "["
-	if name - "readvar" el dh {
+	if name - .readvar el dh {
 		pr "read var " pr varname
 	} th
-	if name - "writevar" el dh {
+	if name - .writevar el dh {
 		pr "write " pr value pr " in var " pr varname
 	} th
-	if name - "print" el dh {
+	if name - .print el dh {
 		pr "print " pr value
 		reemit < 0
 	} th
-	if name - "newline" el dh {
+	if name - .newline el dh {
 		pr "newline"
 		reemit < 0
 		newline < 1

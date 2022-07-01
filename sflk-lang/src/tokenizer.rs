@@ -137,6 +137,9 @@ pub enum Kw {
 	Cx,
 	Cy,
 	Wi,
+	Od,
+	Os,
+	Ln,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -298,6 +301,9 @@ impl Tokenizer {
 			"cx" => Tok::Kw(Kw::Cx),
 			"cy" => Tok::Kw(Kw::Cy),
 			"wi" => Tok::Kw(Kw::Wi),
+			"od" => Tok::Kw(Kw::Od),
+			"os" => Tok::Kw(Kw::Os),
+			"ln" => Tok::Kw(Kw::Ln),
 			_ => {
 				let len = word.len();
 				Tok::Name { string: word, unstable_warning: len == 2 }
@@ -736,6 +742,9 @@ impl fmt::Display for Kw {
 			Kw::Cx => write!(f, "cx"),
 			Kw::Cy => write!(f, "cy"),
 			Kw::Wi => write!(f, "wi"),
+			Kw::Od => write!(f, "od"),
+			Kw::Os => write!(f, "os"),
+			Kw::Ln => write!(f, "ln"),
 		}
 	}
 }
