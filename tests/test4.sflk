@@ -104,3 +104,4 @@ pr ln 1,, 2, 3, 4 nl
 pr ln "1234" nl
 prspchrs < {x < 0 lp wh x - ln v bd pr v ix x sp pr ", " bd x < x + 1}
 ev "01234" > prspchrs nl
+pr .a nl

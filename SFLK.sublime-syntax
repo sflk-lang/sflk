@@ -56,6 +56,10 @@ contexts:
         2: variable.function.sflk
     - match: '\,\,|\,'
       scope: keyword.operator.sflk
+    - match: '(\.)({{name}})'
+      captures:
+        1: punctuation.definition.string.begin.sflk string.other.sflk
+        2: string.other.sflk
     - match: '\.'
       scope: keyword.operator.sflk
     - match: '>'

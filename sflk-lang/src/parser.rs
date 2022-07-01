@@ -122,6 +122,7 @@ enum ParsingAction {
 	ParseExpr,         // ( -- expr)
 	AddUnop,           // (unop expr -- expr)
 	ParseNonChainExpr, // ( -- [paren] expr)
+	ParseDottedString, // ( -- expr)
 	ParseChopOrStop,
 	ConsumeDot,
 	ConsumeRightParen,  // (paren expr -- expr)
@@ -148,6 +149,7 @@ impl fmt::Display for ParsingAction {
 			ParsingAction::ParseExpr => write!(f, "ParseExpr"),
 			ParsingAction::AddUnop => write!(f, "AddUnop"),
 			ParsingAction::ParseNonChainExpr => write!(f, "ParseNonChainExpr"),
+			ParsingAction::ParseDottedString => write!(f, "ParseDottedString"),
 			ParsingAction::ParseChopOrStop => write!(f, "ParseChopOrStop"),
 			ParsingAction::ConsumeDot => write!(f, "ConsumeDot"),
 			ParsingAction::ConsumeRightParen => write!(f, "ConsumeRightParen"),
@@ -671,6 +673,9 @@ impl Parser {
 							chops: Vec::new(),
 							left_paren: None,
 						}),
+						Tok::Op(Op::Dot) => {
+							self.action_stack.push(ParsingAction::ParseDottedString);
+						},
 						Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::VariableName(string), loc)),
 							chops: Vec::new(),
@@ -712,6 +717,40 @@ impl Parser {
 							})
 						},
 					}
+				}
+			},
+			ParsingAction::ParseDottedString => {
+				let (tok, loc) = self.consume_tok();
+				match tok {
+					Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
+						init: Some(Node::from(Expr::StringLiteral(string), loc)),
+						chops: Vec::new(),
+						left_paren: None,
+					}),
+					Tok::Kw(kw) => self.data_stack.push(ParsingData::Expr {
+						init: Some(Node::from(Expr::StringLiteral(kw.to_string()), loc)),
+						chops: Vec::new(),
+						left_paren: None,
+					}),
+					_ => {
+						let error_string = format!("Unexpected token {} for dotted string", tok);
+						self.debug.log_error(&error_string);
+						let error_line_string =
+							format!("{} on line {}", error_string, loc.line());
+						self.data_stack.push(ParsingData::Expr {
+							init: Some(Node::from(
+								Expr::Invalid {
+									error_expr: Box::new(Node::from(
+										Expr::StringLiteral(error_line_string),
+										loc.clone(),
+									)),
+								},
+								loc,
+							)),
+							chops: Vec::new(),
+							left_paren: None,
+						})
+					},
 				}
 			},
 			ParsingAction::ParseExpr => {
