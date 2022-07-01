@@ -735,8 +735,7 @@ impl Parser {
 					_ => {
 						let error_string = format!("Unexpected token {} for dotted string", tok);
 						self.debug.log_error(&error_string);
-						let error_line_string =
-							format!("{} on line {}", error_string, loc.line());
+						let error_line_string = format!("{} on line {}", error_string, loc.line());
 						self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(
 								Expr::Invalid {
