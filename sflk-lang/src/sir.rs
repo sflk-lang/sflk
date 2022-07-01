@@ -94,10 +94,6 @@ struct Frame {
 	/// on the oject stack of the frame below when this one is popped.
 	// TODO: Find a more elegant solution.
 	push_v: bool,
-	/// If some, then the contained value is what the v variable evaluates to
-	/// if it is not defined in the context.
-	// TODO: Find a more elegant solution.
-	signal: Option<Object>,
 }
 
 impl Frame {
@@ -108,7 +104,6 @@ impl Frame {
 			object_stack: Vec::new(),
 			cx_id,
 			push_v: false,
-			signal: None,
 		}
 	}
 
@@ -411,38 +406,16 @@ impl Execution {
 				}
 			},
 			SirInstr::VarToPush { var_name } => {
-				let value = if var_name == "v"
-					&& !context_table.get(self.cx_id()).unwrap().is_var_decl("v")
+				if context_table
+					.get(self.cx_id())
+					.unwrap()
+					.is_var_decl(&var_name)
 				{
-					let mut frame_index = self.frame_stack.len() - 1;
-					loop {
-						if let Some(frame) = self.frame_stack.get(frame_index) {
-							if frame.cx_id != self.cx_id() {
-								break None;
-							} else if let Some(sig) = &frame.signal {
-								break Some(sig.clone());
-							}
-							frame_index -= 1;
-						} else {
-							break None;
-						}
-					}
-				} else {
-					None
-				};
-				if value.is_some()
-					|| context_table
+					let value = context_table
 						.get(self.cx_id())
 						.unwrap()
-						.is_var_decl(&var_name)
-				{
-					let value = value.unwrap_or_else(|| {
-						context_table
-							.get(self.cx_id())
-							.unwrap()
-							.var_value_cloned(&var_name)
-							.unwrap()
-					});
+						.var_value_cloned(&var_name)
+						.unwrap();
 					self.push_obj(value);
 					self.advance_instr_index();
 				} else {
@@ -827,23 +800,33 @@ impl Execution {
 						},
 						Some(Object::Block(block)) => {
 							self.advance_instr_index();
-							let mut sub_frame = Frame::for_sir_block(
-								block.sir_block,
-								context_table.create_context(parent_cx_id),
-							);
-							sub_frame.signal = Some(signal);
+							let sub_context = context_table.create_context(parent_cx_id);
+							context_table
+								.get_mut(sub_context)
+								.unwrap()
+								.decl_var("v".to_string());
+							context_table
+								.get_mut(sub_context)
+								.unwrap()
+								.set_var("v".to_string(), signal);
+							let mut sub_frame = Frame::for_sir_block(block.sir_block, sub_context);
 							sub_frame.push_v = push_result;
 							self.frame_stack.push(sub_frame);
 							break;
 						},
 						Some(Object::String(string)) => {
 							self.advance_instr_index();
+							let sub_context = context_table.create_context(parent_cx_id);
+							context_table
+								.get_mut(sub_context)
+								.unwrap()
+								.decl_var("v".to_string());
+							context_table
+								.get_mut(sub_context)
+								.unwrap()
+								.set_var("v".to_string(), signal);
 							let sir_block = string_to_sir(string, "some string".to_string());
-							let mut sub_frame = Frame::for_sir_block(
-								sir_block,
-								context_table.create_context(parent_cx_id),
-							);
-							sub_frame.signal = Some(signal);
+							let mut sub_frame = Frame::for_sir_block(sir_block, sub_context);
 							sub_frame.push_v = push_result;
 							self.frame_stack.push(sub_frame);
 							break;

@@ -3,6 +3,6 @@ do {
 } wi {
 	cy v
 	pr "[" pr name pr "]"
-	r! < () em v rs r v! < r
+	em v rs v
 }
 nl
