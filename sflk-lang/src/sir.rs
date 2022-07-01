@@ -507,10 +507,7 @@ impl Execution {
 						self.push_obj(Object::Integer(string.chars().count() as i64));
 					},
 					obj => {
-						unimplemented!(
-							"Length operation on object of type {}",
-							obj.type_name()
-						)
+						unimplemented!("Length operation on object of type {}", obj.type_name())
 					},
 				}
 				self.advance_instr_index();
@@ -629,7 +626,34 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::List(vec), Object::Integer(index)) => {
-						self.push_obj(vec.get(index as usize).unwrap().clone());
+						self.push_obj(
+							vec.get(index as usize)
+								.unwrap_or_else(|| {
+									panic!(
+										"List index {} out of range {}-{}",
+										index,
+										0,
+										vec.len() - 1
+									)
+								})
+								.clone(),
+						);
+					},
+					(Object::String(string), Object::Integer(index)) => {
+						self.push_obj(Object::String(
+							string
+								.chars()
+								.nth(index as usize)
+								.unwrap_or_else(|| {
+									panic!(
+										"String index {} out of range {}-{}",
+										index,
+										0,
+										string.chars().count() - 1
+									)
+								})
+								.to_string(),
+						));
 					},
 					(left, right) => unimplemented!(
 						"Index operation on objects of type {} and {}",
@@ -666,15 +690,15 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
 					},
-					(Object::Integer(index), Object::List(list)) => {
+					(Object::Integer(index), Object::List(vec)) => {
 						self.push_obj(
-							list.get(index as usize)
+							vec.get(index as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
 										index,
 										0,
-										list.len() - 1
+										vec.len() - 1
 									)
 								})
 								.clone(),
