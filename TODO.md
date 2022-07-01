@@ -11,7 +11,7 @@ Signals should be contexts instead of lists. Way better for the interceptor expe
 
 ### Better interceptors
 
-Interceptors should be put inbetween frames of the execution frame stack or something, instead of registered in contexts.
+Interceptors should be put on the context they watch instead of on its parent.
 
 That would allow for `do block wi interceptor` instead of the cringer and current `ri interceptor do block ri ()`, and it also allow to run the interception in a new context instead of in a previously created context which causes problems and hack with the `v` variable. Also this will allow for the removal of the `v` ugly hack. It will be better in all kinds of ways.
 
