@@ -5,16 +5,6 @@ Here are listed ideas of ameliorations to SFLK.
 
 ## Big language features
 
-### Better signals
-
-Signals should be contexts instead of lists. Way better for the interceptor experience and allows to store all kinds of stuff in signals and all.
-
-### Better interceptors
-
-Interceptors should be put on the context they watch instead of on its parent.
-
-That would allow for `do block wi interceptor` instead of the cringer and current `ri interceptor do block ri ()`, and it also allow to run the interception in a new context instead of in a previously created context which causes problems and hack with the `v` variable. Also this will allow for the removal of the `v` ugly hack. It will be better in all kinds of ways.
-
 ### "Lambda captures"
 
 Here is the problem:
