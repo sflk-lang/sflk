@@ -328,6 +328,13 @@ Coming soon!
 |:----------:| ------
 | list       | if the list is strictly ordered then `1` else `0`
 
+#### Length `ln`
+
+| right type | result
+|:----------:| ------
+| list       | number of elements
+| string     | number of characters
+
 ## Contribute
 
 If you want to contribute in any way, please feel free to do so ^^.
