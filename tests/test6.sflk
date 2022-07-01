@@ -10,58 +10,59 @@ indent! < {
 	x! < 0 lp wh x -lvl bd pr "| " bd x < x +1
 }
 
-do {
-	ri {
-		type! < v ix 0
-		handled! < 0
-		# Intercepted signals #
-		if type -"newline" el dh {
-			nl
-			indented < 0
-			handled < 1
-		}
-		if type -"print" el dh {
-			if indented el dh indent
-			pr v ix 1
-			indented < 1
-			handled < 1
-		}
-		# Custom signals handling #
-		if type -"indent" el dh {
-			lvl < lvl +1
-			handled < 1
-		}
-		if type -"unindent" el dh {
-			lvl < lvl -1
-			handled < 1
-		}
-		# Let the rest pass through #
-		if handled el em v rs v
+interceptor! < {
+	type! < v ix 0
+	handled! < 0
+	# Intercepted signals #
+	if type -"newline" el dh {
+		nl
+		indented < 0
+		handled < 1
 	}
-	do {
-		# Custom signals emitters #
-		indent! < {em () ,"indent"}
-		unindent! < {em () ,"unindent"}
+	if type -"print" el dh {
+		if indented el dh indent
+		pr v ix 1
+		indented < 1
+		handled < 1
+	}
+	# Custom signals handling #
+	if type -"indent" el dh {
+		lvl < lvl +1
+		handled < 1
+	}
+	if type -"unindent" el dh {
+		lvl < lvl -1
+		handled < 1
+	}
+	# Let the rest pass through #
+	if handled el em v rs v
+}
 
-		# Test #
-		pr "lvl 0" nl
+demo! < {
+	# Custom signals emitters #
+	indent! < {em () ,"indent"}
+	unindent! < {em () ,"unindent"}
+
+	# Test #
+	pr "lvl 0" nl
+	dh indent
+		pr "lvl 1" nl
 		dh indent
-			pr "lvl 1" nl
+			pr "lvl 2" nl
+			pr "lvl 2" nl
+		dh unindent
+		pr "lvl 1" nl
+		dh indent
 			dh indent
-				pr "lvl 2" nl
-				pr "lvl 2" nl
-			dh unindent
-			pr "lvl 1" nl
-			dh indent
+				pr "lvl 3" nl
 				dh indent
-					pr "lvl 3" nl
-					dh indent
-						pr "lvl 4" nl
-					dh unindent
+					pr "lvl 4" nl
 				dh unindent
 			dh unindent
-			pr "lvl 1" nl
 		dh unindent
-		pr "lvl 0" nl
-	}
+		pr "lvl 1" nl
+	dh unindent
+	pr "lvl 0" nl
 }
+
+do demo wi interceptor
