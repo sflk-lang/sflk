@@ -176,7 +176,6 @@ type ContextId = usize;
 struct Context {
 	var_table: HashMap<String, Object>,
 	parent_context: Option<ContextId>,
-	TOREMOVE_interceptor: Option<Object>,
 	interceptor: Option<Object>,
 }
 
@@ -185,7 +184,6 @@ impl Context {
 		Context {
 			var_table: HashMap::new(),
 			parent_context,
-			TOREMOVE_interceptor: None,
 			interceptor: None,
 		}
 	}
@@ -754,32 +752,7 @@ impl Execution {
 				}
 			},
 			SirInstr::RegisterInterceptor => {
-				let obj = self.pop_obj();
-				match obj {
-					Object::Block(_) => {
-						context_table
-							.get_mut(self.cx_id())
-							.unwrap()
-							.TOREMOVE_interceptor = Some(obj);
-					},
-					Object::String(_) => {
-						context_table
-							.get_mut(self.cx_id())
-							.unwrap()
-							.TOREMOVE_interceptor = Some(obj);
-					},
-					Object::Nothing => {
-						context_table
-							.get_mut(self.cx_id())
-							.unwrap()
-							.TOREMOVE_interceptor = None;
-					},
-					obj => unimplemented!(
-						"Register interceptor operation on an object of type {}",
-						obj.type_name()
-					),
-				}
-				self.advance_instr_index();
+				panic!("Use of removed register interceptor operation");
 			},
 			SirInstr::EmitSignal => {
 				let signal = self.pop_obj();
@@ -879,66 +852,6 @@ impl Execution {
 					}
 				},
 			}
-			/*
-			let parent_context = context_table.get(cx_id).unwrap().parent_context;
-			match parent_context {
-				None => {
-					let result = perform_signal_past_root(signal);
-					if push_result {
-						self.push_obj(result);
-					}
-					self.advance_instr_index();
-					break;
-				},
-				Some(parent_context) => {
-					let interceptor = context_table
-						.get(parent_context)
-						.unwrap()
-						.TOREMOVE_interceptor
-						.clone();
-					match interceptor {
-						None => {
-							match perform_signal_passing_context(
-								&signal,
-								context_table.get_mut(parent_context).unwrap(),
-							) {
-								SignalPassingResult::KeepGoing => (),
-								SignalPassingResult::Result(result) => {
-									if push_result {
-										self.push_obj(result);
-									}
-									self.advance_instr_index();
-									break;
-								},
-							}
-							cx_id = parent_context;
-						},
-						Some(Object::Block(block)) => {
-							self.advance_instr_index();
-							let mut sub_frame =
-								Frame::for_sir_block(block.sir_block, parent_context);
-							sub_frame.signal = Some(signal);
-							sub_frame.push_v = push_result;
-							self.frame_stack.push(sub_frame);
-							break;
-						},
-						Some(Object::String(string)) => {
-							self.advance_instr_index();
-							let sir_block = string_to_sir(string, "some string".to_string());
-							let mut sub_frame = Frame::for_sir_block(sir_block, parent_context);
-							sub_frame.signal = Some(signal);
-							sub_frame.push_v = push_result;
-							self.frame_stack.push(sub_frame);
-							break;
-						},
-						Some(interceptor) => unimplemented!(
-							"Interception with an interceptor of type {}",
-							interceptor.type_name()
-						),
-					}
-				},
-			}
-			*/
 		}
 	}
 }
