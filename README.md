@@ -198,47 +198,46 @@ The separator extension to loop statements are imho a very cool feature that mor
 pr "h" nl
 ```
 
-This actually does not *just* print stuff. Printing to the console is a side effect. Such side effects are frowned upon in some religious branches. SFLK empowers the programmer to have complete control over these thanks to the following mechanism:
+This actually does not *just* print stuff. Printing to the console is a side effect. Such side effects are frowned upon in some religious comunities. SFLK empowers the programmer to have complete control over these thanks to the following mechanism:
 
 `pr "h"` actually sends a signal that travels through the context tree toward the root, and finally exits the isolated bubble where the execution takes place to reach the interpreter and ask for an interaction with the rest of the universe (here, the console). The interpreter then performs the required action, and potentially returns a result (but not in the case of a print statement, as there is nothing to answer from it). The execution then continues.
 
-Wtf? Indeed, here are more details: When something like a do statement is executed, the new context that is created to run a piece of code in is a sub-context of the current context. Thus all the contexts that exist at a given time are organized in a tree. There is a statement to register an interceptor in the current context, the interceptor will then intercept all the signals that come from sub-contexts as they travel towards the root. The interceptor may examine the signal, let it pass, send another signal, discard it, whatever.
+Wtf? Indeed, here are more details: When something like a do statement is executed, the new context that is created to run a piece of code in is a sub-context of the current context. Thus all the contexts that exist at a given time are organized in a tree. If the do statement registers an interceptor with the `wi` (With Interceptor) extention, then the interceptor will then intercept all the signals that come from sub-contexts as they travel towards the root. The interceptor may examine the signal, let it pass, send another signal, discard it, whatever.
 
 There is no side effect that a context can do without all its parent contexts agreeing to it.
 
 The details of how this works are still pretty unstable, but to give an idea, here is an example:
 
 ```sflk
-ri {
-	if (v ix 0) - "print"
-	el pr "\e[33m" + (v ix 1) + "\e[39m"
-	th em v rs v
-}
 do {
 	pr "life in yellow~" nl
+} wi {
+	cy v
+	if name - "print"
+	el pr "\e[33m" + value + "\e[39m"
+	th em v rs v
 }
 ```
 
-The register-interceptor statement (`ri`) takes a code block that is registered in the current context as the interceptor. Currently, with an ugly dirty hack in the interpreter code, intercepted signals are available for inspection as if they were stored in the `v` variable (without it being really the case (this will change in the future, it is too wired, even for SFLK)). The final value of the variable `v` will be what the intercepted signal returns.
+The with-interceptor extention (`wi`) takes a code block that is registered in the sub-context as the interceptor. Intercepted signals are available for inspection in the `v` variable. The final value of the variable `v` will be what the intercepted signal returns.
 
 In the above example, only the print statements are tinkered with, and the other signals are handled by the statement `em v rs v` which re-emits them and forwards their result, so that everything happens as it they were not intercepted.
-
-The exact nature of signals as objects and this whole mechanism really may be redesigned in the future to become more elegant.
 
 Another use case for this feature:
 
 ```sflk
-ri {
-	if (v ix 0) - "input"
+do fi "something.sflk"
+wi {
+	cy v
+	if name - "input"
 	el v < "Morbius"
 	th em v rs v
 }
-do fi "something.sflk"
 ```
 
 Here, we suppose that the file `something.sflk` contains an SFLK script that may at some point ask the user about its favorite movie (via the input expression `in` that evaluates into what the user types in the console). But here for some reason you don't want to have to type the name of your favorite movie every time you run the script (but you also don't want to modify the script). So you can write another script that executes `something.sflk` and makes the subscript behave as if you typed `Morbius` in response to every request, even though you are never requested to type anything anymore.
 
-Both these examples are pretty dumb and the details of how interception is done are not very elegant for now, but imho this is a very nice feature with truly useful use cases!
+Both these examples are pretty dumb but imho this is a very nice feature with truly useful use cases!
 
 ##### Coming soon
 
