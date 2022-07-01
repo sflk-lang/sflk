@@ -101,3 +101,4 @@ pr ln "1234" nl
 prspchrs! < {x < 0 lp wh x - ln v bd pr v ix x sp pr ", " bd x < x + 1}
 ev "01234" > prspchrs nl
 pr .a nl
+do {x! < "yes" pr .x > cx nl}
