@@ -815,8 +815,71 @@ impl Execution {
 		signal: Object,
 		push_result: bool,
 	) {
-		let mut cx_id = self.cx_id();
+		let initial_cx_id = Some(self.cx_id());
+		let mut opt_cx_id = initial_cx_id;
 		loop {
+			match opt_cx_id {
+				None => {
+					let result = perform_signal_past_root(signal);
+					if push_result {
+						self.push_obj(result);
+					}
+					self.advance_instr_index();
+					break;
+				},
+				Some(cx_id) => {
+					let interceptor = context_table.get_mut(cx_id).unwrap().interceptor.clone();
+					let parent_cx_id = context_table.get_mut(cx_id).unwrap().parent_context;
+					match interceptor {
+						None | Some(Object::Nothing) => {
+							if opt_cx_id != initial_cx_id {
+								match perform_signal_passing_context(
+									&signal,
+									context_table.get_mut(cx_id).unwrap(),
+								) {
+									SignalPassingResult::KeepGoing => (),
+									SignalPassingResult::Result(result) => {
+										if push_result {
+											self.push_obj(result);
+										}
+										self.advance_instr_index();
+										break;
+									},
+								}
+							}
+							opt_cx_id = parent_cx_id;
+						},
+						Some(Object::Block(block)) => {
+							self.advance_instr_index();
+							let mut sub_frame = Frame::for_sir_block(
+								block.sir_block,
+								context_table.create_context(parent_cx_id),
+							);
+							sub_frame.signal = Some(signal);
+							sub_frame.push_v = push_result;
+							self.frame_stack.push(sub_frame);
+							break;
+						},
+						Some(Object::String(string)) => {
+							self.advance_instr_index();
+							let sir_block = string_to_sir(string, "some string".to_string());
+							let mut sub_frame = Frame::for_sir_block(
+								sir_block,
+								context_table.create_context(parent_cx_id),
+							);
+							sub_frame.signal = Some(signal);
+							sub_frame.push_v = push_result;
+							self.frame_stack.push(sub_frame);
+							break;
+						},
+						Some(interceptor) => unimplemented!(
+							"Interception with an interceptor of type {}",
+							interceptor.type_name()
+						),
+					}
+				},
+			}
+			/*
 			let parent_context = context_table.get(cx_id).unwrap().parent_context;
 			match parent_context {
 				None => {
@@ -875,6 +938,7 @@ impl Execution {
 					}
 				},
 			}
+			*/
 		}
 	}
 }

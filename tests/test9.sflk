@@ -30,9 +30,11 @@ do {
 }
 
 # Test wi extention #
+var! < "var"
 do {
 	pr "jej" nl
+	pr var nl
 } wi {
 	pr "[" pr v ix 0 pr "]"
-	em v rs v
+	r! < () em v rs r v! < r
 }
