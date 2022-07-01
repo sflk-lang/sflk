@@ -301,6 +301,7 @@ Coming soon!
 | left type  | right type | result
 |:----------:|:----------:| ------
 | list       | integer    | The right-th element of left
+| string     | integer    | The right-th character of string
 
 ### Unary operators behaviors
 
