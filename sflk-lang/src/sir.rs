@@ -718,6 +718,15 @@ impl Execution {
 								.to_string(),
 						));
 					},
+					(Object::Context(var_table), Object::String(string)) => {
+						self.push_obj(
+							var_table
+								.get(&string)
+								.unwrap_or_else(|| panic!("Context index {} not present", string))
+								.clone(),
+						);
+						self.advance_instr_index();
+					},
 					(left, right) => unimplemented!(
 						"Index operation on objects of type {} and {}",
 						left.type_name(),
@@ -772,6 +781,15 @@ impl Execution {
 										vec.len() - 1
 									)
 								})
+								.clone(),
+						);
+						self.advance_instr_index();
+					},
+					(Object::String(string), Object::Context(var_table)) => {
+						self.push_obj(
+							var_table
+								.get(&string)
+								.unwrap_or_else(|| panic!("Context index {} not present", string))
 								.clone(),
 						);
 						self.advance_instr_index();
