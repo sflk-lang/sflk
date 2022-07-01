@@ -10,13 +10,13 @@
 # Prints the input followed by a newline.
 | Returns the input.
 | NOTE: May be removed in future versions. #
-prnl < {pr v nl}
+prnl! < {pr v nl}
 
 # Section : conversions (co.sflk) #
 
 # Converts an integer value to a string one 
 | Note : Waiting for equality operator to check `0` #
-itos < {
+itos! < {
     lp
     wh v
     bd dh {
@@ -28,7 +28,7 @@ itos < {
 }
 
 # Converts a string value to an integer one #
-stoi < {
+stoi! < {
     v < 1
 }
 
@@ -36,6 +36,6 @@ stoi < {
 
 # Power function
 | Arguments : (n, pow, base) #
-pow < {
+pow! < {
     v < "pow result baby"
 }

@@ -1,6 +1,6 @@
 
 np
-x < 8 +2 /2 *3 -(2*3+1)
+x! < 8 +2 /2 *3 -(2*3+1)
 ev x
 np np
 if x
@@ -14,94 +14,90 @@ sp pr ", "
 nl
 x < 2
 do {
-	x < 3
+	x! < 3
 	if x-3 el dh {pr "h" nl}
 }
 if x-2 el dh {pr "h" nl}
-uwu < "owo"
+uwu! < "owo"
 pr uwu nl
 pr 4 > {v < v + 4} nl
-ri {v < 0}
 pr "yes" nl
-do {pr "no" nl}
-replace < "jej"
-ri {pr replace nl}
+do {pr "no" nl} wi {v < 0}
+replace! < "jej"
 do {pr "not jej"}
+wi {pr replace nl}
 uwu < () ,"a" ,"b" ,"c"
 x < 0 lp wh x -3 bd dh {pr uwu ix x x < x +1} sp pr ", " nl
 pr "o" + "k" nl
 if "hh" - "hh" th pr "no" el pr "yes" nl
-ri {pr "\e[33m" pr v ix 1 pr "\e[39m" nl} do {pr "h"}
-ri () do {pr "normal" nl}
-not < {if v th v < 0 el v < 1}
+do {pr "h"} wi {cy v pr "\e[33m" pr value pr "\e[39m" nl}
+do {pr "normal" nl}
+not! < {if v th v < 0 el v < 1}
 pr 3 >not pr ", " pr 0 >not nl
-streq < {v < v ix 0 - (v ix 1) >{v<1-v}}
+streq! < {v < v ix 0 - (v ix 1) >{v<1-v}}
 pr (), "heh", "heh" >streq pr ", " pr (), "heh", "xxx" >streq nl
-ri {
-	streq < {v < v ix 0 - (v ix 1) >{v<1-v}}
-	if (), (v ix 0), "print" >streq
-	th em (), (v ix 0), ("\e[33m" + (v ix 1) + "\e[39m") rs v
+do {pr "h" nl} wi {
+	cy v
+	if (), name, "print" >streq
+	th em () > {name! < name value! < ("\e[33m" + value + "\e[39m") v < cx} rs v
 	el em v rs v
 }
-do {pr "h" nl}
-semicolons < {
-	streq < {v < v ix 0 - (v ix 1) >{v<1-v}}
-	if (), (v ix 0), "newline" >streq
+semicolons! < {
+	cy v
+	if (), name, "newline" >streq
 	th dh {pr ";" em v rs v}
 	el em v rs v
 }
-ri semicolons
 do {pr "int x" nl}
-ri ()
-double < {v < v + v}
+wi semicolons
+double! < {v < v + v}
 pr 4 > double pr ", " pr "h" > double nl
-quad < double > double # Can't do that in Rust huh #
+quad! < double > double # Can't do that in Rust huh #
 pr 4 > quad pr ", " pr "h" > quad nl
-triple < {v < v * 3}
+triple! < {v < v * 3}
 pr 4 > triple pr ", " pr "h" > triple nl
-neuf < triple > double
+neuf! < triple > double
 pr 4 > neuf pr ", " pr "h" > neuf nl
 pr "hhh" / "h" nl
 pr "hah" / "h" nl
 if 0 el pr "h" th pr "no" el pr "ey" el nl th nl
 em "print",, "hey\n"
 dh "pr \"owo\" nl"
-ri semicolons do "pr \"int y\" nl" ri ()
-fun < "v < \"v < \\\"np\\\" \" + v"
+do "pr \"int y\" nl" wi semicolons
+fun! < "v < \"v < \\\"np\\\" \" + v"
 lp wh fun>{pr v nl}-"np" bd fun < fun > fun
 pr ((8)) nl
 dh fi "sflk-std/std.sflk"
 ev "jej" >prnl
-ri {
-	type < v ix 0
-	if type -"readfile" el dh {
+do {
+	dh fi "some_file.sflk"
+	pr 5 >fun nl
+}
+wi {
+	cy v
+	if name -"readfile" el dh {
 		v < "fun < {v < v +3}"
 	} th dh {
 		em v rs v
 	}
-}
-do {
-	dh fi "some_file.sflk"
-	pr 5 >fun nl
 }
 x < "<uncomment the line below to have to type stuff>\n"
 # x < in #
 pr "u typed: " pr x
 x < 0 lp bd pr x sp pr ", " bd x < x +1 wh x -8 nl
 lp wh 0 ao bd pr "h" bd nl
-ri {type < v ix 0 if type -"readfile" th em v rs v el v < v ix 1 + "|"}
-do {pr fi "uwu" + "owo" nl}  # (fi "uwu" + "owo") #
-do {pr fi "uwu". + "owo" nl} # (fi "uwu") + "owo" #
-ri ()
+x < {cy v if name -"readfile" th em v rs v el v < value + "|"}
+do {pr fi "uwu"  + "owo" nl} wi x # (fi "uwu"  + "owo") #
+do {pr fi "uwu". + "owo" nl} wi x # (fi "uwu") + "owo"  #
 pr -1 nl
 pr -1+1+1 nl
 pr -1+1.+1 nl
 pr 3 > ("a",, "b", "c", "d", "e") nl
-inf < 3 sup < 6
+inf! < 3 sup! < 6
 x<0 lp wh x-10 bd if od inf,,x,sup th pr x el pr"_"sp pr", "bd x<x+1 nl
 x<0 lp wh x-10 bd if os inf,,x,sup th pr x el pr"_"sp pr", "bd x<x+1 nl
 pr ln 1,, 2, 3, 4 nl
 pr ln "1234" nl
-prspchrs < {x < 0 lp wh x - ln v bd pr v ix x sp pr ", " bd x < x + 1}
+prspchrs! < {x < 0 lp wh x - ln v bd pr v ix x sp pr ", " bd x < x + 1}
 ev "01234" > prspchrs nl
 pr .a nl

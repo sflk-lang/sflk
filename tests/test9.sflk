@@ -35,6 +35,7 @@ do {
 	pr "jej" nl
 	pr var nl
 } wi {
-	pr "[" pr v ix 0 pr "]"
-	r! < () em v rs r v! < r
+	cy v
+	pr "[" pr name pr "]"
+	em v rs v
 }

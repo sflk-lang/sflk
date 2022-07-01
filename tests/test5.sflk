@@ -1,29 +1,53 @@
 
-streq < {v < 1 -(v .0 -(v .1))}
-
-interceptoryellow < {
-	type < v .0 # signal type #
-	if type ,,"print" >streq
-	th # we intercepted a print signal #
-		dh {
-			value < v .1
-			pr "\e[33m" pr value pr "\e[39m" # print it but yellow #
-		}
-	el # we did not intercept a print signal #
-		em v rs v # re-emit the signal and transmit its result #
+interceptoryellow! < {
+	# Deploy the signal description context.
+	| When an interceptor is run on an intercepted signal,
+	| it is run in a sub context (of the parent that set it in place)
+	| and the v variable is initialized to the signal.
+	| Build-in signals should be contexts that can be deployed
+	| with the `cy context` statement (it will define the variables
+	| of that context into the current context). #
+	cy v
+	# Signals should contain a `name` variable that is a string
+	| of which some values make the signal do specific actions.
+	| Here we check if that name is "print" (`a - b` is 0 if
+	| `a` is equal to `b`, so `1 - (a - b)` is 1 (true) if `a`
+	| is equal to `b`).
+	| The syntax `.print` is a dotted string literal that is
+	| exactly like `"print"` but it looks a bit cooler. #
+	if 1 -(name -.print)
+	th
+		# We intercepted a print signal.
+		| Print signals should contain a `value` variable that is the object
+		| that was given to the print statement.
+		| Here, we print this value but in yellow. #
+		dh {pr "\e[33m" pr value pr "\e[39m"}
+	el
+		# We did not intercept a print signal.
+		| Here we re-emit the signal and transmit its result.
+		| This is what an interceptor shoud do if it
+		| does not want do change the behavior of the
+		| intercepted signal. #
+		em v rs v 
 }
 
-ri interceptoryellow
-pr "uwu" nl # not intercepted (not comming from a sub-context) #
-do {pr "owo" nl} # should be yellow #
+# This first printed message should be normal as it is
+| not intercepted in any way. #
+pr "uwu" nl
 
-ri {} # will take signals and do nothing with them #
-pr "uwu" nl # not intercepted #
-do {pr "owo" nl} # not printed at all #
+# This second printed message should be yellow as it is
+| intercepted by the `interceptoryellow` interceptor
+| that will intercept every signal emitted during the execution
+| of the block given to that `do` statement. #
+do {pr "owo" nl} wi interceptoryellow
 
-ri () # registering a nothing object discards the previous interceptor #
-pr "uwu" nl # not intercepted #
-do {pr "owo" nl} # printed normally (signal not intercepted) #
+# This third printed message should be normal as it is
+| not intercepted. The interceptor set by the `wi` extention
+| of a `do` statement is only effective for that `do` statement. #
+do {pr "awa" nl}
 
-# `ri interceptoryellow` but golfed #
-ri{if v.0-"print"el dh{pr"\e[33m"pr v.1 pr"\e[39m"}th em v rs v}
+# This forth printed message should be yellow as it is
+| intercepted. Signals travels through the context tree
+| towards the root (after which is the interpreter) and
+| any interceptor on the way will intercept them. #
+do {do {do {pr "owo" nl}} wi interceptoryellow}

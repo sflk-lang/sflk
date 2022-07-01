@@ -1,5 +1,5 @@
 
-x < 8
+x! < 8
 lp
 wh x
 bd dh {pr x x < x-1}
@@ -17,6 +17,6 @@ do {
 
 do({pr"u"}+{pr"w"}>{v<v+{pr"u"}}+{nl})
 
-block < {v < 8}
+block! < {v < 8}
 x < 0>block
 pr x nl
