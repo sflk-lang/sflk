@@ -47,20 +47,6 @@ Imho, this is so much more better than python's `global x`, `nonlocal x`, and wi
 
 In `ev 8 > {v < v*2}`, `v < v*2` is run in a sub-context in which `v` is declared and assigned `8`, so that `>` keeps working as intended.
 
-### Comparisons
-
-Instead of having comparions operators like `<` and `>` (which are already taken anyway), SFLK coule instead provide the following syntax:
-
-```sflk
-if od 4,, x, 8
-th pr "x is in {4, 5, 6, 7, 8}" th nl
-
-if so 4,, x, 8
-th pr "x is in {5, 6, 7}" th nl
-```
-
-The new things here would be the unary operators `od` and `so`. `od` would expect a list and evaluate to a value whose truthyness is true iff the list is OrdereD (duplicates allowed) and `so` would be the same but with duplicates disallowed (Strictly Ordered).
-
 ### "Lambda captures"
 
 Here is the problem:
