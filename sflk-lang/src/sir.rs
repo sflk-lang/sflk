@@ -90,7 +90,6 @@ struct Frame {
 	instr_index: usize,
 	object_stack: Vec<Object>,
 	cx_id: ContextId,
-	interceptor: Option<Object>,
 	/// If true, then the value of the v variable will be pushed
 	/// on the oject stack of the frame below when this one is popped.
 	// TODO: Find a more elegant solution.
@@ -102,13 +101,12 @@ struct Frame {
 }
 
 impl Frame {
-	fn for_sir_block(sir_block: SirBlock, cx_id: ContextId, interceptor: Option<Object>) -> Frame {
+	fn for_sir_block(sir_block: SirBlock, cx_id: ContextId) -> Frame {
 		Frame {
 			sir_block,
 			instr_index: 0,
 			object_stack: Vec::new(),
 			cx_id,
-			interceptor,
 			push_v: false,
 			signal: None,
 		}
@@ -178,6 +176,7 @@ type ContextId = usize;
 struct Context {
 	var_table: HashMap<String, Object>,
 	parent_context: Option<ContextId>,
+	TOREMOVE_interceptor: Option<Object>,
 	interceptor: Option<Object>,
 }
 
@@ -186,6 +185,7 @@ impl Context {
 		Context {
 			var_table: HashMap::new(),
 			parent_context,
+			TOREMOVE_interceptor: None,
 			interceptor: None,
 		}
 	}
@@ -229,6 +229,19 @@ impl ContextTable {
 		let new_id = self.next_id;
 		self.next_id += 1;
 		let new_cx = Context::child_of(parent_context);
+		self.table.insert(new_id, new_cx);
+		new_id
+	}
+
+	fn create_context_with_interceptor(
+		&mut self,
+		parent_context: Option<ContextId>,
+		interceptor: Object,
+	) -> ContextId {
+		let new_id = self.next_id;
+		self.next_id += 1;
+		let mut new_cx = Context::child_of(parent_context);
+		new_cx.interceptor = Some(interceptor);
 		self.table.insert(new_id, new_cx);
 		new_id
 	}
@@ -654,8 +667,7 @@ impl Execution {
 							.get_mut(sub_context)
 							.unwrap()
 							.set_var("v".to_string(), left);
-						let mut sub_frame =
-							Frame::for_sir_block(block.sir_block, sub_context, None);
+						let mut sub_frame = Frame::for_sir_block(block.sir_block, sub_context);
 						sub_frame.push_v = true; // Will push v.
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
@@ -671,7 +683,7 @@ impl Execution {
 							.unwrap()
 							.set_var("v".to_string(), left);
 						let sir_block = string_to_sir(string, "some string".to_string());
-						let mut sub_frame = Frame::for_sir_block(sir_block, sub_context, None);
+						let mut sub_frame = Frame::for_sir_block(sir_block, sub_context);
 						sub_frame.push_v = true; // Will push v.
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
@@ -703,17 +715,14 @@ impl Execution {
 				match obj {
 					Object::Block(block) => {
 						self.advance_instr_index();
-						self.frame_stack.push(Frame::for_sir_block(
-							block.sir_block,
-							self.cx_id(),
-							None,
-						));
+						self.frame_stack
+							.push(Frame::for_sir_block(block.sir_block, self.cx_id()));
 					},
 					Object::String(string) => {
 						self.advance_instr_index();
 						let sir_block = string_to_sir(string, "some string".to_string());
 						self.frame_stack
-							.push(Frame::for_sir_block(sir_block, self.cx_id(), None));
+							.push(Frame::for_sir_block(sir_block, self.cx_id()));
 					},
 					obj => {
 						unimplemented!("Do here operation on an object of type {}", obj.type_name())
@@ -728,8 +737,8 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(Frame::for_sir_block(
 							block.sir_block,
-							context_table.create_context(Some(self.cx_id())),
-							Some(interceptor),
+							context_table
+								.create_context_with_interceptor(Some(self.cx_id()), interceptor),
 						));
 					},
 					Object::String(string) => {
@@ -737,8 +746,8 @@ impl Execution {
 						let sir_block = string_to_sir(string, "some string".to_string());
 						self.frame_stack.push(Frame::for_sir_block(
 							sir_block,
-							context_table.create_context(Some(self.cx_id())),
-							Some(interceptor),
+							context_table
+								.create_context_with_interceptor(Some(self.cx_id()), interceptor),
 						));
 					},
 					obj => unimplemented!("Do operation on an object of type {}", obj.type_name()),
@@ -748,13 +757,22 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::Block(_) => {
-						context_table.get_mut(self.cx_id()).unwrap().interceptor = Some(obj);
+						context_table
+							.get_mut(self.cx_id())
+							.unwrap()
+							.TOREMOVE_interceptor = Some(obj);
 					},
 					Object::String(_) => {
-						context_table.get_mut(self.cx_id()).unwrap().interceptor = Some(obj);
+						context_table
+							.get_mut(self.cx_id())
+							.unwrap()
+							.TOREMOVE_interceptor = Some(obj);
 					},
 					Object::Nothing => {
-						context_table.get_mut(self.cx_id()).unwrap().interceptor = None;
+						context_table
+							.get_mut(self.cx_id())
+							.unwrap()
+							.TOREMOVE_interceptor = None;
 					},
 					obj => unimplemented!(
 						"Register interceptor operation on an object of type {}",
@@ -813,7 +831,7 @@ impl Execution {
 					let interceptor = context_table
 						.get(parent_context)
 						.unwrap()
-						.interceptor
+						.TOREMOVE_interceptor
 						.clone();
 					match interceptor {
 						None => {
@@ -835,7 +853,7 @@ impl Execution {
 						Some(Object::Block(block)) => {
 							self.advance_instr_index();
 							let mut sub_frame =
-								Frame::for_sir_block(block.sir_block, parent_context, None);
+								Frame::for_sir_block(block.sir_block, parent_context);
 							sub_frame.signal = Some(signal);
 							sub_frame.push_v = push_result;
 							self.frame_stack.push(sub_frame);
@@ -844,8 +862,7 @@ impl Execution {
 						Some(Object::String(string)) => {
 							self.advance_instr_index();
 							let sir_block = string_to_sir(string, "some string".to_string());
-							let mut sub_frame =
-								Frame::for_sir_block(sir_block, parent_context, None);
+							let mut sub_frame = Frame::for_sir_block(sir_block, parent_context);
 							sub_frame.signal = Some(signal);
 							sub_frame.push_v = push_result;
 							self.frame_stack.push(sub_frame);
@@ -983,7 +1000,7 @@ fn perform_signal_past_root(signal: Object) -> Object {
 pub fn exec_sir_block(sir_block: SirBlock) {
 	let mut machine = Machine::new();
 	let root_cx_id = machine.context_table.create_context(None);
-	let first_frame = Frame::for_sir_block(sir_block, root_cx_id, None);
+	let first_frame = Frame::for_sir_block(sir_block, root_cx_id);
 	let mut execuion = Execution::new();
 	execuion.frame_stack.push(first_frame);
 	machine.executions.push(execuion);
