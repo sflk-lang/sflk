@@ -130,6 +130,29 @@ dh fi "file.sflk"
 
 ##### What are contexts
 
+(*TODO: Some explainations here are redundent with the "Signals" section. This redundency should be factored out.*)
+
+A context is a place where variables are defined. When doing `x! < 8`, then a new variable named `x` is defined in the current context (if it was not already defined in that context). A simple assignment statement like `x < 8` does not define `x` (note the missing `!`), it will just assign `8` to an already defined `x` variable. Which one ?
+
+Constexts are arranged as a tree. The context in which the execution takes place (the current context) is always a leaf. `x < 8` will search for an `x` variable starting from the current context and going toward the root (ignoring the other branches) and will write `8` to the first it finds (if any). The same logic applies to reading values from variables, a statement like `pr x + y` will search an `x` variable to read a value from, and then the same goes for `y`, in a manner similar to a search performed by an assignment.
+
+```sflk
+x! < "uwu"
+pr x nl # A #
+do {
+	pr x nl # B #
+	x! < "owo"
+	pr x nl # C #
+}
+pr x nl # D #
+```
+
+In this example, the print statement A prints `uwu` as it reads the variable `x` of the current context. Then, the do statement creates a new context that is a child (in the context tree) of the current context, then this child becomes the current context for the execution of the code block given to the do statement. Then, the print statement B is executed, and this time there is no `x` variable in the current context, but as said earlier, this is not a problem. The parent context has an `x` variable, so it is read, and the print statement B prints `uwu` like A. Then, the print statement C prints `owo` as now there is an `x` variable in the current context. Then, the code block executed by the do statement comes to an end, and that brings the second context (in which `x` has the value `"owo"`) to be discarded, the first context (in which `x` has the value `"uwu"`) becomes the current context again. Then, the print statement D prints `uwu` because we are back in the first context where the `x` variable is untouched.
+
+Should the `x! < "owo"` statement in the do statement block be replaced with `x < "owo"`, it would mean something else entierly. No `!` means that we are not defining a new variable, we are just assigning to an existing `x` variable, and here that would be the one that was initialized to `"uwu"`. So the print statement D would print `owo` instead of `uwu`.
+
+hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+
 ```sflk
 x! < "hey"
 do {x! < "uwu"}
@@ -141,6 +164,8 @@ pr x nl
 The do statement executes its code in a new context. Code always runs in a context, and it interacts with the context via statements like the assignment statements (variables are part of a context) or by reading variables' values when evaluating expressions. With that said, one can predict that the first print statement will print `hey` and not `uwu` (as the "big" context still sees `x` as having the value `"hey"`, it has not been influenced by the `x! < "uwu"` statement executed in a "smaller" other context).
 
 The do-here statement runs its code in the current context, thus the last print statement prints `owo`.
+
+hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
 
 ##### Lists
 
@@ -193,6 +218,8 @@ Similar to the if statement, all these extensions are optional and can be given 
 The separator extension to loop statements are imho a very cool feature that more languages should have. It does not cost a lot in terms of language design but allows removing a code duplication pattern that occurs in pieces of code such as the one featured in the above example. Usually the `pr x` part of the code is duplicated (one instance in the loop body, and one instance before or after the loop) to account for the fact that *n* elements are printed but only *n-1* commas, but the loop body runs either *n-1* or *n* times. Granted, duplication could be avoided in other ways, but still.
 
 ##### Signals
+
+(*TODO: Some explainations here are redundent with the "What are contexts" section. This redundency should be factored out.*)
 
 ```sflk
 pr "h" nl

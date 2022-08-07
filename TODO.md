@@ -115,7 +115,7 @@ An entry in this table could either be a normal SFLK object, or a marked express
 
 Instead of `expression~marker`, we could simply make `variable~` read the variable of the given name in the first context to contain it.
 
-**This looks like it is the better decision.**
+Maybe it is not a good idea, the marker seems important to help be more explicit about what context is used for the capture.
 
 #### Note on more explicit handling of this feature
 
@@ -135,7 +135,39 @@ Have every number be a normalized big int able to store arbitraly big integer va
 
 Have every number be a normalized fraction of big ints so that we can manipulate arbitraly precise rational numbers.
 
+## Everything is a function, a list and a context
+
+### Everything is a function
+
+A list is kind of a function of indices to objects. A context is a function of names to objects. A string is a list of characters so kind of a function there. A number is a list of digits (moreon that later) so also a function.
+
+### Everything is a list
+
+A block is a list of statements.
+
+A number is a list of digits. The base to use can be the number stored in the variable `b`. On that, numbers like *tau* can have an infinite amount of digits, which is not a problem.
+
+### Everything is a context
+
+The idea here is to be able to `cy` anything and get useful information.
+
+For example, `cy`ing a list can put the first element in `f` (front), the last in `b` (back), the length in `l`, etc. `cy`ing a number can put the numerator in `n` and the denominator in `d`, the integral part in `i`, etc. etc.
+
+## Syntax cool stuff
+
+### Everything should be doable with only alphabetical characters and whitespace
+
+Imagine only keywords and variable names. Huge potential for polyglots.
+
+### Everything should be doable with only non-alphanumerc characters
+
+Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means something. It would be so cool, huge potential for obfuscation.
+
 ## Small language features
+
+### Support shebangs and line comments
+
+`#!` could start a line comment. That allows for elegant shebangs (instead of starting a block comment that happens to be a shebang on the first line, and then be closed on the next line) and allow for line comments (not a fan of line comments but whatever, people may prefer line comments).
 
 ### Send error signals instead of panicking
 
