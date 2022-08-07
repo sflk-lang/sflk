@@ -1,4 +1,5 @@
 mod ast;
+mod bigint;
 mod log;
 mod log_indent;
 mod parser;
