@@ -4,6 +4,7 @@ const BASE: u64 = 256;
 
 /// An unsigned big integer.
 /// The base is `BASE`, the most significants digits are at the beginning.
+#[derive(Clone)]
 struct BigUint {
 	digits: Vec<Digit>,
 }
@@ -45,6 +46,43 @@ impl BigUint {
 			i += 1;
 		}
 	}
+
+	#[must_use]
+	fn add(&self, other: &BigUint) -> BigUint {
+		let mut res = self.clone();
+		res.add_in_place(other);
+		res
+	}
+
+	/// Perform `self = self - other` if `self >= other`.
+	fn subtract_in_place(&mut self, other: &BigUint) {
+		let mut i = 0;
+		let mut carry = 0;
+		while i < other.digits.len() || carry > 0 {
+			assert!(
+				i < self.digits.len() || carry == 0,
+				"`self` is smaller than `other`"
+			);
+			let self_digit = self.digits[i] as u64;
+			let other_digit = *other.digits.get(i).unwrap_or(&0) as u64;
+			let mut top_digit = self_digit;
+			let bottom_digit = other_digit + carry;
+			carry = 0;
+			if top_digit < bottom_digit {
+				top_digit += BASE;
+				carry = 1;
+			}
+			self.digits[i] = (top_digit - bottom_digit) as Digit;
+			i += 1;
+		}
+	}
+
+	#[must_use]
+	fn subtract(&self, other: &BigUint) -> BigUint {
+		let mut res = self.clone();
+		res.subtract_in_place(other);
+		res
+	}
 }
 
 #[cfg(test)]
@@ -58,7 +96,7 @@ mod tests {
 	}
 
 	#[test]
-	fn u64_to_BigUint_to_u64() {
+	fn u64_to_big_to_u64() {
 		let values = [0, 1, 71, 255, 256, 257, 2345671, 18446744073709551615];
 		for value in values {
 			let big = BigUint::from_u64(value);
@@ -83,6 +121,31 @@ mod tests {
 			big_a.add_in_place(&big_b);
 			let big_sum = big_a;
 			assert_eq!(big_sum.to_u64(), a + b);
+		}
+	}
+
+	#[test]
+	fn subtract() {
+		let pairs: &[(u64, u64)] = &[
+			(0, 0),
+			(1, 0),
+			(1, 1),
+			(255, 45),
+			(256, 255),
+			(256, 256),
+			(98866571, 435671),
+			(18446744073709551614, 1),
+			(18446744073709551614, 435671),
+			(18446744073709551614, 98866571),
+			(18446744073709551614, 184467440737095),
+		];
+		for &(a, b) in pairs {
+			assert!(a.checked_sub(b).is_some());
+			let mut big_a = BigUint::from_u64(a);
+			let big_b = BigUint::from_u64(b);
+			big_a.subtract_in_place(&big_b);
+			let big_subtraction = big_a;
+			assert_eq!(big_subtraction.to_u64(), a - b);
 		}
 	}
 }
