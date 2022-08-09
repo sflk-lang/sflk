@@ -83,6 +83,36 @@ impl BigUint {
 		res.subtract_in_place(other);
 		res
 	}
+
+	fn multiply_in_place(&mut self, other: &BigUint) {
+		let res = self.multiply(other);
+		*self = res;
+	}
+
+	#[must_use]
+	fn multiply(&self, other: &BigUint) -> BigUint {
+		// https://en.wikipedia.org/wiki/Multiplication_algorithm#Long_multiplication
+		let mut res = BigUint {
+			digits: Some(0)
+				.into_iter()
+				.cycle()
+				.take(self.digits.len() + other.digits.len())
+				.collect(),
+		};
+		for other_i in 0..other.digits.len() {
+			let mut carry = 0;
+			for self_i in 0..self.digits.len() {
+				let self_digit = self.digits[self_i] as u64;
+				let other_digit = other.digits[other_i] as u64;
+				let mut new_digit = res.digits[self_i + other_i] as u64;
+				new_digit += self_digit * other_digit + carry;
+				res.digits[self_i + other_i] = (new_digit % BASE) as Digit;
+				carry = new_digit / BASE;
+			}
+			res.digits[self.digits.len() + other_i] = carry as Digit;
+		}
+		res
+	}
 }
 
 #[cfg(test)]
@@ -116,11 +146,9 @@ mod tests {
 		];
 		for &(a, b) in pairs {
 			assert!(a.checked_add(b).is_some());
-			let mut big_a = BigUint::from_u64(a);
+			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			big_a.add_in_place(&big_b);
-			let big_sum = big_a;
-			assert_eq!(big_sum.to_u64(), a + b);
+			assert_eq!(big_a.add(&big_b).to_u64(), a + b);
 		}
 	}
 
@@ -141,11 +169,32 @@ mod tests {
 		];
 		for &(a, b) in pairs {
 			assert!(a.checked_sub(b).is_some());
-			let mut big_a = BigUint::from_u64(a);
+			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			big_a.subtract_in_place(&big_b);
-			let big_subtraction = big_a;
-			assert_eq!(big_subtraction.to_u64(), a - b);
+			assert_eq!(big_a.subtract(&big_b).to_u64(), a - b);
+		}
+	}
+
+	#[test]
+	fn multiply() {
+		let pairs: &[(u64, u64)] = &[
+			(0, 0),
+			(1, 0),
+			(1, 1),
+			(255, 45),
+			(256, 255),
+			(256, 256),
+			(2, 256),
+			(98866571, 435671),
+			(435671, 98866571),
+			(18446744073709551614, 1),
+			(1, 18446744073709551614),
+		];
+		for &(a, b) in pairs {
+			assert!(a.checked_mul(b).is_some());
+			let big_a = BigUint::from_u64(a);
+			let big_b = BigUint::from_u64(b);
+			assert_eq!(big_a.multiply(&big_b).to_u64(), a * b);
 		}
 	}
 }
