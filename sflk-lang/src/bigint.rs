@@ -1,17 +1,77 @@
+use std::cmp::Ordering;
+
 type Digit = u8;
 
 const BASE: u64 = 256;
 
 /// An unsigned big integer.
-/// The base is `BASE`, the most significants digits are at the beginning.
+/// The base is `BASE`, the most significants digits are at the end.
 #[derive(Clone)]
 struct BigUint {
 	digits: Vec<Digit>,
 }
 
+impl PartialEq for BigUint {
+	fn eq(&self, other: &Self) -> bool {
+		let mut self_iter = self.digits.iter().cloned();
+		let mut other_iter = other.digits.iter().cloned();
+		loop {
+			match (self_iter.next(), other_iter.next()) {
+				(Some(a), Some(b)) if a != b => break false,
+				(Some(_), Some(_)) => (),
+				(Some(a), None) | (None, Some(a)) if a != 0 => break false,
+				(Some(_), None) | (None, Some(_)) => (),
+				(None, None) => break true,
+			}
+		}
+	}
+}
+
+impl Eq for BigUint {}
+
+impl PartialOrd for BigUint {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for BigUint {
+	fn cmp(&self, other: &BigUint) -> Ordering {
+		// Is this readable enough ?
+		let self_start = self.index_of_higest_nonzero_digit();
+		let other_start = other.index_of_higest_nonzero_digit();
+		let start = match (self_start, other_start) {
+			(None, None) => return Ordering::Equal,
+			(Some(_), None) => return Ordering::Greater,
+			(None, Some(_)) => return Ordering::Less,
+			(Some(a), Some(b)) => match a.cmp(&b) {
+				Ordering::Greater => return Ordering::Greater,
+				Ordering::Less => return Ordering::Less,
+				Ordering::Equal => a,
+			}
+		};
+		// The number of significant digits is the same.
+		for i in (0..=start).rev() {
+			match self.digits[i].cmp(&other.digits[i]) {
+				Ordering::Greater => return Ordering::Greater,
+				Ordering::Less => return Ordering::Less,
+				Ordering::Equal => (),
+			}
+		}
+		Ordering::Equal
+	}
+}
+
 impl BigUint {
 	fn zero() -> BigUint {
 		BigUint { digits: Vec::new() }
+	}
+
+	/// Constructs a `BigUint` that has `len` zeros as its digits.
+	fn zeros(len: usize) -> BigUint {
+		BigUint {
+			digits: Some(0).into_iter().cycle().take(len).collect(),
+		}
 	}
 
 	fn from_u64(mut value: u64) -> BigUint {
@@ -29,6 +89,15 @@ impl BigUint {
 			acc = acc * BASE + digit as u64;
 		}
 		acc
+	}
+
+	fn index_of_higest_nonzero_digit(&self) -> Option<usize> {
+		for i in (0..self.digits.len()).rev() {
+			if self.digits[i] != 0 {
+				return Some(i);
+			}
+		}
+		None
 	}
 
 	fn add_in_place(&mut self, other: &BigUint) {
@@ -92,13 +161,7 @@ impl BigUint {
 	#[must_use]
 	fn multiply(&self, other: &BigUint) -> BigUint {
 		// https://en.wikipedia.org/wiki/Multiplication_algorithm#Long_multiplication
-		let mut res = BigUint {
-			digits: Some(0)
-				.into_iter()
-				.cycle()
-				.take(self.digits.len() + other.digits.len())
-				.collect(),
-		};
+		let mut res = BigUint::zeros(self.digits.len() + other.digits.len());
 		for other_i in 0..other.digits.len() {
 			let mut carry = 0;
 			for self_i in 0..self.digits.len() {
@@ -112,6 +175,21 @@ impl BigUint {
 			res.digits[self.digits.len() + other_i] = carry as Digit;
 		}
 		res
+	}
+
+	/// Here, `self` is the numerator.
+	/// The output is (quotient, remainder)
+	#[must_use]
+	fn euclidian_divide(&self, denominator: &BigUint) -> (BigUint, BigUint) {
+		let mut quoient = BigUint::zeros(self.digits.len());
+		let mut remainder = self.clone();
+		for i in 1..=self.digits.len() {
+			let x = BigUint {
+				digits: remainder.digits[self.digits.len()-i..].into()
+			};
+			todo!();
+		}
+		(quoient, remainder)
 	}
 }
 
@@ -195,6 +273,34 @@ mod tests {
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
 			assert_eq!(big_a.multiply(&big_b).to_u64(), a * b);
+		}
+	}
+
+	#[test]
+	fn comparison() {
+		let pairs: &[(u64, u64)] = &[
+			(0, 0),
+			(1, 0),
+			(1, 1),
+			(1, 18446744073709551614),
+			(255, 45),
+			(256, 255),
+			(256, 256),
+			(435671, 435671),
+			(435671, 98866571),
+			(98866571, 435671),
+			(98866571, 98866571),
+			(184467440737095, 184467440737095),
+			(18446744073709551614, 1),
+			(18446744073709551614, 435671),
+			(18446744073709551614, 98866571),
+			(18446744073709551614, 184467440737095),
+			(18446744073709551614, 18446744073709551614),
+		];
+		for &(a, b) in pairs {
+			let big_a = BigUint::from_u64(a);
+			let big_b = BigUint::from_u64(b);
+			assert_eq!(big_a.cmp(&big_b), a.cmp(&b));
 		}
 	}
 }
