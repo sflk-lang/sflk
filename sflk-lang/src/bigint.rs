@@ -106,6 +106,15 @@ impl BigUint {
 		None
 	}
 
+	fn is_zero(&self) -> bool {
+		for &digit in self.digits.iter() {
+			if digit != 0 {
+				return false;
+			}
+		}
+		true
+	}
+
 	fn add_in_place(&mut self, other: &BigUint) {
 		let mut i = 0;
 		let mut carry = 0;
@@ -127,21 +136,6 @@ impl BigUint {
 		let mut res = self.clone();
 		res.add_in_place(other);
 		res
-	}
-
-	fn eprint(&self, end: &str) {
-		if self.digits.is_empty() {
-			eprint!("zero{}", end);
-		} else {
-			for i in (0..self.digits.len()).rev() {
-				eprint!(
-					"{}({}){}",
-					self.digits[i],
-					i,
-					if i == 0 { end } else { "," }
-				);
-			}
-		}
 	}
 
 	/// Perform `self = self - other` if `self >= other`.
@@ -207,11 +201,11 @@ impl BigUint {
 	}
 
 	/// Here, `self` is the numerator.
-	/// The output is (quotient, remainder)
+	/// The output is (quotient, remainder).
 	#[must_use]
 	fn euclidian_divide(&self, denominator: &BigUint) -> (BigUint, BigUint) {
 		// Long division.
-		assert!(denominator != &BigUint::zero(), "division by zero");
+		assert!(!denominator.is_zero(), "division by zero");
 		let mut quoient = BigUint::zeros(self.digits.len());
 		let mut remainder = self.clone();
 		for i in 1..=self.digits.len() {
@@ -264,6 +258,130 @@ impl BigUint {
 	}
 }
 
+/// A signed big integer.
+#[derive(Clone)]
+struct BigSint {
+	biguint: BigUint,
+	/// This can be whatever if `biguint` is zero.
+	is_negative: bool,
+}
+
+impl PartialEq for BigSint {
+	fn eq(&self, other: &Self) -> bool {
+		self.biguint == other.biguint
+			&& (self.is_negative == other.is_negative || self.biguint.is_zero())
+	}
+}
+
+impl Eq for BigSint {}
+
+impl PartialOrd for BigSint {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for BigSint {
+	fn cmp(&self, other: &BigSint) -> Ordering {
+		if self.biguint.is_zero() && other.biguint.is_zero() {
+			return Ordering::Equal;
+		}
+		let unsigned_cmp = self.biguint.cmp(&other.biguint);
+		match (self.is_negative, other.is_negative) {
+			(false, false) => unsigned_cmp,
+			(true, true) => unsigned_cmp.reverse(),
+			(true, false) => Ordering::Less,
+			(false, true) => Ordering::Greater,
+		}
+	}
+}
+
+impl BigSint {
+	fn zero() -> BigSint {
+		BigSint { biguint: BigUint::zero(), is_negative: false }
+	}
+
+	fn from_biguint(biguint: BigUint) -> BigSint {
+		BigSint { biguint, is_negative: false }
+	}
+
+	fn add_in_place_ex(&mut self, other: &BigSint, flip_other_sign: bool) {
+		let other_is_negative = if flip_other_sign {
+			!other.is_negative
+		} else {
+			other.is_negative
+		};
+		match (self.is_negative, other_is_negative) {
+			(false, false) | (true, true) => self.biguint.add_in_place(&other.biguint),
+			(false, true) if self.biguint >= other.biguint => {
+				self.biguint.subtract_in_place(&other.biguint);
+			},
+			(false, true) => {
+				self.biguint = other.biguint.subtract(&self.biguint);
+				self.is_negative = true;
+			},
+			(true, false) if self.biguint > other.biguint => {
+				self.biguint = other.biguint.subtract(&self.biguint);
+			},
+			(true, false) => {
+				self.biguint.subtract_in_place(&other.biguint);
+				self.is_negative = false;
+			},
+		}
+	}
+
+	fn add_in_place(&mut self, other: &BigSint) {
+		self.add_in_place_ex(other, false);
+	}
+
+	#[must_use]
+	fn add(&self, other: &BigSint) -> BigSint {
+		let mut res = self.clone();
+		res.add_in_place(other);
+		res
+	}
+
+	fn subtract_in_place(&mut self, other: &BigSint) {
+		self.add_in_place_ex(other, true);
+	}
+
+	#[must_use]
+	fn subtract(&self, other: &BigSint) -> BigSint {
+		let mut res = self.clone();
+		res.subtract_in_place(other);
+		res
+	}
+
+	fn multiply_in_place(&mut self, other: &BigSint) {
+		let res = self.multiply(other);
+		*self = res;
+	}
+
+	#[must_use]
+	fn multiply(&self, other: &BigSint) -> BigSint {
+		let biguint = self.biguint.multiply(&other.biguint);
+		BigSint {
+			biguint,
+			is_negative: self.is_negative ^ other.is_negative,
+		}
+	}
+
+	/// Here, `self` is the numerator.
+	/// The output is (quotient, remainder).
+	#[must_use]
+	fn euclidian_divide(&self, denominator: &BigSint) -> (BigSint, BigSint) {
+		assert!(
+			!denominator.is_negative,
+			"euclidian division by a negative number"
+		);
+		let (q, r) = self.biguint.euclidian_divide(&denominator.biguint);
+		(
+			BigSint { biguint: q, is_negative: self.is_negative },
+			BigSint::from_biguint(r),
+		)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -297,7 +415,13 @@ mod tests {
 			assert!(a.checked_add(b).is_some());
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			assert_eq!(big_a.add(&big_b).to_u64(), a + b, "results in {} + {}", a, b);
+			assert_eq!(
+				big_a.add(&big_b).to_u64(),
+				a + b,
+				"results in {} + {}",
+				a,
+				b
+			);
 		}
 	}
 
@@ -323,7 +447,13 @@ mod tests {
 			assert!(a.checked_sub(b).is_some());
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			assert_eq!(big_a.subtract(&big_b).to_u64(), a - b, "results in {} - {}", a, b);
+			assert_eq!(
+				big_a.subtract(&big_b).to_u64(),
+				a - b,
+				"results in {} - {}",
+				a,
+				b
+			);
 		}
 	}
 
@@ -346,7 +476,13 @@ mod tests {
 			assert!(a.checked_mul(b).is_some());
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			assert_eq!(big_a.multiply(&big_b).to_u64(), a * b, "results in {} * {}", a, b);
+			assert_eq!(
+				big_a.multiply(&big_b).to_u64(),
+				a * b,
+				"results in {} * {}",
+				a,
+				b
+			);
 		}
 	}
 
