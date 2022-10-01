@@ -1,3 +1,9 @@
+//! Implementation of big integers (integers that can be
+//! as big as we want) so that SFLK integers can be free
+//! from the usual size limitations of 64 bits.
+//!
+//! There are a lot of stuff here that can be optimized.
+
 use std::cmp::Ordering;
 
 type Digit = u8;
@@ -5,7 +11,7 @@ type Digit = u8;
 const BASE: u64 = 256;
 
 /// An unsigned big integer.
-/// The base is `BASE`, the most significants digits are at the end.
+/// The base is `BASE`, the most significants digits are at the back.
 #[derive(Clone)]
 struct BigUint {
 	digits: Vec<Digit>,
@@ -48,7 +54,7 @@ impl Ord for BigUint {
 				Ordering::Greater => return Ordering::Greater,
 				Ordering::Less => return Ordering::Less,
 				Ordering::Equal => a,
-			}
+			},
 		};
 		// The number of significant digits is the same.
 		for i in (0..=start).rev() {
@@ -123,16 +129,39 @@ impl BigUint {
 		res
 	}
 
+	fn eprint(&self, end: &str) {
+		if self.digits.is_empty() {
+			eprint!("zero{}", end);
+		} else {
+			for i in (0..self.digits.len()).rev() {
+				eprint!(
+					"{}({}){}",
+					self.digits[i],
+					i,
+					if i == 0 { end } else { "," }
+				);
+			}
+		}
+	}
+
 	/// Perform `self = self - other` if `self >= other`.
 	fn subtract_in_place(&mut self, other: &BigUint) {
 		let mut i = 0;
 		let mut carry = 0;
-		while i < other.digits.len() || carry > 0 {
+		let other_higest = match other.index_of_higest_nonzero_digit() {
+			Some(index) => index,
+			None => return, // `other` is zero
+		};
+		let self_higest = match self.index_of_higest_nonzero_digit() {
+			Some(index) => index,
+			None => panic!("`self` is smaller than `other`"), // `self` is zero but `other` is not
+		};
+		while i <= other_higest || carry > 0 {
 			assert!(
-				i < self.digits.len() || carry == 0,
+				i <= self_higest || carry == 0,
 				"`self` is smaller than `other`"
 			);
-			let self_digit = self.digits[i] as u64;
+			let self_digit = self.digits[i] as u64; // h
 			let other_digit = *other.digits.get(i).unwrap_or(&0) as u64;
 			let mut top_digit = self_digit;
 			let bottom_digit = other_digit + carry;
@@ -181,13 +210,55 @@ impl BigUint {
 	/// The output is (quotient, remainder)
 	#[must_use]
 	fn euclidian_divide(&self, denominator: &BigUint) -> (BigUint, BigUint) {
+		// Long division.
+		assert!(denominator != &BigUint::zero(), "division by zero");
 		let mut quoient = BigUint::zeros(self.digits.len());
 		let mut remainder = self.clone();
 		for i in 1..=self.digits.len() {
 			let x = BigUint {
-				digits: remainder.digits[self.digits.len()-i..].into()
+				digits: remainder.digits[(self.digits.len() - i)..].into(),
 			};
-			todo!();
+			// `x` is the top number of the incomming subtraction
+			// with the bigest multiple of `denominator` that is
+			// strictly smaller than `x`.
+			let (qx, rx) = if &x < denominator {
+				(0, x)
+			} else {
+				let mut power_of_two = 2;
+				let mut qx = BASE / power_of_two;
+				let mut qx_mult_d = BigUint::from_u64(qx).multiply(denominator);
+				loop {
+					power_of_two *= 2;
+					if x >= qx_mult_d {
+						let maybe_rx = x.subtract(&qx_mult_d);
+						if &maybe_rx < denominator {
+							break (qx, maybe_rx);
+						}
+						qx += BASE / power_of_two;
+					} else {
+						qx -= BASE / power_of_two;
+					}
+					qx_mult_d = BigUint::from_u64(qx).multiply(denominator);
+				}
+			};
+			assert!(qx < BASE);
+			match rx.index_of_higest_nonzero_digit() {
+				Some(rx_highest) => {
+					for j in 0..=rx_highest {
+						remainder.digits[self.digits.len() - i + j] = rx.digits[j];
+					}
+					for j in (self.digits.len() - i + rx_highest + 1)..remainder.digits.len() {
+						remainder.digits[j] = 0;
+					}
+				},
+				None => {
+					for j in (self.digits.len() - i)..remainder.digits.len() {
+						remainder.digits[j] = 0;
+					}
+				},
+			}
+			let qi = quoient.digits.len() - i;
+			quoient.digits[qi] = qx as Digit;
 		}
 		(quoient, remainder)
 	}
@@ -198,7 +269,7 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn zero() {
+	fn zero_is_zero() {
 		let big_zero = BigUint::zero();
 		assert_eq!(big_zero.to_u64(), 0);
 	}
@@ -226,7 +297,7 @@ mod tests {
 			assert!(a.checked_add(b).is_some());
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			assert_eq!(big_a.add(&big_b).to_u64(), a + b);
+			assert_eq!(big_a.add(&big_b).to_u64(), a + b, "results in {} + {}", a, b);
 		}
 	}
 
@@ -240,16 +311,19 @@ mod tests {
 			(256, 255),
 			(256, 256),
 			(98866571, 435671),
+			(98866571, 98866570),
 			(18446744073709551614, 1),
 			(18446744073709551614, 435671),
 			(18446744073709551614, 98866571),
 			(18446744073709551614, 184467440737095),
+			(18446744073709551614, 18446744073709551613),
+			(18446744073709551614, 18446744073709551614),
 		];
 		for &(a, b) in pairs {
 			assert!(a.checked_sub(b).is_some());
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			assert_eq!(big_a.subtract(&big_b).to_u64(), a - b);
+			assert_eq!(big_a.subtract(&big_b).to_u64(), a - b, "results in {} - {}", a, b);
 		}
 	}
 
@@ -272,12 +346,12 @@ mod tests {
 			assert!(a.checked_mul(b).is_some());
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			assert_eq!(big_a.multiply(&big_b).to_u64(), a * b);
+			assert_eq!(big_a.multiply(&big_b).to_u64(), a * b, "results in {} * {}", a, b);
 		}
 	}
 
 	#[test]
-	fn comparison() {
+	fn compare() {
 		let pairs: &[(u64, u64)] = &[
 			(0, 0),
 			(1, 0),
@@ -300,7 +374,43 @@ mod tests {
 		for &(a, b) in pairs {
 			let big_a = BigUint::from_u64(a);
 			let big_b = BigUint::from_u64(b);
-			assert_eq!(big_a.cmp(&big_b), a.cmp(&b));
+			assert_eq!(
+				big_a.cmp(&big_b),
+				a.cmp(&b),
+				"results in comparions between {} and {}",
+				a,
+				b
+			);
+		}
+	}
+
+	#[test]
+	fn divide() {
+		let pairs: &[(u64, u64)] = &[
+			(0, 1),
+			(1, 1),
+			(1, 18446744073709551614),
+			(255, 45),
+			(256, 255),
+			(256, 256),
+			(435671, 435671),
+			(435671, 98866571),
+			(98866571, 435671),
+			(98866571, 98866571),
+			(184467440737095, 184467440737095),
+			(18446744073709551614, 1),
+			(18446744073709551614, 435671),
+			(18446744073709551614, 98866571),
+			(18446744073709551614, 184467440737095),
+			(18446744073709551614, 18446744073709551614),
+		];
+		for &(a, b) in pairs {
+			let (q, r) = ((a / b), (a % b));
+			let big_a = BigUint::from_u64(a);
+			let big_b = BigUint::from_u64(b);
+			let (big_q, big_r) = big_a.euclidian_divide(&big_b);
+			assert_eq!(big_q.to_u64(), q, "quotients in {} / {}", a, b);
+			assert_eq!(big_r.to_u64(), r, "remainders in {} / {}", a, b);
 		}
 	}
 }
