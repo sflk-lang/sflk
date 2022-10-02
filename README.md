@@ -151,22 +151,6 @@ In this example, the print statement A prints `uwu` as it reads the variable `x`
 
 Should the `x! < "owo"` statement in the do statement block be replaced with `x < "owo"`, it would mean something else entierly. No `!` means that we are not defining a new variable, we are just assigning to an existing `x` variable, and here that would be the one that was initialized to `"uwu"`. So the print statement D would print `owo` instead of `uwu`.
 
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-
-```sflk
-x! < "hey"
-do {x! < "uwu"}
-pr x nl
-dh {x < "owo"}
-pr x nl
-```
-
-The do statement executes its code in a new context. Code always runs in a context, and it interacts with the context via statements like the assignment statements (variables are part of a context) or by reading variables' values when evaluating expressions. With that said, one can predict that the first print statement will print `hey` and not `uwu` (as the "big" context still sees `x` as having the value `"hey"`, it has not been influenced by the `x! < "uwu"` statement executed in a "smaller" other context).
-
-The do-here statement runs its code in the current context, thus the last print statement prints `owo`.
-
-hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-
 ##### Lists
 
 ```sflk
