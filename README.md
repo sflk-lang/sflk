@@ -112,7 +112,7 @@ pr -1+1 +1 nl # -3 #
 pr -1+1.+1 nl # -1 #
 ```
 
-Although `-` can be a binary operator, it can also be a unary operator. Since it only takes one argument (the expression on its right) then nothing is expected on its left. However, when does the expression it takes stops? The second line of the above examples shows that it does not stop until there is no more expression to take (the expression here could also be written `-(1 +1 +1`).
+Although `-` can be a binary operator, it can also be a unary operator. Since it only takes one argument (the expression on its right) then nothing is expected on its left. However, when does the expression it takes stops? The second line of the above examples shows that it does not stop until there is no more expression to take (the expression here could also be written `-(1 +1 +1)`).
 
 This could be controlled by writing expressions like `(-1 +1) +1`, but there is a more sugary syntax for this: `-1 +1. +1`. The `.` here makes the parser terminate the expression it is parsing, and this makes `1 +1` the argument of the `-` unary operator. The expression required by the print statement is not over though (the argument of `-` is a sub expression) and its parsing continues to include the last `+1`.
 
