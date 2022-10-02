@@ -11,6 +11,7 @@
 
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
+	bigint::BigSint,
 	parser::Parser,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
@@ -150,7 +151,7 @@ impl Block {
 #[derive(Debug, Clone)]
 enum Object {
 	Nothing,
-	Integer(i64),
+	Integer(BigSint),
 	String(String),
 	Block(Block),
 	List(Vec<Object>),
@@ -465,7 +466,7 @@ impl Execution {
 			},
 			SirInstr::RelativeJumpIf { offset } => {
 				let cond = self.pop_obj();
-				let do_the_jump = matches!(cond, Object::Integer(value) if value != 0);
+				let do_the_jump = matches!(cond, Object::Integer(value) if !value.is_zero());
 				if do_the_jump {
 					self.add_to_instr_index(offset);
 				} else {
@@ -476,7 +477,7 @@ impl Execution {
 				let value = self.pop_obj();
 				match value {
 					Object::Integer(value) => {
-						self.push_obj(Object::Integer(if value == 0 { 1 } else { 0 }));
+						self.push_obj(Object::Integer(BigSint::from_bool(value.is_zero())));
 					},
 					obj => unimplemented!(
 						"Logical not operation on object of type {}",
@@ -490,11 +491,8 @@ impl Execution {
 				let right = self.pop_obj();
 				match (left, right) {
 					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						let value = if left_value != 0 && right_value != 0 {
-							1
-						} else {
-							0
-						};
+						let value =
+							BigSint::from_bool(!left_value.is_zero() && !right_value.is_zero());
 						self.push_obj(Object::Integer(value));
 					},
 					(left, right) => unimplemented!(
@@ -523,7 +521,7 @@ impl Execution {
 							[_, _] => panic!(),
 							_ => panic!(),
 						});
-						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
+						self.push_obj(Object::Integer(BigSint::from_bool(is_ordered)));
 					},
 					obj => {
 						unimplemented!("Is ordered operation on object of type {}", obj.type_name())
@@ -549,7 +547,7 @@ impl Execution {
 							[_, _] => panic!(),
 							_ => panic!(),
 						});
-						self.push_obj(Object::Integer(if is_ordered { 1 } else { 0 }));
+						self.push_obj(Object::Integer(BigSint::from_bool(is_ordered)));
 					},
 					obj => {
 						unimplemented!(
@@ -564,10 +562,12 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
-						self.push_obj(Object::Integer(vec.len() as i64));
+						self.push_obj(Object::Integer(BigSint::from_u64(vec.len() as u64)));
 					},
 					Object::String(string) => {
-						self.push_obj(Object::Integer(string.chars().count() as i64));
+						self.push_obj(Object::Integer(BigSint::from_u64(
+							string.chars().count() as u64
+						)));
 					},
 					obj => {
 						unimplemented!("Length operation on object of type {}", obj.type_name())
@@ -580,7 +580,7 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value + right_value));
+						self.push_obj(Object::Integer(left_value.add(&right_value)));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
 						self.push_obj(Object::String(left_string + &right_string));
@@ -601,10 +601,10 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value - right_value));
+						self.push_obj(Object::Integer(left_value.subtract(&right_value)));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
-						let value = if left_string == right_string { 0 } else { 1 };
+						let value = BigSint::from_bool(left_string != right_string);
 						self.push_obj(Object::Integer(value));
 					},
 					(left, right) => unimplemented!(
@@ -620,14 +620,16 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value * right_value));
+						self.push_obj(Object::Integer(left_value.multiply(&right_value)));
 					},
 					(Object::String(left_string), Object::Integer(right_value)) => {
-						self.push_obj(Object::String(left_string.repeat(right_value as usize)));
+						self.push_obj(Object::String(
+							left_string.repeat(right_value.to_i64() as usize),
+						));
 					},
 					(Object::Block(left_block), Object::Integer(right_value)) => {
 						let mut block = left_block.clone();
-						for _ in 0..right_value {
+						for _ in 0..right_value.to_i64() {
 							block = block.concat(left_block.clone());
 						}
 						self.push_obj(Object::Block(block));
@@ -645,12 +647,12 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value / right_value));
+						self.push_obj(Object::Integer(left_value.euclidian_divide(&right_value).0));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
-						self.push_obj(Object::Integer(
+						self.push_obj(Object::Integer(BigSint::from_i64(
 							left_string.matches(right_string.as_str()).count() as i64,
-						));
+						)));
 					},
 					(left, right) => unimplemented!(
 						"Slash operation on objects of type {} and {}",
@@ -690,11 +692,11 @@ impl Execution {
 				match (left, right) {
 					(Object::List(vec), Object::Integer(index)) => {
 						self.push_obj(
-							vec.get(index as usize)
+							vec.get(index.to_i64() as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
-										index,
+										index.to_i64(),
 										0,
 										vec.len() - 1
 									)
@@ -706,11 +708,11 @@ impl Execution {
 						self.push_obj(Object::String(
 							string
 								.chars()
-								.nth(index as usize)
+								.nth(index.to_i64() as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"String index {} out of range {}-{}",
-										index,
+										index.to_i64(),
 										0,
 										string.chars().count() - 1
 									)
@@ -772,11 +774,11 @@ impl Execution {
 					},
 					(Object::Integer(index), Object::List(vec)) => {
 						self.push_obj(
-							vec.get(index as usize)
+							vec.get(index.to_i64() as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
-										index,
+										index.to_i64(),
 										0,
 										vec.len() - 1
 									)
@@ -1025,7 +1027,7 @@ fn perform_signal_past_root(signal: Object) -> Object {
 		Object::Context(var_table) => match var_table.get("name") {
 			Some(Object::String(sig_name)) if sig_name == "print" => match var_table.get("value") {
 				Some(Object::Integer(value)) => {
-					print!("{}", value);
+					print!("{}", value.to_string_base10());
 					Object::Nothing
 				},
 				Some(Object::String(string)) => {
@@ -1173,7 +1175,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			let has_loop_counter = !sp_stmts.is_empty();
 			if has_loop_counter {
 				// Loop counter for the separator.
-				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(0) });
+				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(BigSint::zero()) });
 			}
 			let mut sp_sir = Vec::new();
 			if !sp_stmts.is_empty() {
@@ -1194,7 +1196,9 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				}
 				if has_loop_counter {
 					// Increment the loop counter.
-					bd_sir.push(SirInstr::PushConstant { value: Object::Integer(1) });
+					bd_sir.push(SirInstr::PushConstant {
+						value: Object::Integer(BigSint::from_u64(1)),
+					});
 					bd_sir.push(SirInstr::Plus);
 				}
 			}
@@ -1295,7 +1299,9 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 		},
 		Expr::NothingLiteral => sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing }),
 		Expr::IntegerLiteral(integer_string) => sir_instrs.push(SirInstr::PushConstant {
-			value: Object::Integer(str::parse(integer_string).expect("TODO: bigints")),
+			value: Object::Integer(
+				BigSint::from_string_base10(integer_string).expect("TODO: better integer parsing"),
+			),
 		}),
 		Expr::StringLiteral(string_string) => {
 			sir_instrs.push(SirInstr::PushConstant { value: Object::String(string_string.clone()) })
@@ -1319,7 +1325,8 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 		Expr::Unop(unop) => match unop {
 			Unop::Negate(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
-				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(-1) });
+				sir_instrs
+					.push(SirInstr::PushConstant { value: Object::Integer(BigSint::from_i64(-1)) });
 				sir_instrs.push(SirInstr::Star);
 			},
 			Unop::ReadFile(expr) => {

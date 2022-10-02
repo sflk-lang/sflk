@@ -12,7 +12,7 @@ const BASE: u64 = 256;
 
 /// An unsigned big integer.
 /// The base is `BASE`, the most significants digits are at the back.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct BigUint {
 	digits: Vec<Digit>,
 }
@@ -95,6 +95,35 @@ impl BigUint {
 			acc = acc * BASE + digit as u64;
 		}
 		acc
+	}
+
+	fn from_string_base10(string: &str) -> Result<BigUint, ()> {
+		let mut value = BigUint::zero();
+		let ten = BigUint::from_u64(10);
+		for c in string.chars() {
+			if c.is_ascii_digit() {
+				value.multiply_in_place(&ten);
+				value.add_in_place(&BigUint::from_u64(c as u64 - '0' as u64))
+			} else {
+				return Err(());
+			}
+		}
+		Ok(value)
+	}
+
+	fn to_string_base10(&self) -> String {
+		if self.is_zero() {
+			return String::from("0");
+		}
+		let mut string = String::new();
+		let mut value = self.clone();
+		let ten = BigUint::from_u64(10);
+		while !value.is_zero() {
+			let (q, r) = value.euclidian_divide(&ten);
+			string = format!("{}", r.to_u64()) + &string;
+			value = q;
+		}
+		string
 	}
 
 	fn index_of_higest_nonzero_digit(&self) -> Option<usize> {
@@ -259,8 +288,8 @@ impl BigUint {
 }
 
 /// A signed big integer.
-#[derive(Clone)]
-struct BigSint {
+#[derive(Clone, Debug)]
+pub struct BigSint {
 	biguint: BigUint,
 	/// This can be whatever if `biguint` is zero.
 	is_negative: bool,
@@ -297,12 +326,50 @@ impl Ord for BigSint {
 }
 
 impl BigSint {
-	fn zero() -> BigSint {
+	pub fn zero() -> BigSint {
 		BigSint { biguint: BigUint::zero(), is_negative: false }
+	}
+
+	pub fn from_u64(value: u64) -> BigSint {
+		BigSint {
+			biguint: BigUint::from_u64(value),
+			is_negative: false,
+		}
+	}
+
+	pub fn from_i64(value: i64) -> BigSint {
+		BigSint {
+			biguint: BigUint::from_u64(value.abs() as u64),
+			is_negative: value < 0,
+		}
+	}
+
+	pub fn to_i64(&self) -> i64 {
+		i64::try_from(self.biguint.to_u64()).unwrap() * if self.is_negative { -1 } else { 1 }
+	}
+
+	pub fn from_bool(value: bool) -> BigSint {
+		if value {
+			BigSint::from_u64(1)
+		} else {
+			BigSint::zero()
+		}
 	}
 
 	fn from_biguint(biguint: BigUint) -> BigSint {
 		BigSint { biguint, is_negative: false }
+	}
+
+	pub fn from_string_base10(string: &str) -> Result<BigSint, ()> {
+		Ok(BigSint::from_biguint(BigUint::from_string_base10(string)?))
+	}
+
+	pub fn to_string_base10(&self) -> String {
+		String::from(if self.is_negative {"-"} else {""}) + &self.biguint.to_string_base10()
+	}
+
+	pub fn is_zero(&self) -> bool {
+		self.biguint.is_zero()
 	}
 
 	fn add_in_place_ex(&mut self, other: &BigSint, flip_other_sign: bool) {
@@ -321,10 +388,10 @@ impl BigSint {
 				self.is_negative = true;
 			},
 			(true, false) if self.biguint > other.biguint => {
-				self.biguint = other.biguint.subtract(&self.biguint);
+				self.biguint.subtract_in_place(&other.biguint);
 			},
 			(true, false) => {
-				self.biguint.subtract_in_place(&other.biguint);
+				self.biguint = other.biguint.subtract(&self.biguint);
 				self.is_negative = false;
 			},
 		}
@@ -335,7 +402,7 @@ impl BigSint {
 	}
 
 	#[must_use]
-	fn add(&self, other: &BigSint) -> BigSint {
+	pub fn add(&self, other: &BigSint) -> BigSint {
 		let mut res = self.clone();
 		res.add_in_place(other);
 		res
@@ -346,7 +413,7 @@ impl BigSint {
 	}
 
 	#[must_use]
-	fn subtract(&self, other: &BigSint) -> BigSint {
+	pub fn subtract(&self, other: &BigSint) -> BigSint {
 		let mut res = self.clone();
 		res.subtract_in_place(other);
 		res
@@ -358,7 +425,7 @@ impl BigSint {
 	}
 
 	#[must_use]
-	fn multiply(&self, other: &BigSint) -> BigSint {
+	pub fn multiply(&self, other: &BigSint) -> BigSint {
 		let biguint = self.biguint.multiply(&other.biguint);
 		BigSint {
 			biguint,
@@ -369,7 +436,7 @@ impl BigSint {
 	/// Here, `self` is the numerator.
 	/// The output is (quotient, remainder).
 	#[must_use]
-	fn euclidian_divide(&self, denominator: &BigSint) -> (BigSint, BigSint) {
+	pub fn euclidian_divide(&self, denominator: &BigSint) -> (BigSint, BigSint) {
 		assert!(
 			!denominator.is_negative,
 			"euclidian division by a negative number"
