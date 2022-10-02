@@ -104,3 +104,5 @@ pr .a nl
 do {x! < "yes" pr .x > cx nl}
 pr 111111111 * 111111111 nl
 pr 100000000000000000000000000000000000000000000000 -1 /9 nl
+#! line comment # still line comment
+pr "after line comment" nl

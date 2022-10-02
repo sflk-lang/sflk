@@ -45,6 +45,7 @@ Binary operators such as `+` do not have a precedence, expressions such as `1 + 
 # Comments are blocks delimited by hashes #
 #### Or by any number
 of successive #s ####
+#! Hash+bang starts a line comment
 ```
 
 #### Variables

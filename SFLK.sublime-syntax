@@ -22,6 +22,10 @@ contexts:
     - match: '##'
       scope: punctuation.definition.comment.begin.sflk
       push: comment_2
+    - match: '(#\!)(.*)$'
+      captures:
+        0: comment.line.sflk
+        1: punctuation.definition.comment.begin.sflk
     - match: '#'
       scope: punctuation.definition.comment.begin.sflk
       push: comment_1

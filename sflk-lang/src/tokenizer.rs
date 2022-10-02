@@ -95,10 +95,13 @@ pub enum Tok {
 		// The usize is the `\` character index in the literal.
 	},
 	InvalidCharacter(char),
-	Comment {
+	CommentBlock {
 		content: String,
 		delimitation_thickness: usize,
 		no_end_hash_warning: bool,
+	},
+	CommentLine {
+		content: String,
 	},
 	Eof,
 }
@@ -547,12 +550,18 @@ impl Tokenizer {
 		assert_eq!(crh.peek(), Some('#'));
 		let mut loc = crh.loc();
 		let mut delimitation_thickness = 0;
+		let mut comment_line = false;
 		while let Some('#') = crh.peek() {
 			delimitation_thickness += 1;
 			loc += crh.loc();
 			crh.disc();
+			if crh.peek() == Some('!') && delimitation_thickness == 1 {
+				comment_line = true;
+				break;
+			}
 		}
 		let delimitation_thickness = delimitation_thickness;
+		let comment_line = comment_line;
 		let mut content = String::new();
 		let mut no_end_hash_warning = false;
 		loop {
@@ -563,7 +572,7 @@ impl Tokenizer {
 					loc += crh.loc();
 					crh.disc();
 				}
-				if hashes_thickness == delimitation_thickness {
+				if !comment_line && hashes_thickness == delimitation_thickness {
 					break;
 				} else {
 					content.extend(std::iter::repeat('#').take(hashes_thickness));
@@ -572,19 +581,26 @@ impl Tokenizer {
 				content.push(ch);
 				loc += crh.loc();
 				crh.disc();
+				if comment_line && ch == '\n' {
+					break;
+				}
 			} else {
 				no_end_hash_warning = true;
 				break;
 			}
 		}
-		(
-			Tok::Comment {
-				content,
-				delimitation_thickness,
-				no_end_hash_warning,
-			},
-			loc,
-		)
+		if comment_line {
+			(Tok::CommentLine { content }, loc)
+		} else {
+			(
+				Tok::CommentBlock {
+					content,
+					delimitation_thickness,
+					no_end_hash_warning,
+				},
+				loc,
+			)
+		}
 	}
 }
 
@@ -610,7 +626,7 @@ impl TokBuffer {
 	fn tokenizer_pop_tok_no_comments(&mut self) -> (Tok, Loc) {
 		loop {
 			let (tok, loc) = self.tokenizer.pop_tok(&mut self.crh);
-			if !matches!(tok, Tok::Comment { .. }) {
+			if !matches!(tok, Tok::CommentBlock { .. } | Tok::CommentLine { .. }) {
 				break (tok, loc);
 			}
 		}
@@ -702,7 +718,8 @@ impl fmt::Display for Tok {
 			Tok::Right(Matched::Paren) => write!(f, "right parenthesis"),
 			Tok::Right(Matched::Curly) => write!(f, "right curly bracket"),
 			Tok::Right(Matched::Bracket) => write!(f, "right bracket"),
-			Tok::Comment { .. } => write!(f, "comment"),
+			Tok::CommentBlock { .. } => write!(f, "comment block"),
+			Tok::CommentLine { .. } => write!(f, "comment line"),
 			Tok::Kw(kw) => write!(f, "keyword {}", kw),
 			Tok::Integer(string) => write!(f, "integer {}", string),
 			Tok::Name { string, .. } => write!(f, "name {}", string),
