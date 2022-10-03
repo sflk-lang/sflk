@@ -302,7 +302,7 @@ impl Parser {
 			ParsingAction::Terminate => panic!(),
 			ParsingAction::ParseStmtOrStop => {
 				let (tok, loc) = self.peek_tok();
-				if let ParsingData::BlockLevel { expected_terminator, right_curly: end, .. } =
+				if let ParsingData::BlockLevel { expected_terminator, .. } =
 					self.data_stack.last_mut().unwrap()
 				{
 					match tok {
@@ -335,6 +335,7 @@ impl Parser {
 			},
 			ParsingAction::AddRightCurly => {
 				let (tok, loc) = self.consume_tok();
+				assert!(matches!(tok, Tok::Right(Matched::Curly)));
 				if let ParsingData::BlockLevel { right_curly: end, .. } =
 					self.data_stack.last_mut().unwrap()
 				{
@@ -528,7 +529,7 @@ impl Parser {
 				}
 			},
 			ParsingAction::ParseExtOrStop => {
-				let (tok, loc) = self.peek_tok();
+				let (tok, _loc) = self.peek_tok();
 				let has_ext = if let Tok::Kw(ext_kw) = tok {
 					if let ParsingData::Stmt { kw, .. } = self.data_stack.last().unwrap() {
 						self.lang
@@ -834,7 +835,7 @@ impl Parser {
 				});
 			},
 			ParsingAction::ParseChopOrStop => {
-				let (tok, loc) = self.peek_tok();
+				let (tok, _loc) = self.peek_tok();
 				let simple_tok = SimpleTok::try_from(&tok).ok();
 				if simple_tok.is_some() && self.lang.binops.contains_key(&simple_tok.unwrap()) {
 					self.action_stack.push(ParsingAction::ParseChopOrStop);
@@ -845,15 +846,16 @@ impl Parser {
 				}
 			},
 			ParsingAction::ConsumeDot => {
-				let (tok, loc) = self.consume_tok();
+				let (tok, _loc) = self.consume_tok();
 				assert!(matches!(tok, Tok::Op(Op::Dot)));
 			},
 			ParsingAction::ConsumeRightParen => {
 				self.debug.log_deindent("Done parsing expression");
-				let (tok, loc) = self.consume_tok();
+				let (tok, _loc) = self.consume_tok();
 				assert!(matches!(tok, Tok::Right(Matched::Paren)));
 				let expr = self.data_stack.pop().unwrap();
 				let left_paren = self.data_stack.pop().unwrap();
+				assert!(matches!(left_paren, ParsingData::LeftParen(_)));
 				self.data_stack.push(expr);
 			},
 			ParsingAction::ParseChop => {

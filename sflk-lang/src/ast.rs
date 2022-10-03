@@ -6,11 +6,6 @@ use crate::{
 	utils::{escape_string, styles, Style},
 };
 
-// TODO:
-// - move Loc here, or not ?
-// - delete Located
-// - parser->program must become parser->ast->program
-
 #[derive(Debug)]
 pub struct Node<T> {
 	content: T,
@@ -132,9 +127,6 @@ pub enum Stmt {
 	DoHere {
 		expr: Node<Expr>,
 	},
-	DoFileHere {
-		expr: Node<Expr>,
-	},
 	If {
 		cond_expr: Node<Expr>,
 		th_stmts: Vec<Node<Stmt>>,
@@ -218,7 +210,7 @@ where
 }
 
 impl Treeable for Chop {
-	fn tree(&self, loc: &Loc) -> StringTree {
+	fn tree(&self, _loc: &Loc) -> StringTree {
 		match self {
 			Chop::Plus(expr_node) => StringTree::new_node(
 				"chop plus".to_string(),
@@ -266,7 +258,7 @@ impl Treeable for Chop {
 }
 
 impl Treeable for Expr {
-	fn tree(&self, loc: &Loc) -> StringTree {
+	fn tree(&self, _loc: &Loc) -> StringTree {
 		match self {
 			Expr::VariableName(name) => {
 				StringTree::new_leaf(format!("variable {}", name), styles::NORMAL)
@@ -328,7 +320,7 @@ impl Treeable for Expr {
 }
 
 impl Treeable for TargetExpr {
-	fn tree(&self, loc: &Loc) -> StringTree {
+	fn tree(&self, _loc: &Loc) -> StringTree {
 		match self {
 			TargetExpr::VariableName(name) => {
 				StringTree::new_leaf(format!("target variable {}", name), styles::NORMAL)
@@ -344,7 +336,7 @@ impl Treeable for TargetExpr {
 }
 
 impl Treeable for Stmt {
-	fn tree(&self, loc: &Loc) -> StringTree {
+	fn tree(&self, _loc: &Loc) -> StringTree {
 		match self {
 			Stmt::Nop => StringTree::new_leaf("nop".to_string(), styles::NORMAL),
 			Stmt::Print { expr } => StringTree::new_node(
@@ -377,11 +369,6 @@ impl Treeable for Stmt {
 			),
 			Stmt::DoHere { expr } => StringTree::new_node(
 				"do here".to_string(),
-				styles::NORMAL,
-				vec![StringTree::from(expr)],
-			),
-			Stmt::DoFileHere { expr } => StringTree::new_node(
-				"do file here".to_string(),
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
@@ -485,7 +472,7 @@ impl Treeable for Stmt {
 }
 
 impl Treeable for Program {
-	fn tree(&self, loc: &Loc) -> StringTree {
+	fn tree(&self, _loc: &Loc) -> StringTree {
 		StringTree::new_node(
 			"program".to_string(),
 			styles::CYAN,
@@ -511,7 +498,6 @@ impl Stmt {
 						.map_or(false, |expr| expr.content.is_invalid())
 			},
 			Stmt::DoHere { expr } => expr.content.is_invalid(),
-			Stmt::DoFileHere { expr } => expr.content.is_invalid(),
 			#[rustfmt::skip]
 			Stmt::If { cond_expr, th_stmts, el_stmts } => {
 				cond_expr.content.is_invalid()

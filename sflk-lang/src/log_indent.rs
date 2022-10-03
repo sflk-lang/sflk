@@ -1,3 +1,13 @@
+//! Logs text in a way that supports nested messages with indentation.
+//! 
+//! Example:
+//! ┌─Text (indent)
+//! │ Text (normal)
+//! │ ┌─Text (indent)
+//! │ │ Text (normal)
+//! │ └─Text (deindent)
+//! └─Text (deindent)
+
 use crate::utils::{styles, StdoutWriter, Style};
 
 pub struct IndentedLogger {

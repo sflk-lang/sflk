@@ -19,31 +19,34 @@ use tokenizer::{CharReadingHead, TokBuffer};
 use std::rc::Rc;
 
 fn main() {
+	// Parse the command line arguments.
 	let settings = Settings::from_args();
-	if settings.execute_wants() {
+	settings.print_info();
+	if settings.src_code().is_none() {
 		return;
 	}
 
 	// Get the source code in memory.
-	let scu = Rc::new(match &settings.src {
+	let scu = Rc::new(match settings.src_code() {
 		Some(Source::FilePath(file_path)) => SourceCodeUnit::from_filename(file_path),
 		Some(Source::Code(code)) => SourceCodeUnit::from_str(code.to_string(), "input".to_string()),
 		None => panic!(),
 	});
 
-	// Get a tokenizer ready.
+	// Get the tokenizer ready.
 	let tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 
-	// Don't execute any code, only display tokens
+	// Don't execute any code, only display tokens.
 	if settings.display_tokens() {
 		tfr.display_all(settings.debug_lines());
 		return;
 	}
 
-	// Parse the source code into an AST.
+	// Get the parser ready.
 	let parser_logger = settings.parser_debugging_logger();
 	let mut parser = Parser::new(tfr, parser_logger);
 
+	// Parse the source code into an AST.
 	let ast = parser.parse_program();
 	if settings.debug() {
 		ast.print();

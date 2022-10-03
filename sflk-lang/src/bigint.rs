@@ -1,17 +1,25 @@
 //! Implementation of big integers (integers that can be
-//! as big as we want) so that SFLK integers can be free
+//! arbitrarly big) so that SFLK integers can be free
 //! from the usual size limitations of 64 bits.
 //!
 //! There are a lot of stuff here that can be optimized.
 
 use std::cmp::Ordering;
 
+/// The type of one digit.
 type Digit = u8;
 
+/// The base should be of type `u64` and be the number of
+/// values that the `Digit` type can represent.
 const BASE: u64 = 256;
 
 /// An unsigned big integer.
 /// The base is `BASE`, the most significants digits are at the back.
+/// There can be leading zeros.
+/// There can be no digits at all (in such case the represented value is zero).
+///
+/// Assuming the `BASE` is 256, the integer 256 can be represented as
+/// `[0, 1]` or `[0, 1, 0]` or `[0, 1, 0, 0]` etc.
 #[derive(Clone, Debug)]
 struct BigUint {
 	digits: Vec<Digit>,
@@ -68,6 +76,33 @@ impl Ord for BigUint {
 	}
 }
 
+#[derive(Debug)]
+pub struct DoesNotFit;
+
+impl TryFrom<&BigUint> for u64 {
+	type Error = DoesNotFit;
+
+	fn try_from(value: &BigUint) -> Result<u64, DoesNotFit> {
+		let mut acc = 0u64;
+		for &digit in value.digits.iter().rev() {
+			acc = acc.checked_mul(BASE).ok_or(DoesNotFit)?;
+			acc += digit as u64;
+		}
+		Ok(acc)
+	}
+}
+
+impl From<u64> for BigUint {
+	fn from(mut value: u64) -> BigUint {
+		let mut digits: Vec<Digit> = Vec::new();
+		while value > 0 {
+			digits.push((value % BASE) as Digit);
+			value /= BASE;
+		}
+		BigUint { digits }
+	}
+}
+
 impl BigUint {
 	fn zero() -> BigUint {
 		BigUint { digits: Vec::new() }
@@ -80,30 +115,13 @@ impl BigUint {
 		}
 	}
 
-	fn from_u64(mut value: u64) -> BigUint {
-		let mut digits: Vec<Digit> = Vec::new();
-		while value > 0 {
-			digits.push((value % BASE) as Digit);
-			value /= BASE;
-		}
-		BigUint { digits }
-	}
-
-	fn to_u64(&self) -> u64 {
-		let mut acc = 0u64;
-		for &digit in self.digits.iter().rev() {
-			acc = acc * BASE + digit as u64;
-		}
-		acc
-	}
-
 	fn from_string_base10(string: &str) -> Result<BigUint, ()> {
 		let mut value = BigUint::zero();
-		let ten = BigUint::from_u64(10);
+		let ten = BigUint::from(10);
 		for c in string.chars() {
 			if c.is_ascii_digit() {
 				value.multiply_in_place(&ten);
-				value.add_in_place(&BigUint::from_u64(c as u64 - '0' as u64))
+				value.add_in_place(&BigUint::from(c as u64 - '0' as u64))
 			} else {
 				return Err(());
 			}
@@ -117,15 +135,16 @@ impl BigUint {
 		}
 		let mut string = String::new();
 		let mut value = self.clone();
-		let ten = BigUint::from_u64(10);
+		let ten = BigUint::from(10);
 		while !value.is_zero() {
 			let (q, r) = value.euclidian_divide(&ten);
-			string = format!("{}", r.to_u64()) + &string;
+			string = format!("{}", u64::try_from(&r).unwrap()) + &string;
 			value = q;
 		}
 		string
 	}
 
+	/// Returns `None` iff `self` is zero.
 	fn index_of_higest_nonzero_digit(&self) -> Option<usize> {
 		for i in (0..self.digits.len()).rev() {
 			if self.digits[i] != 0 {
@@ -173,11 +192,11 @@ impl BigUint {
 		let mut carry = 0;
 		let other_higest = match other.index_of_higest_nonzero_digit() {
 			Some(index) => index,
-			None => return, // `other` is zero
+			None => return, // `other` is zero.
 		};
 		let self_higest = match self.index_of_higest_nonzero_digit() {
 			Some(index) => index,
-			None => panic!("`self` is smaller than `other`"), // `self` is zero but `other` is not
+			None => panic!("`self` is smaller than `other`"), // `self` is zero but `other` is not.
 		};
 		while i <= other_higest || carry > 0 {
 			assert!(
@@ -235,25 +254,34 @@ impl BigUint {
 	fn euclidian_divide(&self, denominator: &BigUint) -> (BigUint, BigUint) {
 		// Long division.
 		assert!(!denominator.is_zero(), "division by zero");
-		let mut quoient = BigUint::zeros(self.digits.len());
+		let mut quotient = BigUint::zeros(self.digits.len());
 		let mut remainder = self.clone();
 		for i in 1..=self.digits.len() {
+			// Each iteration, a bigger slice of the digits of `remainder` is considered as `x`.
+			// Precisely, one digit bigger than the last considered slice (that was replaced by
+			// the result of the last subtraction if any). This is pretty much what we do in a
+			// pen and paper division when we "bring down" the next digit of the numerator next to
+			// the last subrcation result (at least in France that is what we do).
 			let x = BigUint {
 				digits: remainder.digits[(self.digits.len() - i)..].into(),
 			};
 			// `x` is the top number of the incomming subtraction
-			// with the bigest multiple of `denominator` that is
-			// strictly smaller than `x`.
+			// with the bigest multiple of `denominator` (`qx` * `denominator`)
+			// that is strictly smaller than `x`.
+			// `x - qx * denominator == rx`.
 			let (qx, rx) = if &x < denominator {
 				(0, x)
 			} else {
+				// That bigest multiple of `denominator` that is
+				// strictly smaller than `x` is searched for in the same
+				// way as binary search.
 				let mut power_of_two = 2;
 				let mut qx = BASE / power_of_two;
-				let mut qx_mult_d = BigUint::from_u64(qx).multiply(denominator);
+				let mut qx_times_denominator = BigUint::from(qx).multiply(denominator);
 				loop {
 					power_of_two *= 2;
-					if x >= qx_mult_d {
-						let maybe_rx = x.subtract(&qx_mult_d);
+					if x >= qx_times_denominator {
+						let maybe_rx = x.subtract(&qx_times_denominator);
 						if &maybe_rx < denominator {
 							break (qx, maybe_rx);
 						}
@@ -261,10 +289,12 @@ impl BigUint {
 					} else {
 						qx -= BASE / power_of_two;
 					}
-					qx_mult_d = BigUint::from_u64(qx).multiply(denominator);
+					qx_times_denominator = BigUint::from(qx).multiply(denominator);
 				}
 			};
 			assert!(qx < BASE);
+			// The slice of `remainder` that was put in `x` at the beginning of this iteration
+			// is now replaced by the result of the subtraction (`rx`).
 			match rx.index_of_higest_nonzero_digit() {
 				Some(rx_highest) => {
 					for j in 0..=rx_highest {
@@ -280,10 +310,11 @@ impl BigUint {
 					}
 				},
 			}
-			let qi = quoient.digits.len() - i;
-			quoient.digits[qi] = qx as Digit;
+			// `qi` is the next digit in the quotient.
+			let qi = quotient.digits.len() - i;
+			quotient.digits[qi] = qx as Digit;
 		}
-		(quoient, remainder)
+		(quotient, remainder)
 	}
 }
 
@@ -291,7 +322,7 @@ impl BigUint {
 #[derive(Clone, Debug)]
 pub struct BigSint {
 	biguint: BigUint,
-	/// This can be whatever if `biguint` is zero.
+	/// The value zero does not have a specific sign, this can be whatever for zero.
 	is_negative: bool,
 }
 
@@ -325,32 +356,42 @@ impl Ord for BigSint {
 	}
 }
 
+impl TryFrom<&BigSint> for i64 {
+	type Error = DoesNotFit;
+
+	fn try_from(value: &BigSint) -> Result<i64, DoesNotFit> {
+		let biguint_as_u64: u64 = (&value.biguint).try_into()?;
+		let biguint_as_i64: i64 = biguint_as_u64.try_into().map_err(|_| DoesNotFit)?;
+		Ok(biguint_as_i64 * if value.is_negative { -1 } else { 1 })
+	}
+}
+
+impl From<u64> for BigSint {
+	fn from(value: u64) -> BigSint {
+		BigSint {
+			biguint: BigUint::from(value),
+			is_negative: false,
+		}
+	}
+}
+
+impl From<i64> for BigSint {
+	fn from(value: i64) -> BigSint {
+		BigSint {
+			biguint: BigUint::from(value.abs() as u64),
+			is_negative: value < 0,
+		}
+	}
+}
+
 impl BigSint {
 	pub fn zero() -> BigSint {
 		BigSint { biguint: BigUint::zero(), is_negative: false }
 	}
 
-	pub fn from_u64(value: u64) -> BigSint {
-		BigSint {
-			biguint: BigUint::from_u64(value),
-			is_negative: false,
-		}
-	}
-
-	pub fn from_i64(value: i64) -> BigSint {
-		BigSint {
-			biguint: BigUint::from_u64(value.abs() as u64),
-			is_negative: value < 0,
-		}
-	}
-
-	pub fn to_i64(&self) -> i64 {
-		i64::try_from(self.biguint.to_u64()).unwrap() * if self.is_negative { -1 } else { 1 }
-	}
-
 	pub fn from_bool(value: bool) -> BigSint {
 		if value {
-			BigSint::from_u64(1)
+			BigSint::from(1i64)
 		} else {
 			BigSint::zero()
 		}
@@ -365,7 +406,7 @@ impl BigSint {
 	}
 
 	pub fn to_string_base10(&self) -> String {
-		String::from(if self.is_negative {"-"} else {""}) + &self.biguint.to_string_base10()
+		String::from(if self.is_negative { "-" } else { "" }) + &self.biguint.to_string_base10()
 	}
 
 	pub fn is_zero(&self) -> bool {
@@ -381,16 +422,22 @@ impl BigSint {
 		match (self.is_negative, other_is_negative) {
 			(false, false) | (true, true) => self.biguint.add_in_place(&other.biguint),
 			(false, true) if self.biguint >= other.biguint => {
+				// (+8) + (-3) = +5 = +(8 - 3)
 				self.biguint.subtract_in_place(&other.biguint);
+				self.is_negative = false;
 			},
 			(false, true) => {
+				// (+3) + (-8) = -5 = -(8 - 3)
 				self.biguint = other.biguint.subtract(&self.biguint);
 				self.is_negative = true;
 			},
 			(true, false) if self.biguint > other.biguint => {
+				// (-8) + (+3) = -5 = -(8 - 3)
 				self.biguint.subtract_in_place(&other.biguint);
+				self.is_negative = true;
 			},
 			(true, false) => {
+				// (-3) + (+8) = +5 = +(8 - 3)
 				self.biguint = other.biguint.subtract(&self.biguint);
 				self.is_negative = false;
 			},
@@ -456,15 +503,15 @@ mod tests {
 	#[test]
 	fn zero_is_zero() {
 		let big_zero = BigUint::zero();
-		assert_eq!(big_zero.to_u64(), 0);
+		assert_eq!(u64::try_from(&big_zero).unwrap(), 0);
 	}
 
 	#[test]
 	fn u64_to_big_to_u64() {
 		let values = [0, 1, 71, 255, 256, 257, 2345671, 18446744073709551615];
 		for value in values {
-			let big = BigUint::from_u64(value);
-			assert_eq!(big.to_u64(), value);
+			let big = BigUint::from(value);
+			assert_eq!(u64::try_from(&big).unwrap(), value);
 		}
 	}
 
@@ -480,10 +527,10 @@ mod tests {
 		];
 		for &(a, b) in pairs {
 			assert!(a.checked_add(b).is_some());
-			let big_a = BigUint::from_u64(a);
-			let big_b = BigUint::from_u64(b);
+			let big_a = BigUint::from(a);
+			let big_b = BigUint::from(b);
 			assert_eq!(
-				big_a.add(&big_b).to_u64(),
+				u64::try_from(&big_a.add(&big_b)).unwrap(),
 				a + b,
 				"results in {} + {}",
 				a,
@@ -512,10 +559,10 @@ mod tests {
 		];
 		for &(a, b) in pairs {
 			assert!(a.checked_sub(b).is_some());
-			let big_a = BigUint::from_u64(a);
-			let big_b = BigUint::from_u64(b);
+			let big_a = BigUint::from(a);
+			let big_b = BigUint::from(b);
 			assert_eq!(
-				big_a.subtract(&big_b).to_u64(),
+				u64::try_from(&big_a.subtract(&big_b)).unwrap(),
 				a - b,
 				"results in {} - {}",
 				a,
@@ -541,10 +588,10 @@ mod tests {
 		];
 		for &(a, b) in pairs {
 			assert!(a.checked_mul(b).is_some());
-			let big_a = BigUint::from_u64(a);
-			let big_b = BigUint::from_u64(b);
+			let big_a = BigUint::from(a);
+			let big_b = BigUint::from(b);
 			assert_eq!(
-				big_a.multiply(&big_b).to_u64(),
+				u64::try_from(&big_a.multiply(&big_b)).unwrap(),
 				a * b,
 				"results in {} * {}",
 				a,
@@ -575,8 +622,8 @@ mod tests {
 			(18446744073709551614, 18446744073709551614),
 		];
 		for &(a, b) in pairs {
-			let big_a = BigUint::from_u64(a);
-			let big_b = BigUint::from_u64(b);
+			let big_a = BigUint::from(a);
+			let big_b = BigUint::from(b);
 			assert_eq!(
 				big_a.cmp(&big_b),
 				a.cmp(&b),
@@ -609,11 +656,23 @@ mod tests {
 		];
 		for &(a, b) in pairs {
 			let (q, r) = ((a / b), (a % b));
-			let big_a = BigUint::from_u64(a);
-			let big_b = BigUint::from_u64(b);
+			let big_a = BigUint::from(a);
+			let big_b = BigUint::from(b);
 			let (big_q, big_r) = big_a.euclidian_divide(&big_b);
-			assert_eq!(big_q.to_u64(), q, "quotients in {} / {}", a, b);
-			assert_eq!(big_r.to_u64(), r, "remainders in {} / {}", a, b);
+			assert_eq!(
+				u64::try_from(&big_q).unwrap(),
+				q,
+				"quotients in {} / {}",
+				a,
+				b
+			);
+			assert_eq!(
+				u64::try_from(&big_r).unwrap(),
+				r,
+				"remainders in {} / {}",
+				a,
+				b
+			);
 		}
 	}
 }

@@ -4,7 +4,7 @@
 //! to, say, a tree that would be executed recursively.
 //!
 //! An adventage of executing code in SIR is that there is
-//! an instruction pointer that can be saved to susped execution
+//! an instruction pointer that can be saved to pause execution
 //! and resume it later, easily.
 //!
 //! Temporary data is handled via a stack of SFLK objects.
@@ -562,12 +562,12 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
-						self.push_obj(Object::Integer(BigSint::from_u64(vec.len() as u64)));
+						self.push_obj(Object::Integer(BigSint::from(vec.len() as u64)));
 					},
 					Object::String(string) => {
-						self.push_obj(Object::Integer(BigSint::from_u64(
-							string.chars().count() as u64
-						)));
+						self.push_obj(Object::Integer(
+							BigSint::from(string.chars().count() as u64),
+						));
 					},
 					obj => {
 						unimplemented!("Length operation on object of type {}", obj.type_name())
@@ -624,12 +624,12 @@ impl Execution {
 					},
 					(Object::String(left_string), Object::Integer(right_value)) => {
 						self.push_obj(Object::String(
-							left_string.repeat(right_value.to_i64() as usize),
+							left_string.repeat(i64::try_from(&right_value).unwrap() as usize),
 						));
 					},
 					(Object::Block(left_block), Object::Integer(right_value)) => {
 						let mut block = left_block.clone();
-						for _ in 0..right_value.to_i64() {
+						for _ in 0..i64::try_from(&right_value).unwrap() {
 							block = block.concat(left_block.clone());
 						}
 						self.push_obj(Object::Block(block));
@@ -650,7 +650,7 @@ impl Execution {
 						self.push_obj(Object::Integer(left_value.euclidian_divide(&right_value).0));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
-						self.push_obj(Object::Integer(BigSint::from_i64(
+						self.push_obj(Object::Integer(BigSint::from(
 							left_string.matches(right_string.as_str()).count() as i64,
 						)));
 					},
@@ -692,11 +692,11 @@ impl Execution {
 				match (left, right) {
 					(Object::List(vec), Object::Integer(index)) => {
 						self.push_obj(
-							vec.get(index.to_i64() as usize)
+							vec.get(i64::try_from(&index).unwrap() as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
-										index.to_i64(),
+										i64::try_from(&index).unwrap(),
 										0,
 										vec.len() - 1
 									)
@@ -708,11 +708,11 @@ impl Execution {
 						self.push_obj(Object::String(
 							string
 								.chars()
-								.nth(index.to_i64() as usize)
+								.nth(i64::try_from(&index).unwrap() as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"String index {} out of range {}-{}",
-										index.to_i64(),
+										i64::try_from(&index).unwrap(),
 										0,
 										string.chars().count() - 1
 									)
@@ -774,11 +774,11 @@ impl Execution {
 					},
 					(Object::Integer(index), Object::List(vec)) => {
 						self.push_obj(
-							vec.get(index.to_i64() as usize)
+							vec.get(i64::try_from(&index).unwrap() as usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
-										index.to_i64(),
+										i64::try_from(&index).unwrap(),
 										0,
 										vec.len() - 1
 									)
@@ -1197,7 +1197,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				if has_loop_counter {
 					// Increment the loop counter.
 					bd_sir.push(SirInstr::PushConstant {
-						value: Object::Integer(BigSint::from_u64(1)),
+						value: Object::Integer(BigSint::from(1i64)),
 					});
 					bd_sir.push(SirInstr::Plus);
 				}
@@ -1326,7 +1326,7 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 			Unop::Negate(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
 				sir_instrs
-					.push(SirInstr::PushConstant { value: Object::Integer(BigSint::from_i64(-1)) });
+					.push(SirInstr::PushConstant { value: Object::Integer(BigSint::from(-1i64)) });
 				sir_instrs.push(SirInstr::Star);
 			},
 			Unop::ReadFile(expr) => {

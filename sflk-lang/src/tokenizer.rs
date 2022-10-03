@@ -642,23 +642,9 @@ impl TokBuffer {
 		}
 	}
 
-	fn prepare_all(&mut self) {
-		loop {
-			let (tok, loc) = self.tokenizer_pop_tok_no_comments();
-			self.toks_ahead.push_back((tok, loc));
-			if matches!(self.toks_ahead.back().map(|t| &t.0), Some(Tok::Eof)) {
-				break;
-			}
-		}
-	}
-
 	pub fn peek(&mut self, n: usize) -> &(Tok, Loc) {
 		self.prepare_max_index(n);
 		&self.toks_ahead[n]
-	}
-
-	pub fn prepared(&self) -> &VecDeque<(Tok, Loc)> {
-		&self.toks_ahead
 	}
 
 	pub fn pop(&mut self) -> (Tok, Loc) {
@@ -668,12 +654,6 @@ impl TokBuffer {
 			tok_loc
 		} else {
 			panic!("bug: no token to pop")
-		}
-	}
-
-	pub fn disc(&mut self) {
-		if self.toks_ahead.pop_front().is_none() {
-			panic!("bug: token discarded but not peeked before")
 		}
 	}
 

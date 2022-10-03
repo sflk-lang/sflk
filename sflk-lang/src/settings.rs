@@ -30,7 +30,7 @@ const NO_WARRANTY_NOTE: &str = "\
 #[derive(Debug)]
 pub struct Settings {
 	path: String,
-	pub src: Option<Source>,
+	src: Option<Source>,
 	debug: bool,
 	debug_lines: bool,
 	debug_actions: bool,
@@ -47,13 +47,11 @@ pub enum Source {
 }
 
 impl Settings {
-	/// Creates a new `Settings` object filled with default values.
-	///
-	/// Everything is set as `None`, `false`, except `path` that it set from
-	/// parameters
-	pub fn new(path: String) -> Self {
-		Self {
-			path,
+	/// Retrieves and parse command line arguments, returns the according settings.
+	pub fn from_args() -> Settings {
+		let mut args = env::args();
+		let mut settings = Settings {
+			path: args.next().unwrap_or_else(|| "sflk".to_string()),
 			src: None,
 			debug: false,
 			debug_lines: false,
@@ -62,17 +60,11 @@ impl Settings {
 			wants_help: false,
 			wants_version: false,
 			display_tokens: false,
-		}
-	}
-
-	/// Retrieves command line arguments to create the settings according to
-	/// them
-	pub fn from_args() -> Self {
-		let mut args = env::args(); // retrieved command line arguments
-		let mut settings = Self::new(args.next().unwrap_or_else(|| "sflk".to_string()));
+		};
 
 		enum Mode {
 			Normal,
+			/// The next argument is expected to be the source code.
 			SourceCode,
 		}
 		let mut mode = Mode::Normal;
@@ -134,10 +126,8 @@ impl Settings {
 		settings
 	}
 
-	/// Executes some wants of the user set in parameters, like version, help
-	///
-	/// Also, checks for input file
-	pub fn execute_wants(&self) -> bool {
+	/// Prints stuff like version, help message, "no source code", etc.
+	pub fn print_info(&self) {
 		let mut did_something = false;
 
 		if self.wants_version {
@@ -156,17 +146,12 @@ impl Settings {
 			did_something = true;
 		}
 
-		if self.src.is_none() {
-			if !did_something {
-				println!(
-					"No source code provided, nothing to do. Try `{} --help` for usage.",
-					self.path
-				);
-			}
-			return true;
+		if self.src.is_none() && !did_something {
+			println!(
+				"No source code provided, nothing to do. Try `{} --help` for usage.",
+				self.path
+			);
 		}
-
-		false
 	}
 
 	pub fn parser_debugging_logger(&self) -> ParserDebuggingLogger {
@@ -181,6 +166,10 @@ impl Settings {
 			log_actions: self.debug_actions,
 			last_line: 0,
 		}
+	}
+
+	pub fn src_code(&self) -> &Option<Source> {
+		&self.src
 	}
 
 	pub fn display_tokens(&self) -> bool {

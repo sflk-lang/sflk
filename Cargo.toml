@@ -1,2 +1,8 @@
 [workspace]
-members = ["sflk-lang", "sflk-lsp"]
+members = [
+	"sflk-lang",
+	#"sflk-lsp"
+	# The LSP crate is not currently under development and has
+	# dependencies that are a bit annoying (and are not of any use currently)
+	# so it is unlisted from here for now.
+]
