@@ -165,10 +165,6 @@ Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means s
 
 ## Small language features
 
-### Support shebangs and line comments
-
-`#!` could start a line comment. That allows for elegant shebangs (instead of starting a block comment that happens to be a shebang on the first line, and then be closed on the next line) and allow for line comments (not a fan of line comments but whatever, people may prefer line comments).
-
 ### Send error signals instead of panicking
 
 Do that.
