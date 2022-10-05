@@ -1,0 +1,31 @@
+
+ppm! < {
+	i! < 0
+	pr "P3" nl
+	w! < (), .w > v h! < (), .h > v
+	pr w pr " " pr h nl
+	pr 255 nl
+	y! < 0 lp wh os y,, h bd dh {
+		x! < 0 lp wh os x,, w bd dh {
+			color! < (), .c, x, y > v
+			pr 0 > color pr " "
+			pr 1 > color pr " "
+			pr 2 > color nl
+			x < x +1
+		}
+		y < y +1
+	}
+}
+
+ev {
+	w! < 256 / 2 h! < 256 / 2
+	if 0 > v - .w el v < w th
+	if 0 > v - .h el v < h th
+	if 0 > v - .c el dh {
+		x! < 1 > v y! < 2 > v
+		r! < x * 256 / w
+		g! < y * 256 / h
+		b! < 255 / 4
+		v < r,, g, b
+	}
+} > ppm
