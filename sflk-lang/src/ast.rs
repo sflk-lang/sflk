@@ -6,7 +6,6 @@ use crate::{
 	utils::{escape_string, styles, Style},
 };
 
-#[derive(Debug)]
 pub struct Node<T> {
 	content: T,
 	loc: Loc,
@@ -106,7 +105,6 @@ pub struct Program {
 	pub stmts: Vec<Node<Stmt>>,
 }
 
-#[derive(Debug)]
 pub enum Stmt {
 	Nop,
 	Print {
@@ -160,7 +158,6 @@ pub enum TargetExpr {
 	Invalid, // TODO: Add error details
 }
 
-#[derive(Debug)]
 pub enum Expr {
 	VariableName(String),
 	NothingLiteral,
@@ -174,7 +171,6 @@ pub enum Expr {
 	Invalid { error_expr: Box<Node<Expr>> },
 }
 
-#[derive(Debug)]
 pub enum Unop {
 	Negate(Box<Node<Expr>>),
 	ReadFile(Box<Node<Expr>>),
@@ -183,7 +179,6 @@ pub enum Unop {
 	Length(Box<Node<Expr>>),
 }
 
-#[derive(Debug)]
 pub enum Chop {
 	Plus(Node<Expr>),
 	Minus(Node<Expr>),

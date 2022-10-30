@@ -8,6 +8,19 @@
 //! and resume it later, easily.
 //!
 //! Temporary data is handled via a stack of SFLK objects.
+//!
+//!	Contexts hold data such as the declared variables and their value.
+//! The contexts are arranged in a tree, as a simple stack cannot handle
+//! the case of an interceptor creating a new context (its parent is the
+//! same context as an other context from which the intercepted signal comes
+//! from, so we need a stack in which a parent can have multiple children,
+//! hence the tree).
+//! 
+//! Frames hold data such as the stack of temporary values used for the
+//! execution of a sequence of instructions.
+//! The frames are arranges in a stack (no need for a tree here, there
+//! must be a top frame that is the one in which the execution is taking
+//! place at the moment).
 
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
@@ -88,16 +101,24 @@ impl SirBlock {
 	}
 }
 
-// Holds the data used during the execution of one sir block.
+/// Holds the data used during the execution of a `SirBlock`.
+/// A `Frame` is to be pushed on a stack when the execution of a `SirBlock` begins,
+/// and be popped when the execution of that block ends.
 #[derive(Debug)]
 struct Frame {
 	sir_block: SirBlock,
-	/// Refers to the next instruction in the `sir_block`.
+	/// Refers to the next instruction in the `sir_block` that is to be executed at7
+	/// the next call to `perform_one_step`. Such step shall set `instr_index` to
+	/// the instruction that has to be executed in the next step, eventually chosing
+	/// an other instruction that the one that follows (when executing a jumping
+	/// instruction). If set to an invalid index, then it means that there is no
+	/// instruction to execute next, and the next step will pop this frame.
 	instr_index: usize,
+	/// Stack of temporary values.
 	object_stack: Vec<Object>,
 	cx_id: ContextId,
 	/// If true, then the value of the v variable will be pushed
-	/// on the oject stack of the frame below when this one is popped.
+	/// on the object stack of the frame below when this one is popped.
 	// TODO: Find a more elegant solution.
 	push_v: bool,
 }
@@ -122,6 +143,8 @@ impl Frame {
 	}
 }
 
+/// Holds the data unique to one logical thread of execution. 
+// TODO: Allow for multiple executions to exist in parallel.
 #[derive(Debug)]
 struct Execution {
 	frame_stack: Vec<Frame>,
@@ -148,13 +171,26 @@ impl Block {
 	}
 }
 
+/// An `Object` is a value that can manipulated by SFLK code.
+/// Every expression evaluates to an `Object`.
 #[derive(Debug, Clone)]
 enum Object {
+	/// The `()` literal is an expression that evaluates to that.
 	Nothing,
 	Integer(BigSint),
 	String(String),
+	/// A block of code is an expression that evaluates to that,
+	/// without being executed (it may be executed later, but
+	/// not by the evaluation of the literal itself).
+	/// 
+	/// Here is an example of a block of code literal:
+	/// `{pr "SFLK stands for Sus Fucking Language for Kernel dev" nl}`
 	Block(Block),
 	List(Vec<Object>),
+	/// A context object is a dictionary of variable names and their values.
+	/// A context object can be obtained from a context (from the context tree
+	/// that holds data about actual variables) via the `cx` keyword, and
+	/// can be injected in a context (from the context tree) via the `cy` keyword.
 	Context(HashMap<String, Object>),
 }
 
@@ -173,10 +209,36 @@ impl Object {
 
 type ContextId = usize;
 
+/// Holds data such as variable names mapped to their values.
+/// Contexts are often reffered to via their `ContextId` by
+/// asking the `ContextTable` that contains them.
 #[derive(Debug)]
 struct Context {
 	var_table: HashMap<String, Object>,
+	/// No parent means that this context is the root of the context tree.
 	parent_context: Option<ContextId>,
+	/// Intercepts signals coming from *this* context and its subtree,
+	/// when it runs, it does so in the parent of this context.
+	/// 
+	/// ```sflk
+	/// # Code here runs in context A. #
+	/// do {
+	/// 	# Code here runs in context B
+	/// 	| (a context that was created just for
+	/// 	| the execution of this block of code). #
+	/// } wi {
+	/// 	# Code here runs in context A, despite
+	/// 	| the object representing this interceptor
+	/// 	| being stored in the context B. #
+	/// }
+	/// ```
+	/// 
+	/// The reason why interceptors are stored in the concept
+	/// they intercept signals form and not the context they
+	/// are executed in is that they exist as an interceptor
+	/// during the same time as the intercepted context, and
+	/// this way there is no need to store potentially mutiple
+	/// interceptors in the same context. It is simpler this way.
 	interceptor: Option<Object>,
 }
 
@@ -197,6 +259,10 @@ impl Context {
 		if !self.is_var_decl(&var_name) {
 			panic!("Setting undeclared variable");
 		}
+		self.var_table.insert(var_name, value);
+	}
+
+	fn decl_var_and_set(&mut self, var_name: String, value: Object) {
 		self.var_table.insert(var_name, value);
 	}
 
@@ -283,7 +349,8 @@ fn string_to_sir(string: String, name: String) -> SirBlock {
 	let tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 
 	// This temporary solution is using a `ParserDebuggingLogger` that does not
-	// take care about the settings and without logging
+	// care about the settings and without logging.
+	// TODO: Get the settings parsed from the command line in there somehow.
 	let mut parser = Parser::new(
 		tfr,
 		ParserDebuggingLogger {
@@ -300,6 +367,7 @@ fn string_to_sir(string: String, name: String) -> SirBlock {
 }
 
 impl Execution {
+	/// Pushes an object on the stack of temporary values of the top frame.
 	fn push_obj(&mut self, value: Object) {
 		self.frame_stack
 			.last_mut()
@@ -308,6 +376,7 @@ impl Execution {
 			.push(value);
 	}
 
+	/// Pops an object from the stack of temporary values of the top frame.
 	fn pop_obj(&mut self) -> Object {
 		self.frame_stack
 			.last_mut()
@@ -317,6 +386,7 @@ impl Execution {
 			.unwrap()
 	}
 
+	/// Refers to the SIR code instruction index of the top frame.
 	fn instr_index_mut(&mut self) -> &mut usize {
 		&mut self.frame_stack.last_mut().unwrap().instr_index
 	}
@@ -446,12 +516,7 @@ impl Execution {
 								.table
 								.get_mut(&self.cx_id())
 								.unwrap()
-								.decl_var(var_name.clone());
-							context_table
-								.table
-								.get_mut(&self.cx_id())
-								.unwrap()
-								.set_var(var_name, value);
+								.decl_var_and_set(var_name, value);
 						}
 					},
 					obj => unimplemented!(
@@ -1288,7 +1353,6 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::EmitSignal);
 			sir_instrs.push(SirInstr::Discard);
 		},
-		h => unimplemented!("{:?}", h),
 	}
 }
 

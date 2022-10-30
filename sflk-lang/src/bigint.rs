@@ -1,17 +1,23 @@
 //! Implementation of big integers (integers that can be
 //! arbitrarly big) so that SFLK integers can be free
-//! from the usual size limitations of 64 bits.
+//! from the usual 64 bits size limitation.
 //!
 //! There are a lot of stuff here that can be optimized.
 
 use std::cmp::Ordering;
 
 /// The type of one digit.
+/// 
+/// It does not have to be `u8`, this is an arbitrary decision,
+/// and an uneducated guess at that.
+/// I heard Python uses digits that fit closely in 32-bits or something,
+/// maybe a `u32` could be more appropriate.
+/// TODO: Benchmark heavy math hapenning with different types for `Digit`.
 type Digit = u8;
 
-/// The base should be of type `u64` and be the number of
+/// The base should be of type `u64` and is the number of
 /// values that the `Digit` type can represent.
-const BASE: u64 = 256;
+const BASE: u64 = Digit::MAX as u64 + 1;
 
 /// An unsigned big integer.
 /// The base is `BASE`, the most significants digits are at the back.
@@ -231,7 +237,7 @@ impl BigUint {
 
 	#[must_use]
 	fn multiply(&self, other: &BigUint) -> BigUint {
-		// https://en.wikipedia.org/wiki/Multiplication_algorithm#Long_multiplication
+		// (https://en.wikipedia.org/wiki/Multiplication_algorithm#Long_multiplication)
 		let mut res = BigUint::zeros(self.digits.len() + other.digits.len());
 		for other_i in 0..other.digits.len() {
 			let mut carry = 0;

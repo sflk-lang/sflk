@@ -4,7 +4,6 @@ use crate::{
 };
 use std::{collections::VecDeque, convert::TryFrom, fmt, rc::Rc};
 
-#[derive(Debug)]
 pub struct CharReadingHead {
 	scu: Rc<SourceCodeUnit>,
 	raw_index: usize,

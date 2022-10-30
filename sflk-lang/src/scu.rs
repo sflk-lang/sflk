@@ -3,7 +3,6 @@ use std::{
 	rc::Rc,
 };
 
-#[derive(Debug)]
 pub struct SourceCodeUnit {
 	name: String,
 	pub content: String,
@@ -48,7 +47,7 @@ impl Loc {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Loc {
 	pub scu: Rc<SourceCodeUnit>,
 	pub line_start: usize,
