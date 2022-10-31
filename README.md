@@ -124,8 +124,12 @@ This could be controlled by writing expressions like `(-1 +1) +1`, but there is 
 ##### Numbers are arbitrarly precise fractions
 
 ```sflk
-
+pr 333333333333333333333333333 / 111111111111111111111111111 nl # 3 #
+pr 333 / 111111111111111111111111111 nl # 1/333667000333667000333667 #
+# It works, you can check with the `fractions` module from the Python standard library. #
 ```
+
+There is no place for floating point rounding errors in SFLK. Every number is a fraction that is as precise as the RAM allows.
 
 ##### How to include other scripts
 
@@ -267,7 +271,7 @@ Coming soon!
 
 | left type  | right type | behavior
 |:----------:|:----------:| --------
-| integer    | integer    | Arithmetic addition
+| number     | number     | Arithmetic addition
 | string     | string     | String concatenation
 | code block | code block | Code block concatenation
 
@@ -275,22 +279,22 @@ Coming soon!
 
 | left type  | right type | behavior
 |:----------:|:----------:| --------
-| integer    | integer    | Arithmetic subtraction
+| number     | number     | Arithmetic subtraction
 | string     | string     | String comparison (0 iff equal)
 
 #### Star `*`
 
 | left type  | right type | behavior
 |:----------:|:----------:| --------
-| integer    | integer    | Arithmetic multiplication
-| string     | integer    | String repetition
-| code block | integer    | Code block repetition
+| number     | number     | Arithmetic multiplication
+| string     | number     | String repetition
+| code block | number     | Code block repetition
 
 #### Slash `/`
 
 | left type  | right type | behavior
 |:----------:|:----------:| --------
-| integer    | integer    | Arithmetic euclidean division
+| number     | number     | Arithmetic division
 | string     | string     | Count non-overlapping occurrences of right in left
 
 #### To right `>`
@@ -298,7 +302,7 @@ Coming soon!
 | left type  | right type | behavior
 |:----------:|:----------:| --------
 | any type   | code block | Execute right with left as `v`, evaluates to `v`
-| integer    | list       | Same as `right ix left`
+| number     | list       | Same as `right ix left`
 
 #### Comma `,`
 
@@ -317,8 +321,8 @@ Coming soon!
 
 | left type  | right type | result
 |:----------:|:----------:| ------
-| list       | integer    | The right-th element of left
-| string     | integer    | The right-th character of string
+| list       | number     | The right-th element of left
+| string     | number     | The right-th character of string
 
 ### Unary operators behaviors
 
@@ -326,7 +330,7 @@ Coming soon!
 
 | right type | behavior
 |:----------:| --------
-| integer    | Arithmetic negation
+| number     | Arithmetic negation
 
 #### File `fi`
 
