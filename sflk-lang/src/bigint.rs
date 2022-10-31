@@ -929,4 +929,13 @@ mod test_big_fraction {
 			BigSint::from(600000u64)
 		);
 	}
+
+	#[test]
+	fn simplify() {
+		let mut x =
+			BigFraction::from_integers(BigSint::from(1111111110u64), BigSint::from(987654321u64));
+		x.simplify_in_place();
+		assert_eq!(x.numerator(), &BigSint::from(123456790u64));
+		assert_eq!(x.denominator(), &BigSint::from(109739369u64));
+	}
 }

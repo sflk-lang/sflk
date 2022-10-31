@@ -5,7 +5,7 @@
 ## Introduction
 
 *SFLK* is an interpreted programming language. This repository contains the reference implementation.
-SFLK doesn't focus on being fast, a lot of languages are fast already. Instead, it tries new things, in the hope of being interesting. 20% serious, 80% weird stuff.
+SFLK doesn't focus on being fast, a lot of languages are fast already. Instead, it tries new things, in the hope of being interesting. 20% serious, 80% weird stuff (this ratio is an estimation).
 Enjoy!
 
 ## Presentation
@@ -120,6 +120,12 @@ This could be controlled by writing expressions like `(-1 +1) +1`, but there is 
 `-1.` is not to be thought as some kind of negative floating point literal. There is no such thing in SFLK.
 
 #### Some other stuff
+
+##### Numbers are arbitrarly precise fractions
+
+```sflk
+
+```
 
 ##### How to include other scripts
 
