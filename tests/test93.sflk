@@ -10,3 +10,7 @@ pr 3 / 9 nl
 pr 100 / 25 nl
 
 pr (2/5) + 1 nl
+
+nl
+# Print a few numbers of the form 1/2^n #
+x! < 1 lp bd dh {pr x nl} sp x < x / 2 wh os 1/999999999,, x

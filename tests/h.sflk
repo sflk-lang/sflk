@@ -1,0 +1,31 @@
+
+b! < {
+	pr nlhappened nl
+	pr "owo" nl
+	pr "uwu" nl
+	pr nlhappened nl
+}
+
+#
+We wont touch b but we want
+its content to be printed
+only on one line, if any.
+#
+
+nlhappened! < 0
+do b wi {
+	cy v
+	if name - .newline el dh {
+		nlhappened < 1
+		pr " "
+	} th
+		em v rs v
+}
+if nlhappened th
+	nl
+
+#
+Note: Does not yet scan for
+newline characters in print
+signals.
+#
