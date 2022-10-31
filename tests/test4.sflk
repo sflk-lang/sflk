@@ -106,3 +106,5 @@ pr 111111111 * 111111111 nl
 pr 100000000000000000000000000000000000000000000000 -1 /9 nl
 #! line comment # still line comment
 pr "after line comment" nl
+pr (1/10) + (1/10) + (1/10) nl
+if ((1/10) + (1/10) + (1/10)) - (3/10) el dh {pr "no float bs" nl}

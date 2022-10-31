@@ -1,0 +1,12 @@
+
+pr 2 / 5 nl
+pr 5 / 2 nl
+
+pr -2. / 5 nl
+pr 2 / -5. nl
+pr -2. / -5. nl
+
+pr 3 / 9 nl
+pr 100 / 25 nl
+
+pr (2/5) + 1 nl

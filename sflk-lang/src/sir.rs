@@ -15,7 +15,7 @@
 //! same context as an other context from which the intercepted signal comes
 //! from, so we need a stack in which a parent can have multiple children,
 //! hence the tree).
-//! 
+//!
 //! Frames hold data such as the stack of temporary values used for the
 //! execution of a sequence of instructions.
 //! The frames are arranges in a stack (no need for a tree here, there
@@ -24,7 +24,7 @@
 
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
-	bigint::BigSint,
+	bigint::{BigFraction, BigSint},
 	parser::Parser,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
@@ -143,7 +143,7 @@ impl Frame {
 	}
 }
 
-/// Holds the data unique to one logical thread of execution. 
+/// Holds the data unique to one logical thread of execution.
 // TODO: Allow for multiple executions to exist in parallel.
 #[derive(Debug)]
 struct Execution {
@@ -177,12 +177,12 @@ impl Block {
 enum Object {
 	/// The `()` literal is an expression that evaluates to that.
 	Nothing,
-	Integer(BigSint),
+	Number(BigFraction),
 	String(String),
 	/// A block of code is an expression that evaluates to that,
 	/// without being executed (it may be executed later, but
 	/// not by the evaluation of the literal itself).
-	/// 
+	///
 	/// Here is an example of a block of code literal:
 	/// `{pr "SFLK stands for Sus Fucking Language for Kernel dev" nl}`
 	Block(Block),
@@ -198,7 +198,7 @@ impl Object {
 	fn type_name(&self) -> &str {
 		match self {
 			Object::Nothing => "nothing",
-			Object::Integer(_) => "integer",
+			Object::Number(_) => "number",
 			Object::String(_) => "string",
 			Object::Block(_) => "block",
 			Object::List(_) => "list",
@@ -219,7 +219,7 @@ struct Context {
 	parent_context: Option<ContextId>,
 	/// Intercepts signals coming from *this* context and its subtree,
 	/// when it runs, it does so in the parent of this context.
-	/// 
+	///
 	/// ```sflk
 	/// # Code here runs in context A. #
 	/// do {
@@ -232,7 +232,7 @@ struct Context {
 	/// 	| being stored in the context B. #
 	/// }
 	/// ```
-	/// 
+	///
 	/// The reason why interceptors are stored in the concept
 	/// they intercept signals form and not the context they
 	/// are executed in is that they exist as an interceptor
@@ -531,7 +531,7 @@ impl Execution {
 			},
 			SirInstr::RelativeJumpIf { offset } => {
 				let cond = self.pop_obj();
-				let do_the_jump = matches!(cond, Object::Integer(value) if !value.is_zero());
+				let do_the_jump = matches!(cond, Object::Number(value) if !value.is_zero());
 				if do_the_jump {
 					self.add_to_instr_index(offset);
 				} else {
@@ -541,8 +541,10 @@ impl Execution {
 			SirInstr::LogicalNot => {
 				let value = self.pop_obj();
 				match value {
-					Object::Integer(value) => {
-						self.push_obj(Object::Integer(BigSint::from_bool(value.is_zero())));
+					Object::Number(value) => {
+						self.push_obj(Object::Number(BigFraction::from(BigSint::from_bool(
+							value.is_zero(),
+						))));
 					},
 					obj => unimplemented!(
 						"Logical not operation on object of type {}",
@@ -555,10 +557,11 @@ impl Execution {
 				let left = self.pop_obj();
 				let right = self.pop_obj();
 				match (left, right) {
-					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						let value =
-							BigSint::from_bool(!left_value.is_zero() && !right_value.is_zero());
-						self.push_obj(Object::Integer(value));
+					(Object::Number(left_value), Object::Number(right_value)) => {
+						let value = BigFraction::from(BigSint::from_bool(
+							!left_value.is_zero() && !right_value.is_zero(),
+						));
+						self.push_obj(Object::Number(value));
 					},
 					(left, right) => unimplemented!(
 						"Logical and operation on objects of type {} and {}",
@@ -572,21 +575,23 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
-						let non_integer = vec.iter().find(|obj| !matches!(obj, Object::Integer(_)));
-						if let Some(obj) = non_integer {
+						let not_a_number = vec.iter().find(|obj| !matches!(obj, Object::Number(_)));
+						if let Some(obj) = not_a_number {
 							unimplemented!(
 								"Is ordered operation on a list that is not \
-								exclusively composed of integers (at least one \
-								object if type {} is in the list)",
+								exclusively composed of numbers (at least one \
+								object is type {} is in the list)",
 								obj.type_name()
 							);
 						}
 						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
-							[Object::Integer(left), Object::Integer(right)] => left <= right,
+							[Object::Number(left), Object::Number(right)] => left <= right,
 							[_, _] => panic!(),
 							_ => panic!(),
 						});
-						self.push_obj(Object::Integer(BigSint::from_bool(is_ordered)));
+						self.push_obj(Object::Number(BigFraction::from(BigSint::from_bool(
+							is_ordered,
+						))));
 					},
 					obj => {
 						unimplemented!("Is ordered operation on object of type {}", obj.type_name())
@@ -598,21 +603,23 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
-						let non_integer = vec.iter().find(|obj| !matches!(obj, Object::Integer(_)));
-						if let Some(obj) = non_integer {
+						let not_a_number = vec.iter().find(|obj| !matches!(obj, Object::Number(_)));
+						if let Some(obj) = not_a_number {
 							unimplemented!(
 								"Is ordered strictly operation on a list that is not \
-								exclusively composed of integers (at least one \
-								object if type {} is in the list)",
+								exclusively composed of numbers (at least one \
+								object is type {} is in the list)",
 								obj.type_name()
 							);
 						}
 						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
-							[Object::Integer(left), Object::Integer(right)] => left < right,
+							[Object::Number(left), Object::Number(right)] => left < right,
 							[_, _] => panic!(),
 							_ => panic!(),
 						});
-						self.push_obj(Object::Integer(BigSint::from_bool(is_ordered)));
+						self.push_obj(Object::Number(BigFraction::from(BigSint::from_bool(
+							is_ordered,
+						))));
 					},
 					obj => {
 						unimplemented!(
@@ -627,12 +634,12 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
-						self.push_obj(Object::Integer(BigSint::from(vec.len() as u64)));
+						self.push_obj(Object::Number(BigFraction::from(vec.len() as u64)));
 					},
 					Object::String(string) => {
-						self.push_obj(Object::Integer(
-							BigSint::from(string.chars().count() as u64),
-						));
+						self.push_obj(Object::Number(BigFraction::from(
+							string.chars().count() as u64
+						)));
 					},
 					obj => {
 						unimplemented!("Length operation on object of type {}", obj.type_name())
@@ -644,8 +651,8 @@ impl Execution {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
 				match (left, right) {
-					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value.add(&right_value)));
+					(Object::Number(left_value), Object::Number(right_value)) => {
+						self.push_obj(Object::Number(left_value.add(&right_value)));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
 						self.push_obj(Object::String(left_string + &right_string));
@@ -665,12 +672,13 @@ impl Execution {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
 				match (left, right) {
-					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value.subtract(&right_value)));
+					(Object::Number(left_value), Object::Number(right_value)) => {
+						self.push_obj(Object::Number(left_value.subtract(&right_value)));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
-						let value = BigSint::from_bool(left_string != right_string);
-						self.push_obj(Object::Integer(value));
+						let value =
+							BigFraction::from(BigSint::from_bool(left_string != right_string));
+						self.push_obj(Object::Number(value));
 					},
 					(left, right) => unimplemented!(
 						"Minus operation on objects of type {} and {}",
@@ -684,17 +692,20 @@ impl Execution {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
 				match (left, right) {
-					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value.multiply(&right_value)));
+					(Object::Number(left_value), Object::Number(right_value)) => {
+						self.push_obj(Object::Number(left_value.multiply(&right_value)));
 					},
-					(Object::String(left_string), Object::Integer(right_value)) => {
-						self.push_obj(Object::String(
-							left_string.repeat(i64::try_from(&right_value).unwrap() as usize),
-						));
+					(Object::String(left_string), Object::Number(right_value)) => {
+						let right_as_usize =
+							i64::try_from(&BigSint::try_from(&right_value).unwrap()).unwrap()
+								as usize;
+						self.push_obj(Object::String(left_string.repeat(right_as_usize)));
 					},
-					(Object::Block(left_block), Object::Integer(right_value)) => {
+					(Object::Block(left_block), Object::Number(right_value)) => {
 						let mut block = left_block.clone();
-						for _ in 0..i64::try_from(&right_value).unwrap() {
+						let right_as_i64 =
+							i64::try_from(&BigSint::try_from(&right_value).unwrap()).unwrap();
+						for _ in 0..right_as_i64 {
 							block = block.concat(left_block.clone());
 						}
 						self.push_obj(Object::Block(block));
@@ -711,13 +722,13 @@ impl Execution {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
 				match (left, right) {
-					(Object::Integer(left_value), Object::Integer(right_value)) => {
-						self.push_obj(Object::Integer(left_value.euclidian_divide(&right_value).0));
+					(Object::Number(left_value), Object::Number(right_value)) => {
+						self.push_obj(Object::Number(left_value.divide(&right_value)));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
-						self.push_obj(Object::Integer(BigSint::from(
+						self.push_obj(Object::Number(BigFraction::from(BigSint::from(
 							left_string.matches(right_string.as_str()).count() as i64,
-						)));
+						))));
 					},
 					(left, right) => unimplemented!(
 						"Slash operation on objects of type {} and {}",
@@ -755,13 +766,15 @@ impl Execution {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
 				match (left, right) {
-					(Object::List(vec), Object::Integer(index)) => {
+					(Object::List(vec), Object::Number(index)) => {
+						let index_as_usize =
+							i64::try_from(&BigSint::try_from(&index).unwrap()).unwrap() as usize;
 						self.push_obj(
-							vec.get(i64::try_from(&index).unwrap() as usize)
+							vec.get(index_as_usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
-										i64::try_from(&index).unwrap(),
+										index_as_usize,
 										0,
 										vec.len() - 1
 									)
@@ -769,15 +782,17 @@ impl Execution {
 								.clone(),
 						);
 					},
-					(Object::String(string), Object::Integer(index)) => {
+					(Object::String(string), Object::Number(index)) => {
+						let index_as_usize =
+							i64::try_from(&BigSint::try_from(&index).unwrap()).unwrap() as usize;
 						self.push_obj(Object::String(
 							string
 								.chars()
-								.nth(i64::try_from(&index).unwrap() as usize)
+								.nth(index_as_usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"String index {} out of range {}-{}",
-										i64::try_from(&index).unwrap(),
+										index_as_usize,
 										0,
 										string.chars().count() - 1
 									)
@@ -837,13 +852,15 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
 					},
-					(Object::Integer(index), Object::List(vec)) => {
+					(Object::Number(index), Object::List(vec)) => {
+						let index_as_usize =
+							i64::try_from(&BigSint::try_from(&index).unwrap()).unwrap() as usize;
 						self.push_obj(
-							vec.get(i64::try_from(&index).unwrap() as usize)
+							vec.get(index_as_usize)
 								.unwrap_or_else(|| {
 									panic!(
 										"List index {} out of range {}-{}",
-										i64::try_from(&index).unwrap(),
+										index_as_usize,
 										0,
 										vec.len() - 1
 									)
@@ -1091,8 +1108,14 @@ fn perform_signal_past_root(signal: Object) -> Object {
 	match signal {
 		Object::Context(var_table) => match var_table.get("name") {
 			Some(Object::String(sig_name)) if sig_name == "print" => match var_table.get("value") {
-				Some(Object::Integer(value)) => {
-					print!("{}", value.to_string_base10());
+				Some(Object::Number(value)) => {
+					let numerator_str = value.numerator().to_string_base10();
+					if value.denominator() == &BigSint::from(1u64) {
+						print!("{}", numerator_str);
+					} else {
+						let denominator_str = value.denominator().to_string_base10();
+						print!("{}/{}", numerator_str, denominator_str);
+					}
 					Object::Nothing
 				},
 				Some(Object::String(string)) => {
@@ -1240,7 +1263,8 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			let has_loop_counter = !sp_stmts.is_empty();
 			if has_loop_counter {
 				// Loop counter for the separator.
-				sir_instrs.push(SirInstr::PushConstant { value: Object::Integer(BigSint::zero()) });
+				sir_instrs
+					.push(SirInstr::PushConstant { value: Object::Number(BigFraction::zero()) });
 			}
 			let mut sp_sir = Vec::new();
 			if !sp_stmts.is_empty() {
@@ -1262,7 +1286,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				if has_loop_counter {
 					// Increment the loop counter.
 					bd_sir.push(SirInstr::PushConstant {
-						value: Object::Integer(BigSint::from(1i64)),
+						value: Object::Number(BigFraction::from(BigSint::from(1i64))),
 					});
 					bd_sir.push(SirInstr::Plus);
 				}
@@ -1363,9 +1387,9 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 		},
 		Expr::NothingLiteral => sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing }),
 		Expr::IntegerLiteral(integer_string) => sir_instrs.push(SirInstr::PushConstant {
-			value: Object::Integer(
+			value: Object::Number(BigFraction::from(
 				BigSint::from_string_base10(integer_string).expect("TODO: better integer parsing"),
-			),
+			)),
 		}),
 		Expr::StringLiteral(string_string) => {
 			sir_instrs.push(SirInstr::PushConstant { value: Object::String(string_string.clone()) })
@@ -1389,8 +1413,9 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 		Expr::Unop(unop) => match unop {
 			Unop::Negate(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
-				sir_instrs
-					.push(SirInstr::PushConstant { value: Object::Integer(BigSint::from(-1i64)) });
+				sir_instrs.push(SirInstr::PushConstant {
+					value: Object::Number(BigFraction::from(BigSint::from(-1i64))),
+				});
 				sir_instrs.push(SirInstr::Star);
 			},
 			Unop::ReadFile(expr) => {

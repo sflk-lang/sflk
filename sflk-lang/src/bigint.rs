@@ -3,11 +3,12 @@
 //! from the usual 64 bits size limitation.
 //!
 //! There are a lot of stuff here that can be optimized.
+//! There are also a lot of unit tests to write.
 
 use std::cmp::Ordering;
 
 /// The type of one digit.
-/// 
+///
 /// It does not have to be `u8`, this is an arbitrary decision,
 /// and an uneducated guess at that.
 /// I heard Python uses digits that fit closely in 32-bits or something,
@@ -237,7 +238,7 @@ impl BigUint {
 
 	#[must_use]
 	fn multiply(&self, other: &BigUint) -> BigUint {
-		// (https://en.wikipedia.org/wiki/Multiplication_algorithm#Long_multiplication)
+		// See [https://en.wikipedia.org/wiki/Multiplication_algorithm#Long_multiplication].
 		let mut res = BigUint::zeros(self.digits.len() + other.digits.len());
 		for other_i in 0..other.digits.len() {
 			let mut carry = 0;
@@ -324,186 +325,8 @@ impl BigUint {
 	}
 }
 
-/// A signed big integer.
-#[derive(Clone, Debug)]
-pub struct BigSint {
-	biguint: BigUint,
-	/// The value zero does not have a specific sign, this can be whatever for zero.
-	is_negative: bool,
-}
-
-impl PartialEq for BigSint {
-	fn eq(&self, other: &Self) -> bool {
-		self.biguint == other.biguint
-			&& (self.is_negative == other.is_negative || self.biguint.is_zero())
-	}
-}
-
-impl Eq for BigSint {}
-
-impl PartialOrd for BigSint {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl Ord for BigSint {
-	fn cmp(&self, other: &BigSint) -> Ordering {
-		if self.biguint.is_zero() && other.biguint.is_zero() {
-			return Ordering::Equal;
-		}
-		let unsigned_cmp = self.biguint.cmp(&other.biguint);
-		match (self.is_negative, other.is_negative) {
-			(false, false) => unsigned_cmp,
-			(true, true) => unsigned_cmp.reverse(),
-			(true, false) => Ordering::Less,
-			(false, true) => Ordering::Greater,
-		}
-	}
-}
-
-impl TryFrom<&BigSint> for i64 {
-	type Error = DoesNotFit;
-
-	fn try_from(value: &BigSint) -> Result<i64, DoesNotFit> {
-		let biguint_as_u64: u64 = (&value.biguint).try_into()?;
-		let biguint_as_i64: i64 = biguint_as_u64.try_into().map_err(|_| DoesNotFit)?;
-		Ok(biguint_as_i64 * if value.is_negative { -1 } else { 1 })
-	}
-}
-
-impl From<u64> for BigSint {
-	fn from(value: u64) -> BigSint {
-		BigSint {
-			biguint: BigUint::from(value),
-			is_negative: false,
-		}
-	}
-}
-
-impl From<i64> for BigSint {
-	fn from(value: i64) -> BigSint {
-		BigSint {
-			biguint: BigUint::from(value.abs() as u64),
-			is_negative: value < 0,
-		}
-	}
-}
-
-impl BigSint {
-	pub fn zero() -> BigSint {
-		BigSint { biguint: BigUint::zero(), is_negative: false }
-	}
-
-	pub fn from_bool(value: bool) -> BigSint {
-		if value {
-			BigSint::from(1i64)
-		} else {
-			BigSint::zero()
-		}
-	}
-
-	fn from_biguint(biguint: BigUint) -> BigSint {
-		BigSint { biguint, is_negative: false }
-	}
-
-	pub fn from_string_base10(string: &str) -> Result<BigSint, ()> {
-		Ok(BigSint::from_biguint(BigUint::from_string_base10(string)?))
-	}
-
-	pub fn to_string_base10(&self) -> String {
-		String::from(if self.is_negative { "-" } else { "" }) + &self.biguint.to_string_base10()
-	}
-
-	pub fn is_zero(&self) -> bool {
-		self.biguint.is_zero()
-	}
-
-	fn add_in_place_ex(&mut self, other: &BigSint, flip_other_sign: bool) {
-		let other_is_negative = if flip_other_sign {
-			!other.is_negative
-		} else {
-			other.is_negative
-		};
-		match (self.is_negative, other_is_negative) {
-			(false, false) | (true, true) => self.biguint.add_in_place(&other.biguint),
-			(false, true) if self.biguint >= other.biguint => {
-				// (+8) + (-3) = +5 = +(8 - 3)
-				self.biguint.subtract_in_place(&other.biguint);
-				self.is_negative = false;
-			},
-			(false, true) => {
-				// (+3) + (-8) = -5 = -(8 - 3)
-				self.biguint = other.biguint.subtract(&self.biguint);
-				self.is_negative = true;
-			},
-			(true, false) if self.biguint > other.biguint => {
-				// (-8) + (+3) = -5 = -(8 - 3)
-				self.biguint.subtract_in_place(&other.biguint);
-				self.is_negative = true;
-			},
-			(true, false) => {
-				// (-3) + (+8) = +5 = +(8 - 3)
-				self.biguint = other.biguint.subtract(&self.biguint);
-				self.is_negative = false;
-			},
-		}
-	}
-
-	fn add_in_place(&mut self, other: &BigSint) {
-		self.add_in_place_ex(other, false);
-	}
-
-	#[must_use]
-	pub fn add(&self, other: &BigSint) -> BigSint {
-		let mut res = self.clone();
-		res.add_in_place(other);
-		res
-	}
-
-	fn subtract_in_place(&mut self, other: &BigSint) {
-		self.add_in_place_ex(other, true);
-	}
-
-	#[must_use]
-	pub fn subtract(&self, other: &BigSint) -> BigSint {
-		let mut res = self.clone();
-		res.subtract_in_place(other);
-		res
-	}
-
-	fn multiply_in_place(&mut self, other: &BigSint) {
-		let res = self.multiply(other);
-		*self = res;
-	}
-
-	#[must_use]
-	pub fn multiply(&self, other: &BigSint) -> BigSint {
-		let biguint = self.biguint.multiply(&other.biguint);
-		BigSint {
-			biguint,
-			is_negative: self.is_negative ^ other.is_negative,
-		}
-	}
-
-	/// Here, `self` is the numerator.
-	/// The output is (quotient, remainder).
-	#[must_use]
-	pub fn euclidian_divide(&self, denominator: &BigSint) -> (BigSint, BigSint) {
-		assert!(
-			!denominator.is_negative,
-			"euclidian division by a negative number"
-		);
-		let (q, r) = self.biguint.euclidian_divide(&denominator.biguint);
-		(
-			BigSint { biguint: q, is_negative: self.is_negative },
-			BigSint::from_biguint(r),
-		)
-	}
-}
-
 #[cfg(test)]
-mod tests {
+mod test_big_uint {
 	use super::*;
 
 	#[test]
@@ -680,5 +503,430 @@ mod tests {
 				b
 			);
 		}
+	}
+}
+
+/// A signed big integer.
+#[derive(Clone, Debug)]
+pub struct BigSint {
+	biguint: BigUint,
+	/// The value zero does not have a specific sign, this can be whatever for zero.
+	is_negative: bool,
+}
+
+impl PartialEq for BigSint {
+	fn eq(&self, other: &Self) -> bool {
+		self.biguint == other.biguint
+			&& (self.is_negative == other.is_negative || self.biguint.is_zero())
+	}
+}
+
+impl Eq for BigSint {}
+
+impl PartialOrd for BigSint {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for BigSint {
+	fn cmp(&self, other: &BigSint) -> Ordering {
+		if self.biguint.is_zero() && other.biguint.is_zero() {
+			return Ordering::Equal;
+		}
+		let unsigned_cmp = self.biguint.cmp(&other.biguint);
+		match (self.is_negative, other.is_negative) {
+			(false, false) => unsigned_cmp,
+			(true, true) => unsigned_cmp.reverse(),
+			(true, false) => Ordering::Less,
+			(false, true) => Ordering::Greater,
+		}
+	}
+}
+
+impl TryFrom<&BigSint> for i64 {
+	type Error = DoesNotFit;
+
+	fn try_from(value: &BigSint) -> Result<i64, DoesNotFit> {
+		let biguint_as_u64: u64 = (&value.biguint).try_into()?;
+		let biguint_as_i64: i64 = biguint_as_u64.try_into().map_err(|_| DoesNotFit)?;
+		Ok(biguint_as_i64 * if value.is_negative { -1 } else { 1 })
+	}
+}
+
+impl From<u64> for BigSint {
+	fn from(value: u64) -> BigSint {
+		BigSint { biguint: BigUint::from(value), is_negative: false }
+	}
+}
+
+impl From<i64> for BigSint {
+	fn from(value: i64) -> BigSint {
+		BigSint {
+			biguint: BigUint::from(value.abs() as u64),
+			is_negative: value < 0,
+		}
+	}
+}
+
+impl BigSint {
+	pub fn zero() -> BigSint {
+		BigSint { biguint: BigUint::zero(), is_negative: false }
+	}
+
+	pub fn from_bool(value: bool) -> BigSint {
+		if value {
+			BigSint::from(1i64)
+		} else {
+			BigSint::zero()
+		}
+	}
+
+	fn from_biguint(biguint: BigUint) -> BigSint {
+		BigSint { biguint, is_negative: false }
+	}
+
+	pub fn from_string_base10(string: &str) -> Result<BigSint, ()> {
+		Ok(BigSint::from_biguint(BigUint::from_string_base10(string)?))
+	}
+
+	pub fn to_string_base10(&self) -> String {
+		String::from(if self.is_negative { "-" } else { "" }) + &self.biguint.to_string_base10()
+	}
+
+	pub fn is_zero(&self) -> bool {
+		self.biguint.is_zero()
+	}
+
+	pub fn is_negative(&self) -> bool {
+		self.is_negative
+	}
+
+	fn negate_in_place(&mut self) {
+		// Rust does not have a `bool::toggle()` method smh.
+		self.is_negative = !self.is_negative;
+	}
+
+	fn abs(mut self) -> BigSint {
+		self.is_negative = false;
+		self
+	}
+
+	fn add_in_place_ex(&mut self, other: &BigSint, flip_other_sign: bool) {
+		let other_is_negative = if flip_other_sign {
+			!other.is_negative
+		} else {
+			other.is_negative
+		};
+		match (self.is_negative, other_is_negative) {
+			(false, false) | (true, true) => self.biguint.add_in_place(&other.biguint),
+			(false, true) if self.biguint >= other.biguint => {
+				// (+8) + (-3) = +5 = +(8 - 3)
+				self.biguint.subtract_in_place(&other.biguint);
+				self.is_negative = false;
+			},
+			(false, true) => {
+				// (+3) + (-8) = -5 = -(8 - 3)
+				self.biguint = other.biguint.subtract(&self.biguint);
+				self.is_negative = true;
+			},
+			(true, false) if self.biguint > other.biguint => {
+				// (-8) + (+3) = -5 = -(8 - 3)
+				self.biguint.subtract_in_place(&other.biguint);
+				self.is_negative = true;
+			},
+			(true, false) => {
+				// (-3) + (+8) = +5 = +(8 - 3)
+				self.biguint = other.biguint.subtract(&self.biguint);
+				self.is_negative = false;
+			},
+		}
+	}
+
+	fn add_in_place(&mut self, other: &BigSint) {
+		self.add_in_place_ex(other, false);
+	}
+
+	#[must_use]
+	pub fn add(&self, other: &BigSint) -> BigSint {
+		let mut res = self.clone();
+		res.add_in_place(other);
+		res
+	}
+
+	fn subtract_in_place(&mut self, other: &BigSint) {
+		self.add_in_place_ex(other, true);
+	}
+
+	#[must_use]
+	pub fn subtract(&self, other: &BigSint) -> BigSint {
+		let mut res = self.clone();
+		res.subtract_in_place(other);
+		res
+	}
+
+	fn multiply_in_place(&mut self, other: &BigSint) {
+		let res = self.multiply(other);
+		*self = res;
+	}
+
+	#[must_use]
+	pub fn multiply(&self, other: &BigSint) -> BigSint {
+		let biguint = self.biguint.multiply(&other.biguint);
+		BigSint {
+			biguint,
+			is_negative: self.is_negative ^ other.is_negative,
+		}
+	}
+
+	/// Here, `self` is the numerator.
+	/// The output is (quotient, remainder).
+	#[must_use]
+	pub fn euclidian_divide(&self, denominator: &BigSint) -> (BigSint, BigSint) {
+		assert!(
+			!denominator.is_negative,
+			"euclidian division by a negative number"
+		);
+		let (q, r) = self.biguint.euclidian_divide(&denominator.biguint);
+		(
+			BigSint { biguint: q, is_negative: self.is_negative },
+			BigSint::from_biguint(r),
+		)
+	}
+}
+
+/// A big fraction (arbitrarly precise).
+///
+/// It must always be simplified.
+#[derive(Clone, Debug)]
+pub struct BigFraction {
+	numerator: BigSint,
+	/// The `denominator` must be positive when the fraction is simplified
+	/// (so that this can be relied on to simplify code).
+	/// The `denominator` must never be zero.
+	/// The `denominator` can be whatever it wants when the `numerator` is zero
+	/// (but still not zero and still positive).
+	denominator: BigSint,
+}
+
+impl PartialEq for BigFraction {
+	fn eq(&self, other: &Self) -> bool {
+		(self.numerator.is_zero() && other.numerator.is_zero())
+			|| (self.numerator == other.numerator && self.denominator == other.denominator)
+	}
+}
+
+impl Eq for BigFraction {}
+
+impl PartialOrd for BigFraction {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for BigFraction {
+	fn cmp(&self, other: &BigFraction) -> Ordering {
+		// (a/b) < (c/d) iff (a*d) < (c*b) assuming non-zero denominators.
+		(self.numerator.multiply(&other.denominator))
+			.cmp(&other.numerator.multiply(&self.denominator))
+	}
+}
+
+impl BigFraction {
+	pub fn numerator(&self) -> &BigSint {
+		&self.numerator
+	}
+
+	pub fn denominator(&self) -> &BigSint {
+		&self.denominator
+	}
+}
+
+#[derive(Debug)]
+pub struct NotAnInteger;
+
+impl TryFrom<&BigFraction> for BigSint {
+	type Error = NotAnInteger;
+
+	fn try_from(value: &BigFraction) -> Result<BigSint, NotAnInteger> {
+		if value.numerator.is_zero() {
+			Ok(BigSint::zero())
+		} else if value.denominator == BigSint::from(1u64) {
+			Ok(value.numerator.clone())
+		} else {
+			Err(NotAnInteger)
+		}
+	}
+}
+
+impl From<u64> for BigFraction {
+	fn from(value: u64) -> BigFraction {
+		BigFraction::from_integers(BigSint::from(value), BigSint::from(1u64))
+	}
+}
+
+impl From<i64> for BigFraction {
+	fn from(value: i64) -> BigFraction {
+		BigFraction::from_integers(BigSint::from(value), BigSint::from(1u64))
+	}
+}
+
+impl From<BigSint> for BigFraction {
+	fn from(value: BigSint) -> BigFraction {
+		BigFraction::from_integers(value, BigSint::from(1u64))
+	}
+}
+
+fn gcd(mut a: BigSint, mut b: BigSint) -> BigSint {
+	if a < b {
+		// We want `a` to be greater than `b`.
+		gcd(b, a)
+	} else {
+		// Here `a` is greater than `b`.
+		// See [https://en.wikipedia.org/wiki/Greatest_common_divisor#Euclidean_algorithm].
+		while !b.is_zero() {
+			let a_mod_b = a.euclidian_divide(&b).1;
+			(a, b) = (b, a_mod_b);
+		}
+		a
+	}
+}
+
+impl BigFraction {
+	pub fn zero() -> BigFraction {
+		BigFraction {
+			numerator: BigSint::from(0u64),
+			denominator: BigSint::from(1u64),
+		}
+	}
+
+	fn from_integers(numerator: BigSint, denominator: BigSint) -> BigFraction {
+		let mut big_fraction = BigFraction { numerator, denominator };
+		big_fraction.simplify_in_place();
+		big_fraction
+	}
+
+	pub fn is_zero(&self) -> bool {
+		self.numerator.is_zero()
+	}
+
+	fn simplify_in_place(&mut self) {
+		// Ensure that the denominator is strictly positive.
+		assert!(!self.denominator.is_zero());
+		if self.denominator.is_negative() {
+			self.numerator.negate_in_place();
+			self.denominator.negate_in_place();
+		}
+
+		// Simplify by the GCD.
+		let num_den_gcd = gcd(self.numerator.clone().abs(), self.denominator.clone().abs());
+		let (new_numerator, zero) = self.numerator.euclidian_divide(&num_den_gcd);
+		assert!(zero.is_zero());
+		let (new_denominator, zero) = self.denominator.euclidian_divide(&num_den_gcd);
+		assert!(zero.is_zero());
+		self.numerator = new_numerator;
+		self.denominator = new_denominator;
+	}
+
+	#[must_use]
+	fn simplify(&self) -> BigFraction {
+		let mut res = self.clone();
+		res.simplify_in_place();
+		res
+	}
+
+	fn is_negative(&self) -> bool {
+		self.numerator.is_negative()
+	}
+
+	fn negate_in_place(&mut self) {
+		self.numerator.negate_in_place()
+	}
+
+	fn add_in_place(&mut self, other: &BigFraction) {
+		let res = self.add(other);
+		*self = res;
+	}
+
+	#[must_use]
+	pub fn add(&self, other: &BigFraction) -> BigFraction {
+		let (a, b, c, d) = (
+			&self.numerator,
+			&self.denominator,
+			&other.numerator,
+			&other.denominator,
+		);
+		// (a/b) + (c/d) = (a*d)/(b*d) + (c*b)/(b*d) = (a*d + c*b)/(b*d)
+		BigFraction::from_integers((a.multiply(&d)).add(&c.multiply(&b)), b.multiply(&d))
+	}
+
+	fn subtract_in_place(&mut self, other: &BigFraction) {
+		let res = self.subtract(other);
+		*self = res;
+	}
+
+	#[must_use]
+	pub fn subtract(&self, other: &BigFraction) -> BigFraction {
+		let (a, b, c, d) = (
+			&self.numerator,
+			&self.denominator,
+			&other.numerator,
+			&other.denominator,
+		);
+		// (a/b) - (c/d) = (a*d)/(b*d) - (c*b)/(b*d) = (a*d - c*b)/(b*d)
+		BigFraction::from_integers((a.multiply(&d)).subtract(&c.multiply(&b)), b.multiply(&d))
+	}
+
+	fn multiply_in_place(&mut self, other: &BigFraction) {
+		self.numerator.multiply_in_place(&other.numerator);
+		// Both denominators are strictly positive so their product is strictly positive.
+		self.denominator.multiply_in_place(&other.denominator);
+		self.simplify_in_place();
+	}
+
+	#[must_use]
+	pub fn multiply(&self, other: &BigFraction) -> BigFraction {
+		BigFraction::from_integers(
+			self.numerator.multiply(&other.numerator),
+			self.denominator.multiply(&other.denominator),
+		)
+	}
+
+	fn invert_in_place(&mut self) {
+		assert!(!self.is_zero(), "invert of zero");
+		std::mem::swap(&mut self.numerator, &mut self.denominator);
+		self.simplify_in_place();
+	}
+
+	fn invert(&self) -> BigFraction {
+		assert!(!self.is_zero(), "invert of zero");
+		BigFraction::from_integers(self.denominator.clone(), self.numerator.clone())
+	}
+
+	fn divide_in_place(&mut self, other: &BigFraction) {
+		self.multiply_in_place(&other.invert());
+		self.simplify_in_place();
+	}
+
+	#[must_use]
+	pub fn divide(&self, other: &BigFraction) -> BigFraction {
+		self.multiply(&other.invert()).simplify()
+	}
+}
+
+#[cfg(test)]
+mod test_big_fraction {
+	use super::*;
+
+	#[test]
+	fn gcd_calculation() {
+		assert_eq!(
+			gcd(BigSint::from(48u64), BigSint::from(18u64)),
+			BigSint::from(6u64)
+		);
+		assert_eq!(
+			gcd(BigSint::from(4800000u64), BigSint::from(1800000u64)),
+			BigSint::from(600000u64)
+		);
 	}
 }
