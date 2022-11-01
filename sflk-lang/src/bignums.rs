@@ -6,7 +6,19 @@
 mod big_unit {
 	use std::cmp::Ordering;
 
+	/// The type of one digit. The base used for the representation of the digits is `BASE`,
+	/// which should be the number of values that the `Digit` type can represent.
+	///
+	/// It does not have to be `u8` (although some tests may rely on that),
+	/// this is an arbitrary decision, and an uneducated guess at that.
+	///
+	/// TODO: Benchmark heavy math hapenning with different types for `Digit`.
+	/// I heard Python uses digits that fit closely in 32-bits or something,
+	/// maybe a `u32` could be more appropriate.
 	type Digit = u8;
+
+	/// The base should be of type `u64` (as a lot of computations are done with `u64`s)
+	/// and is the number of values that the `Digit` type can represent.
 	const BASE: u64 = Digit::MAX as u64 + 1;
 
 	/// Unsigned big integer. Actually a list of digits in base `BASE`
@@ -25,6 +37,17 @@ mod big_unit {
 	}
 
 	impl BigUint {
+		/// Interpret the given list of digits as a sequence of digits that make up a number
+		/// which is the value of the `BigUint` that is returned. The given digits are
+		/// interpreted as the most significant digits being at the back
+		/// (i.e. it is written "backwards", "from right to left").
+		///
+		/// This is faster than `from_digits_with_most_significant_at_the_beginning` as
+		/// the most significant digits being at the back is already the layout of `BigUint`.
+		///
+		/// For example, in base 10, giving `digits` = `vec![4, 3, 2, 1]` would construct
+		/// a `BigUint` that represents the value 1234.
+		/// Note: The base is not 10.
 		fn from_digits_with_most_significant_at_the_back(mut digits: Vec<Digit>) -> BigUint {
 			// The `digits` vector is already in the expected orientation for `BigUint`.
 
@@ -36,6 +59,16 @@ mod big_unit {
 			BigUint { digits }
 		}
 
+		/// Interpret the given list of digits as a sequence of digits that make up a number
+		/// which is the value of the `BigUint` that is returned. The given digits are
+		/// interpreted as the least significant digits being at the back
+		/// (i.e. it is written "normally", "forward", "from left to right").
+		///
+		/// This is slower than `from_digits_with_most_significant_at_the_back`.
+		///
+		/// For example, in base 10, giving `digits` = `vec![1, 2, 3, 4]` would construct
+		/// a `BigUint` that represents the value 1234.
+		/// Note: The base is not 10.
 		fn from_digits_with_most_significant_at_the_beginning(mut digits: Vec<Digit>) -> BigUint {
 			// The `digits` vector is NOT in the expected orientation for `BigUint`,
 			// it must be reversed.
