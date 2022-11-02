@@ -6,7 +6,7 @@
 mod big_unit {
 	use std::{
 		cmp::Ordering,
-		ops::{Add, AddAssign, Sub, SubAssign},
+		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
 	};
 
 	/// The type of one digit. The base used for the representation of the digits is `BASE`,
@@ -288,19 +288,19 @@ mod big_unit {
 					self.digits.push(0);
 				}
 
-				let self_digit = self.digits[i];
-				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i);
+				let self_digit = self.digits[i] as u64;
+				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i) as u64;
 
 				// Perform one step of the addition, adding digit to digit and
 				// handling the carry.
-				let digit_sum = self_digit as u64 + rhs_digit as u64 + carry;
+				let digit_sum = self_digit + rhs_digit + carry;
 				self.digits[i] = (digit_sum % BASE) as Digit;
-				let digit_sum_remians = digit_sum;
+				let digit_sum_remians_devided_by_base = digit_sum / BASE;
 
 				// The next iteration will be over one digit "to the left" (more significant),
 				// thus this `carry` will be worth more (times `BASE` more) than during
-				// this step, so is has to be divided by `BASE` to conserve value.
-				carry = digit_sum_remians / BASE;
+				// this step, so is had to be divided by `BASE` to conserve value.
+				carry = digit_sum_remians_devided_by_base;
 				assert!(carry == 0 || carry == 1);
 			}
 
@@ -365,11 +365,11 @@ mod big_unit {
 				}
 
 				let mut value_from_which_to_subtract = self.digits[i] as u64;
-				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i);
+				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i) as u64;
 
 				// Perform one step of the subtraction, subtracting digit to digit and
 				// handling the carry.
-				let value_to_subtract = rhs_digit as u64 + carry;
+				let value_to_subtract = rhs_digit + carry;
 				carry = 0;
 				if value_from_which_to_subtract < value_to_subtract {
 					// The digit from `self` to subtract to is not high enough,
@@ -436,6 +436,90 @@ mod big_unit {
 		}
 	}
 
+	impl Mul<&BigUint> for &BigUint {
+		type Output = BigUint;
+
+		fn mul(self, rhs: &BigUint) -> BigUint {
+			// See [https://en.wikipedia.org/wiki/Multiplication_algorithm#Long_multiplication]
+			// for more explanations on the algorithm used here.
+			// It does not quite works in the same order we (at least in France) do it on paper
+			// (doing number by digit multiplications, and then doing the sum of all the
+			// intermediary results). Instead, it does digit by digit multiplications for all
+			// the pairs of digits in the input, in an order that is similar to directly adding
+			// the "current intermediary result (that is still not complete)" on the final result,
+			// with a carry for the addition. Whatever, it works (and is more efficient than
+			// would be storing all the intermediary results to add them later, or even just store
+			// one intermediary result).
+
+			let mut res_digits =
+				Vec::from_iter(std::iter::repeat(0).take(self.digits.len() + rhs.digits.len()));
+
+			for i_rhs in 0..rhs.digits.len() {
+				let mut carry = 0;
+				for i_self in 0..self.digits.len() {
+					let self_digit = self.digits[i_self] as u64;
+					let rhs_digit = rhs.digits[i_rhs] as u64;
+					let i_res = i_self + i_rhs;
+					let target_digit_before = res_digits[i_res] as u64;
+
+					// Perform one step of the multiplication, multiplying digit to digit,
+					// adding it to the result and handling the carry for the ongoing
+					// addition.
+					let input_digit_product = self_digit * rhs_digit;
+					let digit_sum = target_digit_before + input_digit_product + carry;
+					res_digits[i_res] = (digit_sum % BASE) as Digit;
+					let digit_sum_remians_devided_by_base = digit_sum / BASE;
+
+					// The next iteration will be over one digit "to the left" (more significant)
+					// regarding the ongoing addition to the result,
+					// thus this `carry` will be worth more (times `BASE` more) than during
+					// this step, so is had to be divided by `BASE` to conserve value.
+					carry = digit_sum_remians_devided_by_base;
+				}
+				// If any `carry` remains after all the digits to add, it must still be
+				// counted in the result so as to not lose any value.
+				// There is nothing in `res_digits` at this index yet, so there is
+				// no need to add the `carry` to what was there before (which would be 0 anyway).
+				res_digits[self.digits.len() + i_rhs] = carry as Digit;
+			}
+
+			// This conversion will take care of the potential remaining
+			// insignificant leading zeros.
+			BigUint::from_digits_with_most_significant_at_the_back(res_digits)
+		}
+	}
+	impl Mul<BigUint> for &BigUint {
+		type Output = BigUint;
+		fn mul(self, rhs: BigUint) -> BigUint {
+			let res = self * &rhs;
+			res
+		}
+	}
+	impl Mul<&BigUint> for BigUint {
+		type Output = BigUint;
+		fn mul(mut self, rhs: &BigUint) -> BigUint {
+			self = &self * rhs;
+			self
+		}
+	}
+	impl Mul<BigUint> for BigUint {
+		type Output = BigUint;
+		fn mul(mut self, rhs: BigUint) -> BigUint {
+			self = &self * &rhs;
+			self
+		}
+	}
+	impl MulAssign<BigUint> for BigUint {
+		fn mul_assign(&mut self, rhs: BigUint) {
+			*self = &*self * &rhs;
+		}
+	}
+	impl MulAssign<&BigUint> for BigUint {
+		fn mul_assign(&mut self, rhs: &BigUint) {
+			*self = &*self * rhs;
+		}
+	}
+
 	#[cfg(test)]
 	mod tests {
 		use super::*;
@@ -451,7 +535,11 @@ mod big_unit {
 			let values: Vec<u64> = vec![
 				0,
 				1,
+				8,
+				17,
+				42,
 				69,
+				100000000,
 				123456789,
 				0x123456789ABCDEF,
 				BASE - 1,
@@ -562,7 +650,7 @@ mod big_unit {
 					let bu_b = BigUint::from(value_b);
 					let big_sum_a_b = {
 						let mut tmp = bu_a.clone();
-						tmp += bu_b.clone();
+						tmp += &bu_b;
 						tmp
 					};
 					assert!(
@@ -586,7 +674,7 @@ mod big_unit {
 						big_sum_a_b,
 						{
 							let mut tmp = bu_a.clone();
-							tmp += &bu_b;
+							tmp += bu_b.clone();
 							tmp
 						},
 						"one of the `impl`s is missbehaving"
@@ -625,7 +713,7 @@ mod big_unit {
 						let bu_b = BigUint::from(value_b);
 						let big_subtration_a_b = {
 							let mut tmp = bu_a.clone();
-							tmp -= bu_b.clone();
+							tmp -= &bu_b;
 							tmp
 						};
 						assert!(
@@ -640,12 +728,13 @@ mod big_unit {
 							"BigUint subctarction behaves differently from Rusts's"
 						);
 
-						// Check consistency accross all the `impl` blocks related to the subtraction.
+						// Check consistency accross all the `impl` blocks related
+						// to the subtraction.
 						assert_eq!(
 							big_subtration_a_b,
 							{
 								let mut tmp = bu_a.clone();
-								tmp -= &bu_b;
+								tmp -= bu_b.clone();
 								tmp
 							},
 							"one of the `impl`s is missbehaving"
@@ -671,6 +760,77 @@ mod big_unit {
 							"one of the `impl`s is missbehaving"
 						);
 					}
+				}
+			}
+		}
+
+		#[test]
+		#[should_panic]
+		fn sub_small_minus_big() {
+			// 8 - 42 = -34 which require a sign (not available with `BigUint`),
+			// so this should not work and is expected to panic.
+			let _does_not_work = BigUint::from(8u64) - BigUint::from(42u64);
+		}
+
+		#[test]
+		fn mul() {
+			for value_a in some_values() {
+				let bu_a = BigUint::from(value_a);
+				for value_b in some_values() {
+					let bu_b = BigUint::from(value_b);
+					let big_product_a_b = &bu_a * &bu_b;
+					assert!(
+						!big_product_a_b.has_illegal_leading_zeros(),
+						"illegal leading zeros in BigUint resulting from multiplication"
+					);
+
+					// Check against Rust's result, if available.
+					if let Some(product_a_b) = value_a.checked_mul(value_b) {
+						let product_a_b_after = u64::try_from(&big_product_a_b).expect(
+							"the checked multiplication passed, \
+							thus this was expected to pass too",
+						);
+						assert_eq!(
+							product_a_b, product_a_b_after,
+							"BigUint multiplication behaves differently from Rusts's"
+						);
+					}
+
+					// Check consistency accross all the `impl` blocks related
+					// to the multiplication.
+					assert_eq!(
+						big_product_a_b,
+						&bu_a * bu_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						bu_a.clone() * &bu_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						bu_a.clone() * bu_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						{
+							let mut tmp = bu_a.clone();
+							tmp *= &bu_b;
+							tmp
+						},
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						{
+							let mut tmp = bu_a.clone();
+							tmp *= bu_b.clone();
+							tmp
+						},
+						"one of the `impl`s is missbehaving"
+					);
 				}
 			}
 		}
