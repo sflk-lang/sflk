@@ -6,7 +6,7 @@
 mod big_unit {
 	use std::{
 		cmp::Ordering,
-		ops::{Add, AddAssign},
+		ops::{Add, AddAssign, Sub, SubAssign},
 	};
 
 	/// The type of one digit. The base used for the representation of the digits is `BASE`,
@@ -26,7 +26,7 @@ mod big_unit {
 
 	/// Unsigned big integer. Actually a list of digits in base `BASE`
 	/// represented with the integer type `Digit`.
-	#[derive(Debug)]
+	#[derive(Clone, Debug)]
 	struct BigUint {
 		/// The most significants digits are at the back.
 		/// There shall not be insignificant leading zeros.
@@ -51,7 +51,7 @@ mod big_unit {
 		/// and all the methods shall not allow `self` or a returned `BigUint`
 		/// to contain insignificant leading zeros.
 		fn remove_illegal_leading_zeros(&mut self) {
-			while self.digits.last() == Some(&0) {
+			while self.digits.last().copied() == Some(0) {
 				self.digits.pop();
 			}
 		}
@@ -269,7 +269,11 @@ mod big_unit {
 
 	impl AddAssign<&BigUint> for BigUint {
 		fn add_assign(&mut self, rhs: &BigUint) {
+			// When a digit to digit addition produces a result too big to fit
+			// in the one digit being iterated over, this `carry` gets what
+			// remains from the digit to digit sum to carry to the next iteration.
 			let mut carry = 0;
+
 			// Iterating beginning from the least significant digits.
 			for i in 0.. {
 				if i >= self.digits.len() && i >= rhs.digits.len() && carry == 0 {
@@ -284,19 +288,28 @@ mod big_unit {
 					self.digits.push(0);
 				}
 
+				let self_digit = self.digits[i];
+				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i);
+
 				// Perform one step of the addition, adding digit to digit and
 				// handling the carry.
-				let (new_self_digit, next_carry) = {
-					let self_digit = self.digits[i];
-					let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i);
-					let digit_sum = self_digit as u64 + rhs_digit as u64 + carry;
-					((digit_sum % BASE) as Digit, digit_sum / BASE)
-				};
-				self.digits[i] = new_self_digit;
-				carry = next_carry;
+				let digit_sum = self_digit as u64 + rhs_digit as u64 + carry;
+				self.digits[i] = (digit_sum % BASE) as Digit;
+				let digit_sum_remians = digit_sum;
+
+				// The next iteration will be over one digit "to the left" (more significant),
+				// thus this `carry` will be worth more (times `BASE` more) than during
+				// this step, so is has to be divided by `BASE` to conserve value.
+				carry = digit_sum_remians / BASE;
+				assert!(carry == 0 || carry == 1);
 			}
 
 			self.remove_illegal_leading_zeros();
+		}
+	}
+	impl AddAssign<BigUint> for BigUint {
+		fn add_assign(&mut self, rhs: BigUint) {
+			*self += &rhs;
 		}
 	}
 	impl Add<&BigUint> for BigUint {
@@ -306,18 +319,110 @@ mod big_unit {
 			self
 		}
 	}
-	impl Add<BigUint> for &BigUint {
+	impl Add<BigUint> for BigUint {
 		type Output = BigUint;
-		fn add(self, mut rhs: BigUint) -> BigUint {
-			rhs += self;
-			rhs
+		fn add(mut self, rhs: BigUint) -> BigUint {
+			self += &rhs;
+			self
 		}
 	}
 	impl Add<&BigUint> for &BigUint {
 		type Output = BigUint;
 		fn add(self, rhs: &BigUint) -> BigUint {
-			let mut res = BigUint::zero();
+			let mut res = self.clone();
 			res += rhs;
+			res
+		}
+	}
+	impl Add<BigUint> for &BigUint {
+		type Output = BigUint;
+		fn add(self, mut rhs: BigUint) -> BigUint {
+			// `+` is commutative.
+			rhs += self;
+			rhs
+		}
+	}
+
+	impl SubAssign<&BigUint> for BigUint {
+		fn sub_assign(&mut self, rhs: &BigUint) {
+			let mut carry = 0;
+
+			// Iterating beginning from the least significant digits.
+			for i in 0.. {
+				if i >= rhs.digits.len() && carry == 0 {
+					// There is no digit left nor any carry to subtract from `self`.
+					break;
+				}
+
+				if i >= self.digits.len() {
+					// If we get to iterate past the most significant digit of `self`
+					// while still having digitis or carries to subtract, then it means
+					// that `self` was strictly bigger than `rhs`.
+					panic!("subtracting a BigUint from a smaller BigUint");
+				}
+
+				let mut value_from_which_to_subtract = self.digits[i] as u64;
+				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i);
+
+				// Perform one step of the subtraction, subtracting digit to digit and
+				// handling the carry.
+				let value_to_subtract = rhs_digit as u64 + carry;
+				carry = 0;
+				if value_from_which_to_subtract < value_to_subtract {
+					// The digit from `self` to subtract to is not high enough,
+					// so we "move" some value from the one digit of `self` "to the left"
+					// (more significant) to add to the current one. The carry will carry
+					// this information to the next iteration so that value is concerved.
+					let value_moved_from_next_iteration = BASE;
+					value_from_which_to_subtract += value_moved_from_next_iteration;
+					// The next iteration will be over one digit "to the left" (more significant),
+					// thus this `carry` will be worth more (times `BASE` more) than during
+					// this step, so is has to be divided by `BASE` to conserve value.
+					carry = value_moved_from_next_iteration / BASE;
+				}
+				assert!(carry == 0 || carry == 1);
+				let digit_subtraction = value_from_which_to_subtract - value_to_subtract;
+
+				assert!(
+					digit_subtraction < BASE,
+					"`digit_subtraction` is expected to fit in a digit"
+				);
+				self.digits[i] = digit_subtraction as Digit;
+			}
+		}
+	}
+	impl SubAssign<BigUint> for BigUint {
+		fn sub_assign(&mut self, rhs: BigUint) {
+			*self -= &rhs;
+		}
+	}
+	impl Sub<&BigUint> for BigUint {
+		type Output = BigUint;
+		fn sub(mut self, rhs: &BigUint) -> BigUint {
+			self -= rhs;
+			self
+		}
+	}
+	impl Sub<BigUint> for BigUint {
+		type Output = BigUint;
+		fn sub(mut self, rhs: BigUint) -> BigUint {
+			self -= &rhs;
+			self
+		}
+	}
+	impl Sub<&BigUint> for &BigUint {
+		type Output = BigUint;
+		fn sub(self, rhs: &BigUint) -> BigUint {
+			let mut res = self.clone();
+			res -= rhs;
+			res
+		}
+	}
+	impl Sub<BigUint> for &BigUint {
+		type Output = BigUint;
+		fn sub(self, rhs: BigUint) -> BigUint {
+			let mut res = self.clone();
+			res -= rhs;
 			res
 		}
 	}
@@ -326,17 +431,14 @@ mod big_unit {
 	mod tests {
 		use super::*;
 
-		/// A few integer values (in increasing order) to iterate over in tests.
+		/// A few integer values to iterate over in tests.
 		fn some_values() -> impl Iterator<Item = u64> {
-			assert!(69 < BASE - 1, "`values` should be strictly increasing");
-			assert!(
-				BASE + 1 < 123456789,
-				"`values` should be strictly increasing"
-			);
 			let values: Vec<u64> = vec![
 				0,
 				1,
 				69,
+				123456789,
+				0x123456789ABCDEF,
 				BASE - 1,
 				BASE,
 				BASE + 1,
@@ -426,7 +528,12 @@ mod big_unit {
 					assert_eq!(
 						value_a.cmp(&value_b),
 						bu_a.cmp(&bu_b),
-						"BigUint comparison behaves differently from Rust's"
+						"(compare A to B) BigUint comparison behaves differently from Rust's"
+					);
+					assert_eq!(
+						value_b.cmp(&value_a),
+						bu_b.cmp(&bu_a),
+						"(compare B to A) BigUint comparison behaves differently from Rust's"
 					);
 				}
 			}
@@ -437,15 +544,108 @@ mod big_unit {
 			for value_a in some_values() {
 				let bu_a = BigUint::from(value_a);
 				for value_b in some_values() {
+					let bu_b = BigUint::from(value_b);
+					let big_sum_a_b = {
+						let mut tmp = bu_a.clone();
+						tmp += bu_b.clone();
+						tmp
+					};
+
+					// Check against Rust's result, if available.
 					if let Some(sum_a_b) = value_a.checked_add(value_b) {
-						let bu_b = BigUint::from(value_b);
-						let big_sum_a_b = &bu_a + &bu_b;
 						let sum_a_b_after = u64::try_from(&big_sum_a_b).expect(
 							"the checked addition passed, thus this was expected to pass too",
 						);
 						assert_eq!(
 							sum_a_b, sum_a_b_after,
 							"BigUint addition behaves differently from Rusts's"
+						);
+					}
+
+					// Check consistency accross all the `impl` blocks related to the addition.
+					assert_eq!(
+						big_sum_a_b,
+						{
+							let mut tmp = bu_a.clone();
+							tmp += &bu_b;
+							tmp
+						},
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						&bu_a + &bu_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						&bu_a + bu_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						bu_a.clone() + &bu_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						bu_a.clone() + bu_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+				}
+			}
+		}
+
+		#[test]
+		fn sub() {
+			for value_a in some_values() {
+				let bu_a = BigUint::from(value_a);
+				for value_b in some_values() {
+					// If Rust can't do the subtraction, neither can we.
+					if let Some(subtraction_a_b) = value_a.checked_sub(value_b) {
+						let bu_b = BigUint::from(value_b);
+						let big_subtration_a_b = {
+							let mut tmp = bu_a.clone();
+							tmp -= bu_b.clone();
+							tmp
+						};
+
+						// Check against Rust's result.
+						let subtraction_a_b_after = u64::try_from(&big_subtration_a_b).unwrap();
+						assert_eq!(
+							subtraction_a_b, subtraction_a_b_after,
+							"BigUint subctarction behaves differently from Rusts's"
+						);
+
+						// Check consistency accross all the `impl` blocks related to the subtraction.
+						assert_eq!(
+							big_subtration_a_b,
+							{
+								let mut tmp = bu_a.clone();
+								tmp -= &bu_b;
+								tmp
+							},
+							"one of the `impl`s is missbehaving"
+						);
+						assert_eq!(
+							big_subtration_a_b,
+							&bu_a - &bu_b,
+							"one of the `impl`s is missbehaving"
+						);
+						assert_eq!(
+							big_subtration_a_b,
+							&bu_a - bu_b.clone(),
+							"one of the `impl`s is missbehaving"
+						);
+						assert_eq!(
+							big_subtration_a_b,
+							bu_a.clone() - &bu_b,
+							"one of the `impl`s is missbehaving"
+						);
+						assert_eq!(
+							big_subtration_a_b,
+							bu_a.clone() - bu_b.clone(),
+							"one of the `impl`s is missbehaving"
 						);
 					}
 				}
