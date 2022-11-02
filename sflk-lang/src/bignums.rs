@@ -63,7 +63,7 @@ mod big_unit {
 		///
 		/// This is faster than `from_digits_with_most_significant_at_the_beginning` as
 		/// the most significant digits being at the back is already the layout of `BigUint`.
-		///
+		///Mul
 		/// For example, in base 10, giving `digits` = `vec![4, 3, 2, 1]` would construct
 		/// a `BigUint` that represents the value 1234.
 		/// Note: The base is not 10.
@@ -345,6 +345,9 @@ mod big_unit {
 
 	impl SubAssign<&BigUint> for BigUint {
 		fn sub_assign(&mut self, rhs: &BigUint) {
+			// When a digit from `self` is too small to starnd the subtraction with
+			// the digit from `rhs`, this `carry` helps by "moving" some value from
+			// the digit from `self` that will be covered in the next iteration.
 			let mut carry = 0;
 
 			// Iterating beginning from the least significant digits.
@@ -389,6 +392,12 @@ mod big_unit {
 				);
 				self.digits[i] = digit_subtraction as Digit;
 			}
+
+			// Despite never explicitly adding insignificant leading zeros,
+			// something like `x - x` would make all the digits to become zero,
+			// and some other cases would make some of the leading digits to become zero,
+			// so these potential leading zeros must be taken care of.
+			self.remove_illegal_leading_zeros();
 		}
 	}
 	impl SubAssign<BigUint> for BigUint {
@@ -431,6 +440,12 @@ mod big_unit {
 	mod tests {
 		use super::*;
 
+		impl BigUint {
+			fn has_illegal_leading_zeros(&self) -> bool {
+				self.digits.last().copied() == Some(0)
+			}
+		}
+
 		/// A few integer values to iterate over in tests.
 		fn some_values() -> impl Iterator<Item = u64> {
 			let values: Vec<u64> = vec![
@@ -472,19 +487,19 @@ mod big_unit {
 			let digits_bu: Vec<_> = bu.iter_digits_from_least_significant().collect();
 			assert_eq!(
 				digits_bu, digits_without_leading_zeros,
-				"leading zeros in BigUint when constructed from a digit vec"
+				"illegal leading zeros in BigUint when constructed from a digit vec"
 			);
 		}
 
 		#[test]
 		fn no_leading_zeros_from_primitive() {
-			// Such a value is small, if converted naively it may have leading zeros.
-			let small_vlaue_in_large_primitive = 69u64;
-			let bu = BigUint::from(small_vlaue_in_large_primitive);
-			assert!(
-				bu.digits.first() != Some(&0),
-				"leading zeros in BigUint when constructed from a primitive"
-			);
+			for value in some_values() {
+				let bu = BigUint::from(value);
+				assert!(
+					!bu.has_illegal_leading_zeros(),
+					"illegal leading zeros in BigUint when constructed from a primitive"
+				);
+			}
 		}
 
 		#[test]
@@ -550,6 +565,10 @@ mod big_unit {
 						tmp += bu_b.clone();
 						tmp
 					};
+					assert!(
+						!big_sum_a_b.has_illegal_leading_zeros(),
+						"illegal leading zeros in BigUint resulting from addition"
+					);
 
 					// Check against Rust's result, if available.
 					if let Some(sum_a_b) = value_a.checked_add(value_b) {
@@ -609,6 +628,10 @@ mod big_unit {
 							tmp -= bu_b.clone();
 							tmp
 						};
+						assert!(
+							!big_subtration_a_b.has_illegal_leading_zeros(),
+							"illegal leading zeros in BigUint resulting from subtraction"
+						);
 
 						// Check against Rust's result.
 						let subtraction_a_b_after = u64::try_from(&big_subtration_a_b).unwrap();
