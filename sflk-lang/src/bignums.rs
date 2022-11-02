@@ -4,7 +4,10 @@
 //! TODO: Comment the module.
 
 mod big_unit {
-	use std::cmp::Ordering;
+	use std::{
+		cmp::Ordering,
+		ops::{Add, AddAssign},
+	};
 
 	/// The type of one digit. The base used for the representation of the digits is `BASE`,
 	/// which should be the number of values that the `Digit` type can represent.
@@ -26,7 +29,7 @@ mod big_unit {
 	#[derive(Debug)]
 	struct BigUint {
 		/// The most significants digits are at the back.
-		/// There shall not be leading zeros.
+		/// There shall not be insignificant leading zeros.
 		/// The value zero is represented by an empty list of digits.
 		///
 		/// Respecting these rules ensures that each unsigned integer value can be
@@ -37,6 +40,22 @@ mod big_unit {
 	}
 
 	impl BigUint {
+		fn zero() -> BigUint {
+			BigUint { digits: Vec::new() }
+		}
+
+		/// Removes the insignificant leading zeros that may have been added
+		/// by initialisation or for convinience.
+		///
+		/// A lot of methods expect the absence of insignificant leading zeros,
+		/// and all the methods shall not allow `self` or a returned `BigUint`
+		/// to contain insignificant leading zeros.
+		fn remove_illegal_leading_zeros(&mut self) {
+			while self.digits.last() == Some(&0) {
+				self.digits.pop();
+			}
+		}
+
 		/// Interpret the given list of digits as a sequence of digits that make up a number
 		/// which is the value of the `BigUint` that is returned. The given digits are
 		/// interpreted as the most significant digits being at the back
@@ -50,13 +69,10 @@ mod big_unit {
 		/// Note: The base is not 10.
 		fn from_digits_with_most_significant_at_the_back(mut digits: Vec<Digit>) -> BigUint {
 			// The `digits` vector is already in the expected orientation for `BigUint`.
+			let mut big_uint = BigUint { digits };
 
-			// Removes leading zeros.
-			while digits.last() == Some(&0) {
-				digits.pop();
-			}
-
-			BigUint { digits }
+			big_uint.remove_illegal_leading_zeros();
+			big_uint
 		}
 
 		/// Interpret the given list of digits as a sequence of digits that make up a number
@@ -124,7 +140,7 @@ mod big_unit {
 
 					fn try_from(value: &BigUint) -> Result<$primitive_type, DoesNotFit> {
 						let mut acc = 0 as $primitive_type;
-						for &digit in value.digits.iter().rev() {
+						for digit in value.iter_digits_from_most_significant() {
 							acc = acc.checked_mul(BASE as $primitive_type).ok_or(DoesNotFit)?;
 							acc += digit as $primitive_type;
 						}
@@ -137,6 +153,7 @@ mod big_unit {
 	impl_try_from_big_uint!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
 
 	impl BigUint {
+		// TODO: Remove this seamingly useless method ?
 		/// Get the `index`th most significant digit (i.e. iterating "from the left").
 		///
 		/// For example, in base 10, with `self` being the number 123456:
@@ -147,6 +164,7 @@ mod big_unit {
 			self.digits.iter().rev().copied().nth(index)
 		}
 
+		// TODO: Remove this seamingly useless method ?
 		/// Get the `index`th least significant digit (i.e. iterating "from the right").
 		///
 		/// For example, in base 10, with `self` being the number 123456:
@@ -157,6 +175,7 @@ mod big_unit {
 			self.digits.iter().copied().nth(index)
 		}
 
+		// TODO: Remove this seamingly useless method ?
 		/// Get the `index`th least significant digit (i.e. iterating "from the right")
 		/// when considering that there are infinitely many insignificant leading zeros.
 		///
@@ -173,7 +192,7 @@ mod big_unit {
 		///
 		/// For example, in base 10, with `self` being the number 123456,
 		/// the iterator would give (in order): 1, 2, 3, 4, 5, 6, and stop.
-		fn digits_from_most_significant(&self) -> impl Iterator<Item = Digit> + '_ {
+		fn iter_digits_from_most_significant(&self) -> impl Iterator<Item = Digit> + '_ {
 			self.digits.iter().rev().copied()
 		}
 
@@ -182,7 +201,7 @@ mod big_unit {
 		///
 		/// For example, in base 10, with `self` being the number 123456,
 		/// the iterator would give (in order): 6, 5, 4, 3, 2, 1, and stop.
-		fn digits_from_least_significant(&self) -> impl Iterator<Item = Digit> + '_ {
+		fn iter_digits_from_least_significant(&self) -> impl Iterator<Item = Digit> + '_ {
 			self.digits.iter().copied()
 		}
 
@@ -192,28 +211,28 @@ mod big_unit {
 		///
 		/// For example, in base 10, with `self` being the number 123456,
 		/// the iterator would give (in order): 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, ... (never stops).
-		fn digits_from_least_significant_with_leading_zeros(
+		fn iter_digits_from_least_significant_with_leading_zeros(
 			&self,
 		) -> impl Iterator<Item = Digit> + '_ {
-			self.digits_from_least_significant()
+			self.iter_digits_from_least_significant()
 				.chain(std::iter::repeat(0))
 		}
 	}
 
 	impl Eq for BigUint {}
 	impl PartialEq for BigUint {
-		fn eq(&self, other: &Self) -> bool {
-			self.digits == other.digits
+		fn eq(&self, rhs: &Self) -> bool {
+			self.digits == rhs.digits
 		}
 	}
 
 	impl Ord for BigUint {
-		fn cmp(&self, other: &BigUint) -> Ordering {
-			// First, look if one inetger has more digits than the other
+		fn cmp(&self, rhs: &BigUint) -> Ordering {
+			// First, look if one inetger has more digits than the `rhs`
 			// in which case that would be the bigger one.
-			if self.digits.len() < other.digits.len() {
+			if self.digits.len() < rhs.digits.len() {
 				return Ordering::Less;
-			} else if self.digits.len() > other.digits.len() {
+			} else if self.digits.len() > rhs.digits.len() {
 				return Ordering::Greater;
 			}
 
@@ -227,11 +246,11 @@ mod big_unit {
 			// For example, in the comparison `11811211 > 11611911`, the only
 			// digit to digit comparison that matters is 8 > 6 that that is because
 			// this is the most significant digit to digit comparison.
-			for (digit_self, digit_other) in self
-				.digits_from_most_significant()
-				.zip(other.digits_from_most_significant())
+			for (digit_self, digit_rhs) in self
+				.iter_digits_from_most_significant()
+				.zip(rhs.iter_digits_from_most_significant())
 			{
-				match digit_self.cmp(&digit_other) {
+				match digit_self.cmp(&digit_rhs) {
 					Ordering::Greater => return Ordering::Greater,
 					Ordering::Less => return Ordering::Less,
 					Ordering::Equal => (),
@@ -243,8 +262,63 @@ mod big_unit {
 		}
 	}
 	impl PartialOrd for BigUint {
-		fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-			Some(self.cmp(other))
+		fn partial_cmp(&self, rhs: &BigUint) -> Option<Ordering> {
+			Some(self.cmp(rhs))
+		}
+	}
+
+	impl AddAssign<&BigUint> for BigUint {
+		fn add_assign(&mut self, rhs: &BigUint) {
+			let mut carry = 0;
+			// Iterating beginning from the least significant digits.
+			for i in 0.. {
+				if i >= self.digits.len() && i >= rhs.digits.len() && carry == 0 {
+					// There is no digit left nor a carry to add to `self`.
+					break;
+				}
+
+				// Make sure there is a digit in `self` at index `i` to add something to.
+				if i >= self.digits.len() {
+					// ADDING LEADING ZERO
+					// Unused leading zeros must be removed before returning.
+					self.digits.push(0);
+				}
+
+				// Perform one step of the addition, adding digit to digit and
+				// handling the carry.
+				let (new_self_digit, next_carry) = {
+					let self_digit = self.digits[i];
+					let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i);
+					let digit_sum = self_digit as u64 + rhs_digit as u64 + carry;
+					((digit_sum % BASE) as Digit, digit_sum / BASE)
+				};
+				self.digits[i] = new_self_digit;
+				carry = next_carry;
+			}
+
+			self.remove_illegal_leading_zeros();
+		}
+	}
+	impl Add<&BigUint> for BigUint {
+		type Output = BigUint;
+		fn add(mut self, rhs: &BigUint) -> BigUint {
+			self += rhs;
+			self
+		}
+	}
+	impl Add<BigUint> for &BigUint {
+		type Output = BigUint;
+		fn add(self, mut rhs: BigUint) -> BigUint {
+			rhs += self;
+			rhs
+		}
+	}
+	impl Add<&BigUint> for &BigUint {
+		type Output = BigUint;
+		fn add(self, rhs: &BigUint) -> BigUint {
+			let mut res = BigUint::zero();
+			res += rhs;
+			res
 		}
 	}
 
@@ -261,11 +335,22 @@ mod big_unit {
 			);
 			let values: Vec<u64> = vec![
 				0,
+				1,
 				69,
 				BASE - 1,
 				BASE,
 				BASE + 1,
-				123456789,
+				u16::MAX as u64 - 123,
+				u16::MAX as u64 - 1,
+				u16::MAX as u64,
+				u16::MAX as u64 + 1,
+				u16::MAX as u64 + 123,
+				u32::MAX as u64 - 123,
+				u32::MAX as u64 - 1,
+				u32::MAX as u64,
+				u32::MAX as u64 + 1,
+				u32::MAX as u64 + 123,
+				u64::MAX - 123,
 				u64::MAX - 1,
 				u64::MAX,
 			];
@@ -282,7 +367,7 @@ mod big_unit {
 			};
 			let bu =
 				BigUint::from_digits_with_most_significant_at_the_back(digits_with_leading_zeros);
-			let digits_bu: Vec<_> = bu.digits_from_least_significant().collect();
+			let digits_bu: Vec<_> = bu.iter_digits_from_least_significant().collect();
 			assert_eq!(
 				digits_bu, digits_without_leading_zeros,
 				"leading zeros in BigUint when constructed from a digit vec"
@@ -314,10 +399,14 @@ mod big_unit {
 		}
 
 		#[test]
-		#[should_panic]
 		fn too_big_to_fit() {
 			let too_big_for_u32 = u32::MAX as u64 + 1;
-			let _too_small: u32 = (&BigUint::from(too_big_for_u32)).try_into().unwrap();
+			let does_not_fit = u32::try_from(&BigUint::from(too_big_for_u32));
+			assert!(
+				matches!(does_not_fit, Err(DoesNotFit)),
+				"converting to u32 a BigUint that represents a value \
+				too big to fit in a u32 must fail"
+			);
 		}
 
 		#[test]
@@ -337,8 +426,28 @@ mod big_unit {
 					assert_eq!(
 						value_a.cmp(&value_b),
 						bu_a.cmp(&bu_b),
-						"BigUint comparison different from Rust's"
+						"BigUint comparison behaves differently from Rust's"
 					);
+				}
+			}
+		}
+
+		#[test]
+		fn add() {
+			for value_a in some_values() {
+				let bu_a = BigUint::from(value_a);
+				for value_b in some_values() {
+					if let Some(sum_a_b) = value_a.checked_add(value_b) {
+						let bu_b = BigUint::from(value_b);
+						let big_sum_a_b = &bu_a + &bu_b;
+						let sum_a_b_after = u64::try_from(&big_sum_a_b).expect(
+							"the checked addition passed, thus this was expected to pass too",
+						);
+						assert_eq!(
+							sum_a_b, sum_a_b_after,
+							"BigUint addition behaves differently from Rusts's"
+						);
+					}
 				}
 			}
 		}
