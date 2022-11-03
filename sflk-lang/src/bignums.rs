@@ -450,6 +450,8 @@ mod big_unit {
 			// with a carry for the addition. Whatever, it works (and is more efficient than
 			// would be storing all the intermediary results to add them later, or even just store
 			// one intermediary result).
+			//
+			// Note: Doing a multiplication on paper might help to understand.
 
 			let mut res_digits =
 				Vec::from_iter(std::iter::repeat(0).take(self.digits.len() + rhs.digits.len()));
@@ -517,6 +519,103 @@ mod big_unit {
 	impl MulAssign<&BigUint> for BigUint {
 		fn mul_assign(&mut self, rhs: &BigUint) {
 			*self = &*self * rhs;
+		}
+	}
+
+	impl BigUint {
+		/// Perform the euclidian division `self / rhs`,
+		/// returns `(quotient, remainder)`.
+		#[must_use]
+		fn div_euclidian(&self, rhs: &BigUint) -> (BigUint, BigUint) {
+			// Classic long division algorithm.
+			// Surprisingly, it is pretty hard to find a readable and complete implementation
+			// or pseudocode of this algorithm on the Internet (or I haven't searched good enough),
+			// so this is a custom version. It works (for what it's worth).
+			//
+			// Note: Doing a division on paper will probably help to understand.
+
+			assert_ne!(rhs, &BigUint::zero(), "dividing a BigUint by zero");
+
+			let mut quotient_digits = Vec::from_iter(std::iter::repeat(0).take(self.digits.len()));
+			let mut current = BigUint::zero();
+
+			for i in 1..=self.digits.len() {
+				// Append "to the right" of the result of the last subtraction
+				// (or to 0 for the first iteration) the next most significant digit of `self`
+				// that have not yet been considered.
+				current.digits.insert(0, self.digits[self.digits.len() - i]);
+				// Might be an insignificant leading zero that causes problems
+				// in a subtraction later.
+				current.remove_illegal_leading_zeros();
+
+				// Now must happen a subtraction between `current` (the bigger number
+				// in the subtraction) and the biggets possible multiple of `rhs`.
+				// To find this biggest multiple (let it be `factor * rhs`),
+				// `factor` is searched for (in a fast way), then the subtraction
+				// happens and the result becomes the next `current`.
+				// `current - factor * rhs = next_current`.
+				// `factor` is supposed to be smaller than `BASE` and is the next
+				// digit to be appended "to the right" of the `quotient`.
+				let factor = if &current < rhs {
+					// The case when `factor == 0` seem to be a special case for the
+					// following algorithm that searches `factor`.
+					0
+				} else {
+					// That bigest multiple of `rhs` that is strictly smaller than `current`
+					// is searched for in the "same order" that a binary search is done
+					// (see [https://en.wikipedia.org/wiki/Binary_search_algorithm] or something).
+					//
+					// `factor` is supposed to be between 0 and `BASE` (excluded), so only this
+					// range is scanned. A failed attemp can tell us if ths `factor` we search is
+					// smaller or bigger, so we can cut in half the range to scan each try.
+					//
+					// For example, if `BASE` is 256 and the `factor` we search is 100, the values
+					// that will be tested are (in order):
+					//         tested `factor`: 128, 64, 96, 112, 104, 100
+					//   `BASE / power_of_two`: 64,  32, 16,   8,   4,   2 ...
+					let mut power_of_two = 2;
+					let mut factor = BASE / power_of_two;
+					let mut factor_times_rhs = BigUint::from(factor) * rhs;
+					loop {
+						power_of_two *= 2;
+						if current >= factor_times_rhs {
+							// We have `0 <= current - factor * rhs`, now we check if
+							// this `factor` is the biggest possible that has this property.
+							println!("{current:?} - {factor_times_rhs:?}");
+							let subtraction_result = &current - factor_times_rhs;
+							if &subtraction_result < rhs {
+								// This is the `factor` we search (as we have
+								// `0 <= current - factor * rhs < rhs`, both increasing or
+								// decreasing `factor` would make this invalid)!
+								// Also, the subtrcation result is the next `current`.
+								current = subtraction_result;
+								break factor;
+							} else {
+								// The `factor` we search is bigger.
+								factor += BASE / power_of_two;
+							}
+						} else {
+							// The `factor` we search is smaller
+							// (since `current < factor * rhs` and we want
+							// `0 <= current - factor * rhs`).
+							factor -= BASE / power_of_two;
+						}
+						factor_times_rhs = BigUint::from(factor) * rhs;
+					}
+				};
+
+				// Append `factor` as a digit "to the right" of the `quotient`
+				// (its new least significant digit).
+				assert!(factor < BASE);
+				let i_quotient = quotient_digits.len() - i;
+				quotient_digits[i_quotient] = factor as Digit;
+			}
+			
+			let remainder = current;
+			// This conversion will take care of the potential remaining
+			// insignificant leading zeros.
+			let quotient = BigUint::from_digits_with_most_significant_at_the_back(quotient_digits);
+			(quotient, remainder)
 		}
 	}
 
@@ -631,12 +730,7 @@ mod big_unit {
 					assert_eq!(
 						value_a.cmp(&value_b),
 						bu_a.cmp(&bu_b),
-						"(compare A to B) BigUint comparison behaves differently from Rust's"
-					);
-					assert_eq!(
-						value_b.cmp(&value_a),
-						bu_b.cmp(&bu_a),
-						"(compare B to A) BigUint comparison behaves differently from Rust's"
+						"BigUint comparison behaves differently from Rust's"
 					);
 				}
 			}
@@ -831,6 +925,44 @@ mod big_unit {
 						},
 						"one of the `impl`s is missbehaving"
 					);
+				}
+			}
+		}
+
+		#[test]
+		fn div_euclidian() {
+			for value_a in some_values() {
+				let bu_a = BigUint::from(value_a);
+				for value_b in some_values() {
+					// If Rust can't do the division (because `value_b` is zero), neither can we.
+					if let Some(quotient_a_b) = value_a.checked_div(value_b) {
+						let remainder_a_b = value_a % value_b;
+
+						let bu_b = BigUint::from(value_b);
+						let (big_quotient_a_b, big_remainder_a_b) = bu_a.div_euclidian(&bu_b);
+						assert!(
+							!big_quotient_a_b.has_illegal_leading_zeros(),
+							"illegal leading zeros in BigUint resulting from \
+							euclidian division (quotient)"
+						);
+						assert!(
+							!big_remainder_a_b.has_illegal_leading_zeros(),
+							"illegal leading zeros in BigUint resulting from \
+							euclidian division (remainder)"
+						);
+
+						// Check against Rust's result.
+						let quotient_a_b_after = u64::try_from(&big_quotient_a_b).unwrap();
+						assert_eq!(
+							quotient_a_b, quotient_a_b_after,
+							"BigUint euclidian behaves differently from Rusts's for the quotient"
+						);
+						let remainder_a_b_after = u64::try_from(&big_remainder_a_b).unwrap();
+						assert_eq!(
+							remainder_a_b, remainder_a_b_after,
+							"BigUint euclidian behaves differently from Rusts's for the remainder"
+						);
+					}
 				}
 			}
 		}
