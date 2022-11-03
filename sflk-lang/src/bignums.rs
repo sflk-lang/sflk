@@ -3,7 +3,13 @@
 //! TODO: Reimplement every feature of `bigint` but cleaner.
 //! TODO: Comment the module.
 
+/// A conversion from a big number into a primitive integer type have failed due
+/// to the value being too big to be representable by the primitive integer type.
+#[derive(Debug)]
+pub struct DoesNotFit;
+
 mod big_unit {
+	use super::DoesNotFit;
 	use std::{
 		cmp::Ordering,
 		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
@@ -18,6 +24,8 @@ mod big_unit {
 	/// TODO: Benchmark heavy math hapenning with different types for `Digit`.
 	/// I heard Python uses digits that fit closely in 32-bits or something,
 	/// maybe a `u32` could be more appropriate.
+	///
+	/// TODO: Make `BigUint` be generic over the type used for digitis, and over the `BASE` value.
 	type Digit = u8;
 
 	/// The base should be of type `u64` (as a lot of computations are done with `u64`s)
@@ -27,7 +35,7 @@ mod big_unit {
 	/// Unsigned big integer. Actually a list of digits in base `BASE`
 	/// represented with the integer type `Digit`.
 	#[derive(Clone, Debug)]
-	struct BigUint {
+	pub struct BigUint {
 		/// The most significants digits are at the back.
 		/// There shall not be insignificant leading zeros.
 		/// The value zero is represented by an empty list of digits.
@@ -40,7 +48,7 @@ mod big_unit {
 	}
 
 	impl BigUint {
-		fn zero() -> BigUint {
+		pub fn zero() -> BigUint {
 			BigUint { digits: Vec::new() }
 		}
 
@@ -94,9 +102,9 @@ mod big_unit {
 	}
 
 	/// Locat trait used to tag a few primitive integer types that can be converted
-	/// to a `BigUint`. Bounding to this local trait is allowed by the orphan rule,
+	/// to `BigUint`. Bounding to this local trait is allowed by the orphan rule,
 	/// unlike bounding directly to `Into<u64>`.
-	trait LocalIntoU64: Into<u64> {}
+	pub trait LocalIntoU64: Into<u64> {}
 	macro_rules! impl_local_into_u64 {
 		($($primitive_type:ty),*) => {
 			$(
@@ -122,11 +130,6 @@ mod big_unit {
 			BigUint::from_digits_with_most_significant_at_the_back(digits)
 		}
 	}
-
-	/// A conversion from a big number into a primitive integer type have failed due
-	/// to the value being too big to be representable by the primitive integer type.
-	#[derive(Debug)]
-	pub struct DoesNotFit;
 
 	/// Both the primpitive types and the `TryFrom` trait are not local to this crate,
 	/// thus the orphan rule forbids a nice `impl` block that generalizes all the convenrsions,
@@ -192,7 +195,7 @@ mod big_unit {
 		///
 		/// For example, in base 10, with `self` being the number 123456,
 		/// the iterator would give (in order): 1, 2, 3, 4, 5, 6, and stop.
-		fn iter_digits_from_most_significant(&self) -> impl Iterator<Item = Digit> + '_ {
+		pub fn iter_digits_from_most_significant(&self) -> impl Iterator<Item = Digit> + '_ {
 			self.digits.iter().rev().copied()
 		}
 
@@ -610,7 +613,7 @@ mod big_unit {
 				let i_quotient = quotient_digits.len() - i;
 				quotient_digits[i_quotient] = factor as Digit;
 			}
-			
+
 			let remainder = current;
 			// This conversion will take care of the potential remaining
 			// insignificant leading zeros.
@@ -965,6 +968,187 @@ mod big_unit {
 					}
 				}
 			}
+		}
+	}
+}
+
+mod big_sint {
+	use super::{big_unit::BigUint, DoesNotFit};
+
+	/// Big signed integer.
+	struct BigSint {
+		abs_value: BigUint,
+		/// This should be `false` for the value zero.
+		is_strictly_negative: bool,
+	}
+
+	impl BigSint {
+		fn zero() -> BigSint {
+			BigSint {
+				abs_value: BigUint::zero(),
+				is_strictly_negative: false,
+			}
+		}
+	}
+
+	impl<T: super::big_unit::LocalIntoU64> From<T> for BigSint {
+		fn from(value: T) -> BigSint {
+			let value: u64 = value.into();
+			BigSint {
+				abs_value: BigUint::from(value),
+				is_strictly_negative: false,
+			}
+		}
+	}
+
+	/// Rust forbids an other `impl From<T> for BigSint` block even if T is bound
+	/// to a trait that does not overlap with the trait bound of the previous block.
+	/// This is because an hypothetical programmer could potentially sneak in and
+	/// add `impl`s that make the two non-overlapping traits now overlapping.
+	macro_rules! impl_from_into_i64 {
+		($($primitive_type:ty),*) => {
+			$(
+				impl From<$primitive_type> for BigSint {
+					fn from(value: $primitive_type) -> BigSint {
+						let value: i64 = value.into();
+						BigSint {
+							abs_value: BigUint::from(value.abs() as u64),
+							is_strictly_negative: value < 0,
+						}
+					}
+				}
+			)*
+		}
+	}
+	impl_from_into_i64!(i8, i16, i32, i64);
+
+	macro_rules! impl_try_from_big_sint_unsigned {
+		($($primitive_type:ty),*) => {
+			$(
+				impl TryFrom<&BigSint> for $primitive_type {
+					type Error = DoesNotFit;
+
+					fn try_from(value: &BigSint) -> Result<$primitive_type, DoesNotFit> {
+						if value.is_strictly_negative {
+							Err(DoesNotFit)
+						} else {
+							Ok((&value.abs_value).try_into()?)
+						}
+					}
+				}
+			)*
+		}
+	}
+
+	impl_try_from_big_sint_unsigned!(u8, u16, u32, u64, u128, usize);
+
+	macro_rules! impl_try_from_big_sint_signed {
+		($(($primitive_type:ty, $unsigned_intermediary_type:ty)),*) => {
+			$(
+				impl TryFrom<&BigSint> for $primitive_type {
+					type Error = DoesNotFit;
+
+					fn try_from(value: &BigSint) -> Result<$primitive_type, DoesNotFit> {
+						// The given `$unsigned_intermediary_type` is supposed to be able to hold
+						// the absolute value.
+						let intermediary: $unsigned_intermediary_type =
+							(&value.abs_value).try_into()?;
+						if (
+							intermediary == (<$primitive_type>::MIN) as $unsigned_intermediary_type
+						) {
+							// The case of the value being `<$primitive_type>::MIN` cannot
+							// be handled naively as its abolute value does not fit in
+							// a value of type `$primitive_type`.
+							Ok(-(intermediary as $primitive_type))
+						} else {
+							let res: $primitive_type =
+								intermediary.try_into().map_err(|_| DoesNotFit)?;
+							let sign: $primitive_type =
+								if value.is_strictly_negative { -1 as $primitive_type } else { 1 };
+							Ok(res * sign)
+						}
+					}
+				}
+			)*
+		}
+	}
+	impl_try_from_big_sint_signed!(
+		(i8, u8),
+		(i16, u16),
+		(i32, u32),
+		(i64, u64),
+		(i128, u128),
+		(isize, usize)
+	);
+
+	#[cfg(test)]
+	mod tests {
+		use super::*;
+
+		impl BigSint {
+			fn is_illegal_strictly_negative_zero(&self) -> bool {
+				self.abs_value == BigUint::zero() && self.is_illegal_strictly_negative_zero()
+			}
+		}
+
+		/// A few signed integer values to iterate over in tests.
+		fn some_values() -> impl Iterator<Item = i64> {
+			let values: Vec<i64> = vec![
+				0,
+				1,
+				8,
+				17,
+				42,
+				69,
+				100000000,
+				123456789,
+				0x123456789ABCDEF,
+				u8::MAX as i64 - 1,
+				u8::MAX as i64,
+				u8::MAX as i64 + 1,
+				u16::MAX as i64 - 123,
+				u16::MAX as i64 - 1,
+				u16::MAX as i64,
+				u16::MAX as i64 + 1,
+				u16::MAX as i64 + 123,
+				u32::MAX as i64 - 123,
+				u32::MAX as i64 - 1,
+				u32::MAX as i64,
+				u32::MAX as i64 + 1,
+				u32::MAX as i64 + 123,
+				i64::MAX - 123,
+				i64::MAX - 1,
+				i64::MAX,
+			];
+			values
+				.clone()
+				.into_iter()
+				.map(|value| -value)
+				.chain(values.into_iter())
+		}
+
+		#[test]
+		fn preserve_value() {
+			for value in some_values() {
+				let value_before = value;
+				let bu = BigSint::from(value_before);
+				let value_after = i64::try_from(&bu).unwrap();
+				assert_eq!(
+					value_before, value_after,
+					"converting to and then from a BigSint does not preserve the value"
+				);
+			}
+		}
+
+		#[test]
+		fn too_negative_to_fit() {
+			let too_negative_for_u32 = -8;
+			let does_not_fit = u32::try_from(&BigSint::from(too_negative_for_u32));
+			assert!(
+				matches!(does_not_fit, Err(DoesNotFit)),
+				"converting to u32 a BigSint that represents a value \
+				too negative to fit in a u32 must fail"
+			);
 		}
 	}
 }
