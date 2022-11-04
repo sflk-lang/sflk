@@ -73,13 +73,10 @@ mod big_unit {
 		/// interpreted as the most significant digits being at the back
 		/// (i.e. it is written "backwards", "from right to left").
 		///
-		/// This is faster than `from_digits_with_most_significant_at_the_beginning` as
-		/// the most significant digits being at the back is already the layout of `BigUint`.
-		///Mul
 		/// For example, in base 10, giving `digits` = `vec![4, 3, 2, 1]` would construct
 		/// a `BigUint` that represents the value 1234.
 		/// Note: The base is not 10.
-		fn from_digits_with_most_significant_at_the_back(mut digits: Vec<Digit>) -> BigUint {
+		fn from_digits_with_most_significant_at_the_back(digits: Vec<Digit>) -> BigUint {
 			// The `digits` vector is already in the expected orientation for `BigUint`.
 			let mut big_uint = BigUint { digits };
 
@@ -87,21 +84,13 @@ mod big_unit {
 			big_uint
 		}
 
-		/// Interpret the given list of digits as a sequence of digits that make up a number
-		/// which is the value of the `BigUint` that is returned. The given digits are
-		/// interpreted as the least significant digits being at the back
-		/// (i.e. it is written "normally", "forward", "from left to right").
+		/// Iterate over the digits, beginning with the most significant digits
+		/// (i.e. iterating "from the left").
 		///
-		/// This is slower than `from_digits_with_most_significant_at_the_back`.
-		///
-		/// For example, in base 10, giving `digits` = `vec![1, 2, 3, 4]` would construct
-		/// a `BigUint` that represents the value 1234.
-		/// Note: The base is not 10.
-		fn from_digits_with_most_significant_at_the_beginning(mut digits: Vec<Digit>) -> BigUint {
-			// The `digits` vector is NOT in the expected orientation for `BigUint`,
-			// it must be reversed.
-			digits.reverse();
-			BigUint::from_digits_with_most_significant_at_the_back(digits)
+		/// For example, in base 10, with `self` being the number 123456,
+		/// the iterator would give (in order): 1, 2, 3, 4, 5, 6, and stop.
+		fn iter_digits_from_most_significant(&self) -> impl Iterator<Item = Digit> + '_ {
+			self.digits.iter().rev().copied()
 		}
 	}
 
@@ -158,73 +147,6 @@ mod big_unit {
 		}
 	}
 	impl_try_from_big_uint!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
-
-	impl BigUint {
-		// TODO: Remove this seamingly useless method ?
-		/// Get the `index`th most significant digit (i.e. iterating "from the left").
-		///
-		/// For example, in base 10, with `self` being the number 123456:
-		/// - `index` = 0 would get `Some(1)`.
-		/// - `index` = 2 would get `Some(3)`.
-		/// - `index` = 9 would get `None`.
-		fn get_nth_most_significant_digit(&self, index: usize) -> Option<Digit> {
-			self.digits.iter().rev().copied().nth(index)
-		}
-
-		// TODO: Remove this seamingly useless method ?
-		/// Get the `index`th least significant digit (i.e. iterating "from the right").
-		///
-		/// For example, in base 10, with `self` being the number 123456:
-		/// - `index` = 0 would get `Some(6)`.
-		/// - `index` = 2 would get `Some(4)`.
-		/// - `index` = 9 would get `None`.
-		fn get_nth_least_significant_digit(&self, index: usize) -> Option<Digit> {
-			self.digits.iter().copied().nth(index)
-		}
-
-		// TODO: Remove this seamingly useless method ?
-		/// Get the `index`th least significant digit (i.e. iterating "from the right")
-		/// when considering that there are infinitely many insignificant leading zeros.
-		///
-		/// For example, in base 10, with `self` being the number 123456:
-		/// - `index` = 0 would get 6.
-		/// - `index` = 2 would get 4.
-		/// - `index` = 9 would get 0 (a virtual leading zero in ...00000123456).
-		fn get_nth_least_significant_digit_with_leading_zeros(&self, index: usize) -> Digit {
-			self.get_nth_least_significant_digit(index).unwrap_or(0)
-		}
-
-		/// Iterate over the digits, beginning with the most significant digits
-		/// (i.e. iterating "from the left").
-		///
-		/// For example, in base 10, with `self` being the number 123456,
-		/// the iterator would give (in order): 1, 2, 3, 4, 5, 6, and stop.
-		pub fn iter_digits_from_most_significant(&self) -> impl Iterator<Item = Digit> + '_ {
-			self.digits.iter().rev().copied()
-		}
-
-		/// Iterate over the digits, beginning with the least significant digits
-		/// (i.e. iterating "from the right").
-		///
-		/// For example, in base 10, with `self` being the number 123456,
-		/// the iterator would give (in order): 6, 5, 4, 3, 2, 1, and stop.
-		fn iter_digits_from_least_significant(&self) -> impl Iterator<Item = Digit> + '_ {
-			self.digits.iter().copied()
-		}
-
-		/// Iterate over the digits, beginning with the least significant digits
-		/// (i.e. iterating "from the right")
-		/// when considering that there are infinitely many insignificant leading zeros.
-		///
-		/// For example, in base 10, with `self` being the number 123456,
-		/// the iterator would give (in order): 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, ... (never stops).
-		fn iter_digits_from_least_significant_with_leading_zeros(
-			&self,
-		) -> impl Iterator<Item = Digit> + '_ {
-			self.iter_digits_from_least_significant()
-				.chain(std::iter::repeat(0))
-		}
-	}
 
 	impl Eq for BigUint {}
 	impl PartialEq for BigUint {
@@ -296,7 +218,7 @@ mod big_unit {
 				}
 
 				let self_digit = self.digits[i] as u64;
-				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i) as u64;
+				let rhs_digit = rhs.digits.get(i).copied().unwrap_or(0) as u64;
 
 				// Perform one step of the addition, adding digit to digit and
 				// handling the carry.
@@ -372,7 +294,7 @@ mod big_unit {
 				}
 
 				let mut value_from_which_to_subtract = self.digits[i] as u64;
-				let rhs_digit = rhs.get_nth_least_significant_digit_with_leading_zeros(i) as u64;
+				let rhs_digit = rhs.digits.get(i).copied().unwrap_or(0) as u64;
 
 				// Perform one step of the subtraction, subtracting digit to digit and
 				// handling the carry.
@@ -678,9 +600,8 @@ mod big_unit {
 			};
 			let bu =
 				BigUint::from_digits_with_most_significant_at_the_back(digits_with_leading_zeros);
-			let digits_bu: Vec<_> = bu.iter_digits_from_least_significant().collect();
 			assert_eq!(
-				digits_bu, digits_without_leading_zeros,
+				bu.digits, digits_without_leading_zeros,
 				"illegal leading zeros in BigUint when constructed from a digit vec"
 			);
 		}
