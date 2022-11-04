@@ -744,6 +744,21 @@ mod big_unit {
 		}
 
 		#[test]
+		fn eq_consistent_with_ord() {
+			for value_a in some_values() {
+				let bu_a = BigUint::from(value_a);
+				for value_b in some_values() {
+					let bu_b = BigUint::from(value_b);
+					assert_eq!(
+						bu_a.eq(&bu_b),
+						bu_a.cmp(&bu_b) == Ordering::Equal,
+						"BigUint comparison (cmp) behaves differently BigUint equality test (eq)"
+					);
+				}
+			}
+		}
+
+		#[test]
 		fn add() {
 			for value_a in some_values() {
 				let bu_a = BigUint::from(value_a);
@@ -1106,7 +1121,7 @@ mod big_sint {
 	impl Eq for BigSint {}
 	impl PartialEq for BigSint {
 		fn eq(&self, rhs: &BigSint) -> bool {
-			self.is_zero()
+			(self.is_zero() && rhs.is_zero())
 				|| (self.abs_value == rhs.abs_value && self.is_negative == rhs.is_negative)
 		}
 	}
@@ -1393,6 +1408,21 @@ mod big_sint {
 						value_a.cmp(&value_b),
 						bs_a.cmp(&bs_b),
 						"BigSint comparison behaves differently from Rust's"
+					);
+				}
+			}
+		}
+
+		#[test]
+		fn eq_consistent_with_ord() {
+			for value_a in some_values() {
+				let bs_a = BigSint::from(value_a);
+				for value_b in some_values() {
+					let bs_b = BigSint::from(value_b);
+					assert_eq!(
+						bs_a.eq(&bs_b),
+						bs_a.cmp(&bs_b) == Ordering::Equal,
+						"BigSint comparison (cmp) behaves differently BigSint equality test (eq)"
 					);
 				}
 			}
