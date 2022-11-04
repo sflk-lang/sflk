@@ -4,12 +4,13 @@
 //! TODO: Comment the module.
 
 /// A conversion from a big number into a primitive integer type have failed due
-/// to the value being too big to be representable by the primitive integer type.
+/// to the value being ouside the representable range of values supported by the
+/// primitive integer type.
 #[derive(Debug)]
-pub struct DoesNotFit;
+pub struct DoesNotFitInPrimitive;
 
 mod big_unit {
-	use super::DoesNotFit;
+	use super::DoesNotFitInPrimitive;
 	use std::{
 		cmp::Ordering,
 		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
@@ -132,12 +133,15 @@ mod big_unit {
 		($($primitive_type:ty),*) => {
 			$(
 				impl TryFrom<&BigUint> for $primitive_type {
-					type Error = DoesNotFit;
+					type Error = DoesNotFitInPrimitive;
 
-					fn try_from(value: &BigUint) -> Result<$primitive_type, DoesNotFit> {
+					fn try_from(
+						value: &BigUint
+					) -> Result<$primitive_type, DoesNotFitInPrimitive> {
 						let mut acc = 0 as $primitive_type;
 						for digit in value.iter_digits_from_most_significant() {
-							acc = acc.checked_mul(BASE as $primitive_type).ok_or(DoesNotFit)?;
+							acc = acc.checked_mul(BASE as $primitive_type)
+								.ok_or(DoesNotFitInPrimitive)?;
 							acc += digit as $primitive_type;
 						}
 						Ok(acc)
@@ -510,7 +514,6 @@ mod big_unit {
 						if current >= factor_times_rhs {
 							// We have `0 <= current - factor * rhs`, now we check if
 							// this `factor` is the biggest possible that has this property.
-							println!("{current:?} - {factor_times_rhs:?}");
 							let subtraction_result = &current - factor_times_rhs;
 							if &subtraction_result < rhs {
 								// This is the `factor` we search (as we have
@@ -635,12 +638,12 @@ mod big_unit {
 			let too_big_for_u32 = u32::MAX as u64 + 1;
 			let does_not_fit = u32::try_from(&BigUint::from(too_big_for_u32));
 			assert!(
-				matches!(does_not_fit, Err(DoesNotFit)),
+				matches!(does_not_fit, Err(DoesNotFitInPrimitive)),
 				"converting to u32 a BigUint that represents a value \
 				too big to fit in a u32 must fail"
 			);
 		}
-		
+
 		#[test]
 		fn eq_with_itself() {
 			for value in some_values() {
@@ -939,27 +942,47 @@ mod big_sint {
 		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
 	};
 
-	use super::{big_unit::BigUint, DoesNotFit};
+	use super::{big_unit::BigUint, DoesNotFitInPrimitive};
 
 	/// Big signed integer.
 	#[derive(Clone, Debug)]
-	struct BigSint {
+	pub struct BigSint {
 		abs_value: BigUint,
 		/// There is no constraint on this when the value is zero.
 		is_negative: bool,
 	}
 
 	impl BigSint {
-		fn zero() -> BigSint {
+		pub fn zero() -> BigSint {
 			BigSint { abs_value: BigUint::zero(), is_negative: false }
 		}
 
-		fn is_zero(&self) -> bool {
+		pub fn is_zero(&self) -> bool {
 			self.abs_value.is_zero()
 		}
 
-		fn is_positive(&self) -> bool {
+		pub fn is_positive(&self) -> bool {
 			(!self.is_negative) || self.is_zero()
+		}
+
+		pub fn is_strictly_positive(&self) -> bool {
+			(!self.is_negative) && (!self.is_zero())
+		}
+
+		pub fn is_negative(&self) -> bool {
+			self.is_negative || self.is_zero()
+		}
+
+		pub fn is_strictly_negative(&self) -> bool {
+			self.is_negative && (!self.is_zero())
+		}
+
+		pub fn negate(&mut self) {
+			self.is_negative = !self.is_negative;
+		}
+
+		pub fn abs(self) -> BigSint {
+			BigSint { abs_value: self.abs_value, is_negative: false }
 		}
 	}
 
@@ -1004,11 +1027,13 @@ mod big_sint {
 		($($primitive_type:ty),*) => {
 			$(
 				impl TryFrom<&BigSint> for $primitive_type {
-					type Error = DoesNotFit;
+					type Error = DoesNotFitInPrimitive;
 
-					fn try_from(value: &BigSint) -> Result<$primitive_type, DoesNotFit> {
+					fn try_from(
+						value: &BigSint
+					) -> Result<$primitive_type, DoesNotFitInPrimitive> {
 						if value.is_negative {
-							Err(DoesNotFit)
+							Err(DoesNotFitInPrimitive)
 						} else {
 							Ok((&value.abs_value).try_into()?)
 						}
@@ -1024,9 +1049,11 @@ mod big_sint {
 		($(($primitive_type:ty, $unsigned_intermediary_type:ty)),*) => {
 			$(
 				impl TryFrom<&BigSint> for $primitive_type {
-					type Error = DoesNotFit;
+					type Error = DoesNotFitInPrimitive;
 
-					fn try_from(value: &BigSint) -> Result<$primitive_type, DoesNotFit> {
+					fn try_from(
+						value: &BigSint
+					) -> Result<$primitive_type, DoesNotFitInPrimitive> {
 						// The given `$unsigned_intermediary_type` is supposed to be able to hold
 						// the absolute value (even for `<$primitive_type>::MIN`).
 						let intermediary: $unsigned_intermediary_type =
@@ -1042,7 +1069,7 @@ mod big_sint {
 							Ok(<$primitive_type>::MIN)
 						} else {
 							let res: $primitive_type =
-								intermediary.try_into().map_err(|_| DoesNotFit)?;
+								intermediary.try_into().map_err(|_| DoesNotFitInPrimitive)?;
 							let sign: $primitive_type =
 								if value.is_negative { -1 as $primitive_type } else { 1 };
 							Ok(res * sign)
@@ -1255,7 +1282,7 @@ mod big_sint {
 		///
 		/// Only accepts a (strictly) positive `rhs`.
 		#[must_use]
-		fn div_euclidian(&self, rhs: &BigSint) -> (BigSint, BigSint) {
+		pub fn div_euclidian(&self, rhs: &BigSint) -> (BigSint, BigSint) {
 			assert!(
 				!(rhs.is_negative || rhs.is_zero()),
 				"dividing a BigSint by zero or negative"
@@ -1326,7 +1353,7 @@ mod big_sint {
 			let too_negative_for_u32 = -8;
 			let does_not_fit = u32::try_from(&BigSint::from(too_negative_for_u32));
 			assert!(
-				matches!(does_not_fit, Err(DoesNotFit)),
+				matches!(does_not_fit, Err(DoesNotFitInPrimitive)),
 				"converting to u32 a BigSint that represents a value \
 				too negative to fit in a u32 must fail"
 			);
@@ -1557,7 +1584,6 @@ mod big_sint {
 			}
 		}
 
-
 		#[test]
 		fn div_euclidian() {
 			for value_a in some_values() {
@@ -1582,7 +1608,8 @@ mod big_sint {
 						);
 						let remainder_a_b_after = i64::try_from(&big_remainder_a_b).unwrap();
 						assert_eq!(
-							remainder_a_b.abs(), remainder_a_b_after,
+							remainder_a_b.abs(),
+							remainder_a_b_after,
 							"BigSint euclidian behaves differently from Rusts's \
 							(when taking its absolute value) for the remainder"
 						);
@@ -1602,6 +1629,510 @@ mod big_sint {
 		fn div_by_strictly_negative() {
 			// Expected to fail by design choice.
 			let _does_not_work = BigSint::from(69u64).div_euclidian(&BigSint::from(-8i64));
+		}
+	}
+}
+
+mod big_frac {
+	use std::{
+		cmp::Ordering,
+		ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
+	};
+
+	use super::{big_sint::BigSint, DoesNotFitInPrimitive};
+
+	/// Big fraction (arbitrarly precise).
+	///
+	/// Is always simplified after creation or any operation.
+	#[derive(Clone, Debug)]
+	struct BigFrac {
+		/// Numerator, bears the sign when simplified.
+		num: BigSint,
+		/// Denominator, must be positive when simplified.
+		/// Must never be zero.
+		/// Must be one if the numerator is zero and the fraction is simplified.
+		den: BigSint,
+	}
+
+	impl BigFrac {
+		fn zero() -> BigFrac {
+			BigFrac { num: BigSint::zero(), den: BigSint::from(1) }
+		}
+
+		fn is_zero(&self) -> bool {
+			self.num.is_zero()
+		}
+
+		/// Numerator.
+		fn num(&self) -> &BigSint {
+			&self.num
+		}
+
+		/// Denominator.
+		///
+		/// It is equal to one when the fraction is an integer (even zero).
+		fn den(&self) -> &BigSint {
+			&self.den
+		}
+
+		fn is_positive(&self) -> bool {
+			self.num.is_positive()
+		}
+
+		fn is_integer(&self) -> bool {
+			self.den == BigSint::from(1)
+		}
+	}
+
+	impl From<BigSint> for BigFrac {
+		fn from(value: BigSint) -> BigFrac {
+			BigFrac { num: value, den: BigSint::from(1) }
+		}
+	}
+
+	#[derive(Debug)]
+	struct NotAnInteger;
+
+	impl TryFrom<&BigFrac> for BigSint {
+		type Error = NotAnInteger;
+		fn try_from(value: &BigFrac) -> Result<BigSint, NotAnInteger> {
+			if value.is_integer() {
+				Ok(value.num.clone())
+			} else {
+				Err(NotAnInteger)
+			}
+		}
+	}
+	impl TryFrom<BigFrac> for BigSint {
+		type Error = NotAnInteger;
+		fn try_from(value: BigFrac) -> Result<BigSint, NotAnInteger> {
+			if value.is_integer() {
+				Ok(value.num)
+			} else {
+				Err(NotAnInteger)
+			}
+		}
+	}
+
+	impl<T: super::big_unit::LocalIntoU64> From<T> for BigFrac {
+		fn from(value: T) -> BigFrac {
+			BigFrac::from(BigSint::from(value))
+		}
+	}
+
+	/// Rust forbids an other `impl From<T> for BigFrac` block even if T is bound
+	/// to a trait that does not overlap with the trait bound of the previous block.
+	/// This is because an hypothetical programmer could potentially sneak in and
+	/// add `impl`s that make the two non-overlapping traits now overlapping.
+	macro_rules! impl_from_into_i64 {
+		($($primitive_type:ty),*) => {
+			$(
+				impl From<$primitive_type> for BigFrac {
+					fn from(value: $primitive_type) -> BigFrac {
+						let value: i64 = value.into();
+						BigFrac::from(BigSint::from(value))
+					}
+				}
+			)*
+		}
+	}
+	impl_from_into_i64!(i8, i16, i32, i64);
+
+	/// Greatest common divisor, expects `a` and `b` to be strictly positive.
+	fn gcd(mut a: BigSint, mut b: BigSint) -> BigSint {
+		if a < b {
+			// We want `a` to be greater than `b`.
+			gcd(b, a)
+		} else {
+			// Here `a` is greater than `b`.
+			assert!(
+				a.is_strictly_positive(),
+				"`gcd` expects strictly positive arguments"
+			);
+			assert!(
+				b.is_strictly_positive(),
+				"`gcd` expects strictly positive arguments"
+			);
+
+			// See [https://en.wikipedia.org/wiki/Greatest_common_divisor#Euclidean_algorithm].
+			while !b.is_zero() {
+				let a_mod_b = a.div_euclidian(&b).1;
+				(a, b) = (b, a_mod_b);
+			}
+			a
+		}
+	}
+
+	impl BigFrac {
+		/// Simplify the fraction, making sure it is in a "valid" state.
+		///
+		/// A lot of methods expect `BigFrac`s in arguments to be simplified,
+		/// and all the methods shall not allow `self` or a returned `BigFrac`
+		/// to not be simplified.
+		fn simplify(&mut self) {
+			assert!(!self.den.is_zero());
+
+			// The numerator must bear the sign.
+			if self.den.is_strictly_negative() {
+				self.den.negate();
+				self.num.negate();
+			}
+
+			if self.num.is_zero() {
+				// The denominator is expected to be one when the numerator is zero.
+				self.den = BigSint::from(1);
+			} else {
+				// A fraction can be simplified by dividing both the numerator and the denominator
+				// by their GCD. For example, 18 / 12 = (18/6) / (12/6) = 3 / 2, with GCD(18, 12) = 6.
+				let gcd_num_den = gcd(self.num.clone().abs(), self.den.clone().abs());
+				let (new_num, reminder_zero) = self.num.div_euclidian(&gcd_num_den);
+				assert!(reminder_zero.is_zero());
+				self.num = new_num;
+				let (new_den, reminder_zero) = self.den.div_euclidian(&gcd_num_den);
+				assert!(reminder_zero.is_zero());
+				self.den = new_den;
+			}
+		}
+	}
+
+	impl BigFrac {
+		fn from_num_and_den(num: impl Into<BigSint>, den: impl Into<BigSint>) -> BigFrac {
+			let mut big_frac = BigFrac { num: num.into(), den: den.into() };
+			assert!(
+				!big_frac.den.is_zero(),
+				"attempted to create a fraction with zero as the denominator"
+			);
+			big_frac.simplify();
+			big_frac
+		}
+	}
+
+	impl Eq for BigFrac {}
+	impl PartialEq for BigFrac {
+		fn eq(&self, rhs: &BigFrac) -> bool {
+			(self.is_zero() && rhs.is_zero()) || (self.num == rhs.num && self.den == rhs.den)
+		}
+	}
+
+	impl Ord for BigFrac {
+		fn cmp(&self, rhs: &BigFrac) -> Ordering {
+			// (a/b) < (c/d) iff (a*d) < (c*b) assuming non-zero denominators.
+			(&self.num * &rhs.den).cmp(&(&rhs.num * &self.den))
+		}
+	}
+	impl PartialOrd for BigFrac {
+		fn partial_cmp(&self, rhs: &BigFrac) -> Option<Ordering> {
+			Some(self.cmp(rhs))
+		}
+	}
+
+	impl Add<&BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn add(self, rhs: &BigFrac) -> BigFrac {
+			// (a/b) + (c/d) = (a*d)/(b*d) + (c*b)/(b*d) = (a*d + c*b)/(b*d)
+			BigFrac::from_num_and_den(
+				&self.num * &rhs.den + &rhs.num * &self.den,
+				&self.den * &rhs.den,
+			)
+		}
+	}
+	impl Add<&BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn add(self, rhs: &BigFrac) -> BigFrac {
+			&self + rhs
+		}
+	}
+	impl Add<BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn add(self, rhs: BigFrac) -> BigFrac {
+			self + &rhs
+		}
+	}
+	impl Add<BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn add(self, rhs: BigFrac) -> BigFrac {
+			&self + &rhs
+		}
+	}
+	impl AddAssign<BigFrac> for BigFrac {
+		fn add_assign(&mut self, rhs: BigFrac) {
+			*self = &*self + &rhs
+		}
+	}
+	impl AddAssign<&BigFrac> for BigFrac {
+		fn add_assign(&mut self, rhs: &BigFrac) {
+			*self = &*self + rhs
+		}
+	}
+
+	impl Sub<&BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn sub(self, rhs: &BigFrac) -> BigFrac {
+			// (a/b) - (c/d) = (a*d)/(b*d) - (c*b)/(b*d) = (a*d - c*b)/(b*d)
+			BigFrac::from_num_and_den(
+				&self.num * &rhs.den - &rhs.num * &self.den,
+				&self.den * &rhs.den,
+			)
+		}
+	}
+	impl Sub<&BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn sub(self, rhs: &BigFrac) -> BigFrac {
+			&self - rhs
+		}
+	}
+	impl Sub<BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn sub(self, rhs: BigFrac) -> BigFrac {
+			self - &rhs
+		}
+	}
+	impl Sub<BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn sub(self, rhs: BigFrac) -> BigFrac {
+			&self - &rhs
+		}
+	}
+	impl SubAssign<BigFrac> for BigFrac {
+		fn sub_assign(&mut self, rhs: BigFrac) {
+			*self = &*self - &rhs
+		}
+	}
+	impl SubAssign<&BigFrac> for BigFrac {
+		fn sub_assign(&mut self, rhs: &BigFrac) {
+			*self = &*self - rhs
+		}
+	}
+
+	impl Mul<&BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn mul(self, rhs: &BigFrac) -> BigFrac {
+			BigFrac {
+				num: &self.num * &rhs.num,
+				den: &self.den * &rhs.den,
+			}
+		}
+	}
+	impl Mul<&BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn mul(self, rhs: &BigFrac) -> BigFrac {
+			&self * rhs
+		}
+	}
+	impl Mul<BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn mul(self, rhs: BigFrac) -> BigFrac {
+			self * &rhs
+		}
+	}
+	impl Mul<BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn mul(self, rhs: BigFrac) -> BigFrac {
+			&self * rhs
+		}
+	}
+	impl MulAssign<BigFrac> for BigFrac {
+		fn mul_assign(&mut self, rhs: BigFrac) {
+			*self = &*self * &rhs;
+		}
+	}
+	impl MulAssign<&BigFrac> for BigFrac {
+		fn mul_assign(&mut self, rhs: &BigFrac) {
+			*self = &*self * rhs;
+		}
+	}
+
+	impl Div<&BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn div(self, rhs: &BigFrac) -> BigFrac {
+			BigFrac {
+				num: &self.num * &rhs.den,
+				den: &self.den * &rhs.num,
+			}
+		}
+	}
+	impl Div<&BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn div(self, rhs: &BigFrac) -> BigFrac {
+			&self / rhs
+		}
+	}
+	impl Div<BigFrac> for &BigFrac {
+		type Output = BigFrac;
+		fn div(self, rhs: BigFrac) -> BigFrac {
+			self / &rhs
+		}
+	}
+	impl Div<BigFrac> for BigFrac {
+		type Output = BigFrac;
+		fn div(self, rhs: BigFrac) -> BigFrac {
+			&self / rhs
+		}
+	}
+	impl DivAssign<BigFrac> for BigFrac {
+		fn div_assign(&mut self, rhs: BigFrac) {
+			*self = &*self / &rhs;
+		}
+	}
+	impl DivAssign<&BigFrac> for BigFrac {
+		fn div_assign(&mut self, rhs: &BigFrac) {
+			*self = &*self / rhs;
+		}
+	}
+
+	#[cfg(test)]
+	mod tests {
+		use super::*;
+
+		impl BigFrac {
+			fn is_not_properly_simplified(&self) -> bool {
+				if self.den.is_negative() {
+					true
+				} else if self.den.is_zero() {
+					true
+				} else if self.num.is_zero() && self.den != BigSint::from(1) {
+					true
+				} else {
+					let mut simplified = self.clone();
+					simplified.simplify();
+					self.num != simplified.num || self.den != simplified.den
+				}
+			}
+		}
+
+		/// A few signed integer values to iterate over in tests.
+		fn some_values() -> impl Iterator<Item = i64> {
+			let values: Vec<i64> = vec![
+				0,
+				1,
+				8,
+				17,
+				42,
+				69,
+				100000000,
+				123456789,
+				0x123456789ABCDEF,
+				u8::MAX as i64 - 1,
+				u8::MAX as i64,
+				u8::MAX as i64 + 1,
+				u16::MAX as i64 - 123,
+				u16::MAX as i64 - 1,
+				u16::MAX as i64,
+				u16::MAX as i64 + 1,
+				u16::MAX as i64 + 123,
+				u32::MAX as i64 - 123,
+				u32::MAX as i64 - 1,
+				u32::MAX as i64,
+				u32::MAX as i64 + 1,
+				u32::MAX as i64 + 123,
+				i64::MAX - 123,
+				i64::MAX - 1,
+				i64::MAX,
+			];
+			values
+				.clone()
+				.into_iter()
+				.map(|value| -value)
+				.chain(values.into_iter())
+		}
+
+		#[test]
+		fn is_simplified_upon_creation() {
+			for (value_a, value_b) in some_values().zip(some_values()) {
+				if value_b == 0 {
+					continue;
+				}
+				let bf_a_b = BigFrac::from_num_and_den(value_a, value_b);
+				assert!(
+					!bf_a_b.is_not_properly_simplified(),
+					"BigFrac is not simplified upon creation from a num and den"
+				);
+			}
+		}
+
+		#[test]
+		fn eq_with_itself() {
+			for (value_a, value_b) in some_values().zip(some_values()) {
+				if value_b == 0 {
+					continue;
+				}
+				let bf_a_b = BigFrac::from_num_and_den(value_a, value_b);
+				assert_eq!(bf_a_b, bf_a_b, "BigFrac is not equal with itself");
+			}
+		}
+
+		#[test]
+		fn simplify() {
+			let bf = BigFrac::from_num_and_den(123456789, 987654321);
+			assert!(
+				bf.num == BigSint::from(13717421),
+				"BigFrac not simplified upon creation from a num and den"
+			);
+			assert!(
+				bf.den == BigSint::from(109739369),
+				"BigFrac not simplified upon creation from a num and den"
+			);
+		}
+
+		#[test]
+		fn eq_consistent_with_ord() {
+			for (value_a, value_b) in some_values().zip(some_values()) {
+				if value_b == 0 {
+					continue;
+				}
+				let bf_a_b = BigFrac::from_num_and_den(value_a, value_b);
+				for (value_c, value_d) in some_values().zip(some_values()) {
+					if value_d == 0 {
+						continue;
+					}
+					let bf_c_d = BigFrac::from_num_and_den(value_c, value_d);
+					assert_eq!(
+						bf_a_b.eq(&bf_c_d),
+						bf_a_b.cmp(&bf_c_d) == Ordering::Equal,
+						"BigFrac comparison (cmp) behaves differently BigFrac equality test (eq)"
+					);
+				}
+			}
+		}
+
+		#[test]
+		fn add() {
+			let bf_a = BigFrac::from_num_and_den(123456789, 987654321);
+			let bf_b = BigFrac::from_num_and_den(999999999, 123454321);
+			let bf_sum = bf_a + bf_b;
+			let expected_result =
+				BigFrac::from_num_and_den(111432843785686772u64, 13547799286863449u64);
+			assert_eq!(bf_sum, expected_result);
+		}
+
+		#[test]
+		fn sub() {
+			let bf_a = BigFrac::from_num_and_den(123456789, 987654321);
+			let bf_b = BigFrac::from_num_and_den(999999999, 123454321);
+			let bf_subtraction = bf_a - bf_b;
+			let expected_result =
+				BigFrac::from_num_and_den(-108045893994834490i64, 13547799286863449i64);
+			assert_eq!(bf_subtraction, expected_result);
+		}
+
+		#[test]
+		fn mul() {
+			let bf_a = BigFrac::from_num_and_den(123456789, 987654321);
+			let bf_b = BigFrac::from_num_and_den(999999999, 123454321);
+			let bf_product = bf_a * bf_b;
+			let expected_result =
+				BigFrac::from_num_and_den(13717420986282579u64, 13547799286863449u64);
+			assert_eq!(bf_product, expected_result);
+		}
+
+		#[test]
+		fn div() {
+			let bf_a = BigFrac::from_num_and_den(123456789, 987654321);
+			let bf_b = BigFrac::from_num_and_den(999999999, 123454321);
+			let bf_division = bf_a / bf_b;
+			let expected_result =
+				BigFrac::from_num_and_den(1693474895426141u64, 109739368890260631u64);
+			assert_eq!(bf_division, expected_result);
 		}
 	}
 }
