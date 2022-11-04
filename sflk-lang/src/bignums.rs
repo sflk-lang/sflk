@@ -52,6 +52,10 @@ mod big_unit {
 			BigUint { digits: Vec::new() }
 		}
 
+		pub fn is_zero(&self) -> bool {
+			self.digits.is_empty()
+		}
+
 		/// Removes the insignificant leading zeros that may have been added
 		/// by initialisation or for convinience.
 		///
@@ -526,10 +530,10 @@ mod big_unit {
 	}
 
 	impl BigUint {
-		/// Perform the euclidian division `self / rhs`,
+		/// Performs the euclidian division `self / rhs`,
 		/// returns `(quotient, remainder)`.
 		#[must_use]
-		fn div_euclidian(&self, rhs: &BigUint) -> (BigUint, BigUint) {
+		pub fn div_euclidian(&self, rhs: &BigUint) -> (BigUint, BigUint) {
 			// Classic long division algorithm.
 			// Surprisingly, it is pretty hard to find a readable and complete implementation
 			// or pseudocode of this algorithm on the Internet (or I haven't searched good enough),
@@ -973,21 +977,38 @@ mod big_unit {
 }
 
 mod big_sint {
+	use std::{
+		cmp::Ordering,
+		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
+	};
+
 	use super::{big_unit::BigUint, DoesNotFit};
 
 	/// Big signed integer.
+	#[derive(Clone, Debug)]
 	struct BigSint {
 		abs_value: BigUint,
-		/// This should be `false` for the value zero.
-		is_strictly_negative: bool,
+		/// There is no constraint on this when the value is zero.
+		is_negative: bool,
 	}
 
 	impl BigSint {
 		fn zero() -> BigSint {
-			BigSint {
-				abs_value: BigUint::zero(),
-				is_strictly_negative: false,
-			}
+			BigSint { abs_value: BigUint::zero(), is_negative: false }
+		}
+
+		fn is_zero(&self) -> bool {
+			self.abs_value.is_zero()
+		}
+
+		fn is_positive(&self) -> bool {
+			(!self.is_negative) || self.is_zero()
+		}
+	}
+
+	impl From<BigUint> for BigSint {
+		fn from(value: BigUint) -> BigSint {
+			BigSint { abs_value: value, is_negative: false }
 		}
 	}
 
@@ -996,7 +1017,7 @@ mod big_sint {
 			let value: u64 = value.into();
 			BigSint {
 				abs_value: BigUint::from(value),
-				is_strictly_negative: false,
+				is_negative: false,
 			}
 		}
 	}
@@ -1013,7 +1034,7 @@ mod big_sint {
 						let value: i64 = value.into();
 						BigSint {
 							abs_value: BigUint::from(value.abs() as u64),
-							is_strictly_negative: value < 0,
+							is_negative: value < 0,
 						}
 					}
 				}
@@ -1029,7 +1050,7 @@ mod big_sint {
 					type Error = DoesNotFit;
 
 					fn try_from(value: &BigSint) -> Result<$primitive_type, DoesNotFit> {
-						if value.is_strictly_negative {
+						if value.is_negative {
 							Err(DoesNotFit)
 						} else {
 							Ok((&value.abs_value).try_into()?)
@@ -1040,7 +1061,7 @@ mod big_sint {
 		}
 	}
 
-	impl_try_from_big_sint_unsigned!(u8, u16, u32, u64, u128, usize);
+	impl_try_from_big_sint_unsigned!(u8, u16, u32, u64, usize);
 
 	macro_rules! impl_try_from_big_sint_signed {
 		($(($primitive_type:ty, $unsigned_intermediary_type:ty)),*) => {
@@ -1050,21 +1071,23 @@ mod big_sint {
 
 					fn try_from(value: &BigSint) -> Result<$primitive_type, DoesNotFit> {
 						// The given `$unsigned_intermediary_type` is supposed to be able to hold
-						// the absolute value.
+						// the absolute value (even for `<$primitive_type>::MIN`).
 						let intermediary: $unsigned_intermediary_type =
 							(&value.abs_value).try_into()?;
 						if (
-							intermediary == (<$primitive_type>::MIN) as $unsigned_intermediary_type
+							intermediary ==
+								<$primitive_type>::MAX as $unsigned_intermediary_type + 1
+							&& value.is_negative
 						) {
 							// The case of the value being `<$primitive_type>::MIN` cannot
 							// be handled naively as its abolute value does not fit in
 							// a value of type `$primitive_type`.
-							Ok(-(intermediary as $primitive_type))
+							Ok(<$primitive_type>::MIN)
 						} else {
 							let res: $primitive_type =
 								intermediary.try_into().map_err(|_| DoesNotFit)?;
 							let sign: $primitive_type =
-								if value.is_strictly_negative { -1 as $primitive_type } else { 1 };
+								if value.is_negative { -1 as $primitive_type } else { 1 };
 							Ok(res * sign)
 						}
 					}
@@ -1073,23 +1096,224 @@ mod big_sint {
 		}
 	}
 	impl_try_from_big_sint_signed!(
-		(i8, u8),
-		(i16, u16),
-		(i32, u32),
-		(i64, u64),
-		(i128, u128),
-		(isize, usize)
+		(i8, u16),
+		(i16, u32),
+		(i32, u64),
+		(i64, u128),
+		(isize, u128)
 	);
+
+	impl Eq for BigSint {}
+	impl PartialEq for BigSint {
+		fn eq(&self, rhs: &BigSint) -> bool {
+			self.is_zero()
+				|| (self.abs_value == rhs.abs_value && self.is_negative == rhs.is_negative)
+		}
+	}
+
+	impl Ord for BigSint {
+		fn cmp(&self, rhs: &BigSint) -> Ordering {
+			if self.abs_value.is_zero() && rhs.abs_value.is_zero() {
+				Ordering::Equal
+			} else {
+				match (self.is_negative, rhs.is_negative) {
+					(false, false) => self.abs_value.cmp(&rhs.abs_value),
+					(true, true) => rhs.abs_value.cmp(&self.abs_value),
+					(true, false) => Ordering::Less,
+					(false, true) => Ordering::Greater,
+				}
+			}
+		}
+	}
+	impl PartialOrd for BigSint {
+		fn partial_cmp(&self, rhs: &BigSint) -> Option<Ordering> {
+			Some(self.cmp(rhs))
+		}
+	}
+
+	impl BigSint {
+		fn add_assign_ex(&mut self, rhs: &BigSint, flip_sign_of_rhs: bool) {
+			let rhs_is_negative = if flip_sign_of_rhs {
+				!rhs.is_negative
+			} else {
+				rhs.is_negative
+			};
+			// TODO: Try to remove useless clones in some subtractions without
+			// duplicating too much code.
+			match (self.is_negative, rhs_is_negative) {
+				(false, false) | (true, true) => {
+					// (+1) + (+2) = +3 = +(1 + 2)
+					// (-1) + (-2) = -3 = -(1 + 2)
+					self.abs_value += &rhs.abs_value;
+				},
+				(false, true) if self.abs_value >= rhs.abs_value => {
+					// (+8) + (-3) = +5 = +(8 - 3)
+					self.abs_value -= &rhs.abs_value;
+					self.is_negative = false;
+				},
+				(false, true) => {
+					// (+3) + (-8) = -5 = -(8 - 3)
+					// TODO: Remove useless clone somehow.
+					self.abs_value = &rhs.abs_value - &self.abs_value;
+					self.is_negative = true;
+				},
+				(true, false) if self.abs_value > rhs.abs_value => {
+					// (-8) + (+3) = -5 = -(8 - 3)
+					self.abs_value -= &rhs.abs_value;
+					self.is_negative = true;
+				},
+				(true, false) => {
+					// (-3) + (+8) = +5 = +(8 - 3)
+					// TODO: Remove useless clone somehow.
+					self.abs_value = &rhs.abs_value - &self.abs_value;
+					self.is_negative = false;
+				},
+			}
+		}
+		fn add_ex(&self, rhs: &BigSint, flip_sign_of_rhs: bool) -> BigSint {
+			let mut res = self.clone();
+			res.add_assign_ex(rhs, flip_sign_of_rhs);
+			res
+		}
+	}
+
+	impl AddAssign<BigSint> for BigSint {
+		fn add_assign(&mut self, rhs: BigSint) {
+			self.add_assign_ex(&rhs, false);
+		}
+	}
+	impl AddAssign<&BigSint> for BigSint {
+		fn add_assign(&mut self, rhs: &BigSint) {
+			self.add_assign_ex(rhs, false);
+		}
+	}
+	impl Add<BigSint> for BigSint {
+		type Output = BigSint;
+		fn add(self, rhs: BigSint) -> BigSint {
+			self.add_ex(&rhs, false)
+		}
+	}
+	impl Add<&BigSint> for BigSint {
+		type Output = BigSint;
+		fn add(self, rhs: &BigSint) -> BigSint {
+			self.add_ex(rhs, false)
+		}
+	}
+	impl Add<BigSint> for &BigSint {
+		type Output = BigSint;
+		fn add(self, rhs: BigSint) -> BigSint {
+			self.add_ex(&rhs, false)
+		}
+	}
+	impl Add<&BigSint> for &BigSint {
+		type Output = BigSint;
+		fn add(self, rhs: &BigSint) -> BigSint {
+			self.add_ex(rhs, false)
+		}
+	}
+
+	impl SubAssign<BigSint> for BigSint {
+		fn sub_assign(&mut self, rhs: BigSint) {
+			self.add_assign_ex(&rhs, true);
+		}
+	}
+	impl SubAssign<&BigSint> for BigSint {
+		fn sub_assign(&mut self, rhs: &BigSint) {
+			self.add_assign_ex(rhs, true);
+		}
+	}
+	impl Sub<BigSint> for BigSint {
+		type Output = BigSint;
+		fn sub(self, rhs: BigSint) -> BigSint {
+			self.add_ex(&rhs, true)
+		}
+	}
+	impl Sub<&BigSint> for BigSint {
+		type Output = BigSint;
+		fn sub(self, rhs: &BigSint) -> BigSint {
+			self.add_ex(rhs, true)
+		}
+	}
+	impl Sub<BigSint> for &BigSint {
+		type Output = BigSint;
+		fn sub(self, rhs: BigSint) -> BigSint {
+			self.add_ex(&rhs, true)
+		}
+	}
+	impl Sub<&BigSint> for &BigSint {
+		type Output = BigSint;
+		fn sub(self, rhs: &BigSint) -> BigSint {
+			self.add_ex(rhs, true)
+		}
+	}
+
+	impl MulAssign<BigSint> for BigSint {
+		fn mul_assign(&mut self, rhs: BigSint) {
+			self.is_negative ^= rhs.is_negative;
+			self.abs_value *= rhs.abs_value;
+		}
+	}
+	impl MulAssign<&BigSint> for BigSint {
+		fn mul_assign(&mut self, rhs: &BigSint) {
+			self.is_negative ^= rhs.is_negative;
+			self.abs_value *= &rhs.abs_value;
+		}
+	}
+	impl Mul<BigSint> for BigSint {
+		type Output = BigSint;
+		fn mul(mut self, rhs: BigSint) -> BigSint {
+			self *= rhs;
+			self
+		}
+	}
+	impl Mul<&BigSint> for BigSint {
+		type Output = BigSint;
+		fn mul(mut self, rhs: &BigSint) -> BigSint {
+			self *= rhs;
+			self
+		}
+	}
+	impl Mul<BigSint> for &BigSint {
+		type Output = BigSint;
+		fn mul(self, mut rhs: BigSint) -> BigSint {
+			// `*` is commutative.
+			rhs *= self;
+			rhs
+		}
+	}
+	impl Mul<&BigSint> for &BigSint {
+		type Output = BigSint;
+		fn mul(self, rhs: &BigSint) -> BigSint {
+			BigSint {
+				abs_value: &self.abs_value * &rhs.abs_value,
+				is_negative: self.is_negative ^ rhs.is_negative,
+			}
+		}
+	}
+
+	impl BigSint {
+		/// Performs the euclidian division `self / rhs`,
+		/// returns `(quotient, remainder)`,
+		/// `quotient` having the sign of `self` and `remainder` being positive.
+		///
+		/// Only accepts a (strictly) positive `rhs`.
+		#[must_use]
+		fn div_euclidian(&self, rhs: &BigSint) -> (BigSint, BigSint) {
+			assert!(
+				!(rhs.is_negative || rhs.is_zero()),
+				"dividing a BigSint by zero or negative"
+			);
+			let (quotient, remainder) = self.abs_value.div_euclidian(&rhs.abs_value);
+			(
+				BigSint { abs_value: quotient, is_negative: self.is_negative },
+				BigSint::from(remainder),
+			)
+		}
+	}
 
 	#[cfg(test)]
 	mod tests {
 		use super::*;
-
-		impl BigSint {
-			fn is_illegal_strictly_negative_zero(&self) -> bool {
-				self.abs_value == BigUint::zero() && self.is_illegal_strictly_negative_zero()
-			}
-		}
 
 		/// A few signed integer values to iterate over in tests.
 		fn some_values() -> impl Iterator<Item = i64> {
@@ -1131,8 +1355,8 @@ mod big_sint {
 		fn preserve_value() {
 			for value in some_values() {
 				let value_before = value;
-				let bu = BigSint::from(value_before);
-				let value_after = i64::try_from(&bu).unwrap();
+				let bs = BigSint::from(value_before);
+				let value_after = i64::try_from(&bs).unwrap();
 				assert_eq!(
 					value_before, value_after,
 					"converting to and then from a BigSint does not preserve the value"
@@ -1149,6 +1373,235 @@ mod big_sint {
 				"converting to u32 a BigSint that represents a value \
 				too negative to fit in a u32 must fail"
 			);
+		}
+
+		#[test]
+		fn eq_with_itself() {
+			for value in some_values() {
+				let bs = BigSint::from(value);
+				assert_eq!(bs, bs, "BigSint is not equal with itself");
+			}
+		}
+
+		#[test]
+		fn ord() {
+			for value_a in some_values() {
+				let bs_a = BigSint::from(value_a);
+				for value_b in some_values() {
+					let bs_b = BigSint::from(value_b);
+					assert_eq!(
+						value_a.cmp(&value_b),
+						bs_a.cmp(&bs_b),
+						"BigSint comparison behaves differently from Rust's"
+					);
+				}
+			}
+		}
+
+		#[test]
+		fn add() {
+			for value_a in some_values() {
+				let bs_a = BigSint::from(value_a);
+				for value_b in some_values() {
+					let bs_b = BigSint::from(value_b);
+					let big_sum_a_b = {
+						let mut tmp = bs_a.clone();
+						tmp += &bs_b;
+						tmp
+					};
+
+					// Check against Rust's result, if available.
+					if let Some(sum_a_b) = value_a.checked_add(value_b) {
+						let sum_a_b_after = i64::try_from(&big_sum_a_b).expect(
+							"the checked addition passed, thus this was expected to pass too",
+						);
+						assert_eq!(
+							sum_a_b, sum_a_b_after,
+							"BigSint addition behaves differently from Rusts's"
+						);
+					}
+
+					// Check consistency accross all the `impl` blocks related to the addition.
+					assert_eq!(
+						big_sum_a_b,
+						{
+							let mut tmp = bs_a.clone();
+							tmp += bs_b.clone();
+							tmp
+						},
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						&bs_a + &bs_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						&bs_a + bs_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						bs_a.clone() + &bs_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_sum_a_b,
+						bs_a.clone() + bs_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+				}
+			}
+		}
+
+		#[test]
+		fn sub() {
+			for value_a in some_values() {
+				let bs_a = BigSint::from(value_a);
+				for value_b in some_values() {
+					let bs_b = BigSint::from(value_b);
+					let big_subtration_a_b = {
+						let mut tmp = bs_a.clone();
+						tmp -= &bs_b;
+						tmp
+					};
+
+					// Check against Rust's result, if available.
+					if let Some(subtraction_a_b) = value_a.checked_sub(value_b) {
+						let subtraction_a_b_after = i64::try_from(&big_subtration_a_b).unwrap();
+						assert_eq!(
+							subtraction_a_b, subtraction_a_b_after,
+							"BigSint subctarction behaves differently from Rusts's"
+						);
+					}
+
+					// Check consistency accross all the `impl` blocks related
+					// to the subtraction.
+					assert_eq!(
+						big_subtration_a_b,
+						{
+							let mut tmp = bs_a.clone();
+							tmp -= bs_b.clone();
+							tmp
+						},
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_subtration_a_b,
+						&bs_a - &bs_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_subtration_a_b,
+						&bs_a - bs_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_subtration_a_b,
+						bs_a.clone() - &bs_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_subtration_a_b,
+						bs_a.clone() - bs_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+				}
+			}
+		}
+
+		#[test]
+		fn mul() {
+			for value_a in some_values() {
+				let bs_a = BigSint::from(value_a);
+				for value_b in some_values() {
+					let bs_b = BigSint::from(value_b);
+					let big_product_a_b = &bs_a * &bs_b;
+
+					// Check against Rust's result, if available.
+					if let Some(product_a_b) = value_a.checked_mul(value_b) {
+						let product_a_b_after = i64::try_from(&big_product_a_b).expect(
+							"the checked multiplication passed, \
+							thus this was expected to pass too",
+						);
+						assert_eq!(
+							product_a_b, product_a_b_after,
+							"BigSint multiplication behaves differently from Rusts's"
+						);
+					}
+
+					// Check consistency accross all the `impl` blocks related
+					// to the multiplication.
+					assert_eq!(
+						big_product_a_b,
+						&bs_a * bs_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						bs_a.clone() * &bs_b,
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						bs_a.clone() * bs_b.clone(),
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						{
+							let mut tmp = bs_a.clone();
+							tmp *= &bs_b;
+							tmp
+						},
+						"one of the `impl`s is missbehaving"
+					);
+					assert_eq!(
+						big_product_a_b,
+						{
+							let mut tmp = bs_a.clone();
+							tmp *= bs_b.clone();
+							tmp
+						},
+						"one of the `impl`s is missbehaving"
+					);
+				}
+			}
+		}
+
+
+		#[test]
+		fn div_euclidian() {
+			for value_a in some_values() {
+				let bs_a = BigSint::from(value_a);
+				for value_b in some_values() {
+					// We don't do division by a negative number at the `BigSint` level.
+					if value_b < 0 {
+						continue;
+					}
+					// If Rust can't do the division (because `value_b` is zero), neither can we.
+					if let Some(quotient_a_b) = value_a.checked_div(value_b) {
+						let remainder_a_b = value_a % value_b;
+
+						let bs_b = BigSint::from(value_b);
+						let (big_quotient_a_b, big_remainder_a_b) = bs_a.div_euclidian(&bs_b);
+
+						// Check against Rust's result.
+						let quotient_a_b_after = i64::try_from(&big_quotient_a_b).unwrap();
+						assert_eq!(
+							quotient_a_b, quotient_a_b_after,
+							"BigSint euclidian behaves differently from Rusts's for the quotient"
+						);
+						let remainder_a_b_after = i64::try_from(&big_remainder_a_b).unwrap();
+						assert_eq!(
+							remainder_a_b.abs(), remainder_a_b_after,
+							"BigSint euclidian behaves differently from Rusts's \
+							(when taking its absolute value) for the remainder"
+						);
+					}
+				}
+			}
 		}
 	}
 }
