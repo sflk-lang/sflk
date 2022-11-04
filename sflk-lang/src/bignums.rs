@@ -41,7 +41,7 @@ mod big_unit {
 		/// The value zero is represented by an empty list of digits.
 		///
 		/// Respecting these rules ensures that each unsigned integer value can be
-		/// represented by one unique representation.
+		/// represented by one unique representation, code is simpler in some places.
 		///
 		/// For example, in base 10, the number 1234 would be stored as `vec![4, 3, 2, 1]`.
 		digits: Vec<Digit>,
@@ -719,12 +719,27 @@ mod big_unit {
 				too big to fit in a u32 must fail"
 			);
 		}
-
+		
 		#[test]
 		fn eq_with_itself() {
 			for value in some_values() {
 				let bu = BigUint::from(value);
 				assert_eq!(bu, bu, "BigUint is not equal with itself");
+			}
+		}
+
+		#[test]
+		fn eq() {
+			for value_a in some_values() {
+				let bu_a = BigUint::from(value_a);
+				for value_b in some_values() {
+					let bu_b = BigUint::from(value_b);
+					assert_eq!(
+						value_a.eq(&value_b),
+						bu_a.eq(&bu_b),
+						"BigUint equality test behaves differently from Rust's"
+					);
+				}
 			}
 		}
 
@@ -987,6 +1002,12 @@ mod big_unit {
 					}
 				}
 			}
+		}
+
+		#[test]
+		#[should_panic]
+		fn div_by_zero() {
+			let _does_not_work = BigUint::from(69u64).div_euclidian(&BigUint::zero());
 		}
 	}
 }
@@ -1399,6 +1420,21 @@ mod big_sint {
 		}
 
 		#[test]
+		fn eq() {
+			for value_a in some_values() {
+				let bs_a = BigSint::from(value_a);
+				for value_b in some_values() {
+					let bs_b = BigSint::from(value_b);
+					assert_eq!(
+						value_a.eq(&value_b),
+						bs_a.eq(&bs_b),
+						"BigSint equality test behaves differently from Rust's"
+					);
+				}
+			}
+		}
+
+		#[test]
 		fn ord() {
 			for value_a in some_values() {
 				let bs_a = BigSint::from(value_a);
@@ -1632,6 +1668,19 @@ mod big_sint {
 					}
 				}
 			}
+		}
+
+		#[test]
+		#[should_panic]
+		fn div_by_zero() {
+			let _does_not_work = BigSint::from(69u64).div_euclidian(&BigSint::zero());
+		}
+
+		#[test]
+		#[should_panic]
+		fn div_by_strictly_negative() {
+			// Expected to fail by design choice.
+			let _does_not_work = BigSint::from(69u64).div_euclidian(&BigSint::from(-8i64));
 		}
 	}
 }
