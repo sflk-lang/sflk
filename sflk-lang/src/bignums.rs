@@ -936,6 +936,8 @@ mod big_unit {
 	}
 
 	mod srting_conversion {
+		use std::ops::Add;
+
 		use super::BigUint;
 
 		#[derive(Debug)]
@@ -982,6 +984,47 @@ mod big_unit {
 					bu += BigUint::from(char_to_number_in_base(c, base)?);
 				}
 				Ok(bu)
+			}
+
+			fn to_string_in_base(mut self, base: u64, upper_case: bool) -> String {
+				assert!(base >= 1);
+				assert!(
+					base <= 10 + 26,
+					"base {base} is too high to be supported by digits and letters"
+				);
+
+				// Since we extract the least significant digit at each step,
+				// digits are produced "in reverse" and the vec they are stored in
+				// will have to be reversed after.
+				let mut char_digits_reversed = Vec::new();
+
+				let bu_base = BigUint::from(base);
+				while !self.is_zero() {
+					// Extract the least significant digit.
+					let (new_self, digit_in_base) = self.div_euclidian(&bu_base);
+					self = new_self;
+					let digit_in_base = u8::try_from(&digit_in_base).unwrap();
+
+					// Convert the extracted digit to an alphanumeric character.
+					let digit_as_char = if digit_in_base < 10 {
+						'0' as u8 + digit_in_base
+					} else {
+						(if upper_case { 'A' } else { 'a' }) as u8 - 10 + digit_in_base
+					} as char;
+
+					char_digits_reversed.push(digit_as_char);
+				}
+
+				if char_digits_reversed.is_empty() {
+					// Zero is a special case since its usual notation ("0")
+					// is actually one insignificant leading zero before the
+					// sequence of significant digits (that happens to be empty).
+					String::from("0")
+				} else {
+					let mut string = String::new();
+					string.extend(char_digits_reversed.into_iter().rev());
+					string
+				}
 			}
 		}
 
@@ -1045,6 +1088,24 @@ mod big_unit {
 				assert!(BigUint::from_string_in_base("100w001", 10).is_err());
 				assert!(BigUint::from_string_in_base("100w001", 10).is_err());
 				assert!(BigUint::from_string_in_base("@0", 10).is_err());
+			}
+
+			#[test]
+			fn to_string_in_base() {
+				assert_eq!(BigUint::from(0u64).to_string_in_base(10, false), "0");
+				assert_eq!(BigUint::from(123u64).to_string_in_base(10, false), "123");
+				assert_eq!(
+					BigUint::from(123000u64).to_string_in_base(10, false),
+					"123000"
+				);
+				assert_eq!(
+					BigUint::from(0xffffffffu64).to_string_in_base(16, false),
+					"ffffffff"
+				);
+				assert_eq!(
+					BigUint::from(0b1010101010101010u64).to_string_in_base(2, false),
+					"1010101010101010"
+				);
 			}
 		}
 	}
