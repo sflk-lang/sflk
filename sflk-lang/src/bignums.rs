@@ -934,6 +934,120 @@ mod big_unit {
 			let _does_not_work = BigUint::from(69u64).div_euclidian(&BigUint::zero());
 		}
 	}
+
+	mod srting_conversion {
+		use super::BigUint;
+
+		#[derive(Debug)]
+		struct CharIsNoDigitInBase {
+			character: char,
+			base: u64,
+		}
+
+		fn char_to_number_in_base(c: char, base: u64) -> Result<u64, CharIsNoDigitInBase> {
+			assert!(base >= 1);
+			assert!(
+				base <= 10 + 26,
+				"base {base} is too high to be supported by digits and letters"
+			);
+
+			if c.is_ascii_digit() {
+				let value = c as u64 - '0' as u64;
+				if value < base {
+					Ok(value)
+				} else {
+					Err(CharIsNoDigitInBase { character: c, base })
+				}
+			} else if c.is_ascii_alphabetic() {
+				let value = 10 + c as u64 - if c.is_uppercase() { 'A' } else { 'a' } as u64;
+				if value < base {
+					Ok(value)
+				} else {
+					Err(CharIsNoDigitInBase { character: c, base })
+				}
+			} else {
+				Err(CharIsNoDigitInBase { character: c, base })
+			}
+		}
+
+		impl BigUint {
+			fn from_string_in_base(
+				string: &str,
+				base: u64,
+			) -> Result<BigUint, CharIsNoDigitInBase> {
+				let mut bu = BigUint::zero();
+				let bu_base = BigUint::from(base);
+				for c in string.chars() {
+					bu *= &bu_base;
+					bu += BigUint::from(char_to_number_in_base(c, base)?);
+				}
+				Ok(bu)
+			}
+		}
+
+		#[cfg(test)]
+		mod tests {
+			use super::*;
+
+			#[test]
+			fn char_to_number() {
+				assert_eq!(char_to_number_in_base('0', 10).unwrap(), 0);
+				assert_eq!(char_to_number_in_base('8', 10).unwrap(), 8);
+				assert_eq!(char_to_number_in_base('9', 10).unwrap(), 9);
+				assert!(char_to_number_in_base('a', 10).is_err());
+
+				assert_eq!(char_to_number_in_base('4', 5).unwrap(), 4);
+				assert!(char_to_number_in_base('5', 5).is_err());
+				assert!(char_to_number_in_base('a', 5).is_err());
+
+				assert_eq!(char_to_number_in_base('0', 16).unwrap(), 0);
+				assert_eq!(char_to_number_in_base('8', 16).unwrap(), 8);
+				assert_eq!(char_to_number_in_base('f', 16).unwrap(), 15);
+				assert!(char_to_number_in_base('z', 16).is_err());
+
+				assert_eq!(char_to_number_in_base('z', 36).unwrap(), 35);
+
+				assert!(char_to_number_in_base('+', 16).is_err());
+				assert!(char_to_number_in_base('-', 16).is_err());
+				assert!(char_to_number_in_base('.', 16).is_err());
+				assert!(char_to_number_in_base('/', 16).is_err());
+				assert!(char_to_number_in_base('^', 16).is_err());
+			}
+
+			#[test]
+			fn from_string_in_base() {
+				assert_eq!(
+					BigUint::from_string_in_base("0", 10).unwrap(),
+					BigUint::zero()
+				);
+				assert_eq!(
+					BigUint::from_string_in_base("000", 10).unwrap(),
+					BigUint::zero()
+				);
+				assert_eq!(
+					BigUint::from_string_in_base("123", 10).unwrap(),
+					BigUint::from(123u64)
+				);
+				assert_eq!(
+					BigUint::from_string_in_base("123000", 10).unwrap(),
+					BigUint::from(123000u64)
+				);
+				assert_eq!(
+					BigUint::from_string_in_base("ffffffff", 16).unwrap(),
+					BigUint::from(0xffffffffu64)
+				);
+				assert_eq!(
+					BigUint::from_string_in_base("1010101010101010", 2).unwrap(),
+					BigUint::from(0b1010101010101010u64)
+				);
+
+				assert!(BigUint::from_string_in_base("ffffffff", 10).is_err());
+				assert!(BigUint::from_string_in_base("100w001", 10).is_err());
+				assert!(BigUint::from_string_in_base("100w001", 10).is_err());
+				assert!(BigUint::from_string_in_base("@0", 10).is_err());
+			}
+		}
+	}
 }
 
 mod big_sint {
