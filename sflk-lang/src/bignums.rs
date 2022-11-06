@@ -9,7 +9,13 @@
 #[derive(Debug)]
 pub struct DoesNotFitInPrimitive;
 
-mod big_unit {
+#[derive(Debug)]
+pub struct CharIsNoDigitInBase {
+	character: char,
+	base: u64,
+}
+
+pub mod big_uint {
 	use super::DoesNotFitInPrimitive;
 	use std::{
 		cmp::Ordering,
@@ -935,17 +941,12 @@ mod big_unit {
 		}
 	}
 
-	mod srting_conversion {
-		use std::ops::Add;
-
+	pub mod string_conversion {
+		use super::super::CharIsNoDigitInBase;
 		use super::BigUint;
 
-		#[derive(Debug)]
-		struct CharIsNoDigitInBase {
-			character: char,
-			base: u64,
-		}
-
+		/// Returns the number value of a character that represent a digit in the given base.
+		/// For example, in base 10, `'8'` maps to `8`, and in base 16, `'f'` maps to `15`.
 		fn char_to_number_in_base(c: char, base: u64) -> Result<u64, CharIsNoDigitInBase> {
 			assert!(base >= 1);
 			assert!(
@@ -972,25 +973,49 @@ mod big_unit {
 			}
 		}
 
+		pub struct FromStringFormat {
+			pub base: u64,
+			/// Allows underscores that will be ignored.
+			pub allow_underscores: bool,
+		}
+
+		pub struct ToStringFormat {
+			pub base: u64,
+			/// Produces upper case characters for higer-than-9 digits
+			/// (e.g. "FF" instead of "ff" for 255 in base 16).
+			pub upper_case: bool,
+		}
+
 		impl BigUint {
-			fn from_string_in_base(
+			/// Converts a string representing an unsigned integer
+			/// in the given format to a `BigUint`.
+			pub fn from_string(
 				string: &str,
-				base: u64,
+				format: FromStringFormat,
 			) -> Result<BigUint, CharIsNoDigitInBase> {
 				let mut bu = BigUint::zero();
-				let bu_base = BigUint::from(base);
+				let bu_base = BigUint::from(format.base);
 				for c in string.chars() {
+					if format.allow_underscores {
+						// Ignore underscores to allow better formatting of number literals.
+						if c == '_' {
+							continue;
+						}
+					}
+
 					bu *= &bu_base;
-					bu += BigUint::from(char_to_number_in_base(c, base)?);
+					bu += BigUint::from(char_to_number_in_base(c, format.base)?);
 				}
 				Ok(bu)
 			}
 
-			fn to_string_in_base(mut self, base: u64, upper_case: bool) -> String {
-				assert!(base >= 1);
+			/// Produces a string representation in the given format.
+			pub fn to_string(mut self, format: ToStringFormat) -> String {
+				assert!(format.base >= 1);
 				assert!(
-					base <= 10 + 26,
-					"base {base} is too high to be supported by digits and letters"
+					format.base <= 10 + 26,
+					"base {} is too high to be supported by digits and letters",
+					format.base
 				);
 
 				// Since we extract the least significant digit at each step,
@@ -998,7 +1023,7 @@ mod big_unit {
 				// will have to be reversed after.
 				let mut char_digits_reversed = Vec::new();
 
-				let bu_base = BigUint::from(base);
+				let bu_base = BigUint::from(format.base);
 				while !self.is_zero() {
 					// Extract the least significant digit.
 					let (new_self, digit_in_base) = self.div_euclidian(&bu_base);
@@ -1009,7 +1034,7 @@ mod big_unit {
 					let digit_as_char = if digit_in_base < 10 {
 						'0' as u8 + digit_in_base
 					} else {
-						(if upper_case { 'A' } else { 'a' }) as u8 - 10 + digit_in_base
+						(if format.upper_case { 'A' } else { 'a' }) as u8 - 10 + digit_in_base
 					} as char;
 
 					char_digits_reversed.push(digit_as_char);
@@ -1058,52 +1083,120 @@ mod big_unit {
 			}
 
 			#[test]
-			fn from_string_in_base() {
+			fn from_string() {
 				assert_eq!(
-					BigUint::from_string_in_base("0", 10).unwrap(),
+					BigUint::from_string(
+						"0",
+						FromStringFormat { base: 10, allow_underscores: false }
+					)
+					.unwrap(),
 					BigUint::zero()
 				);
 				assert_eq!(
-					BigUint::from_string_in_base("000", 10).unwrap(),
+					BigUint::from_string(
+						"000",
+						FromStringFormat { base: 10, allow_underscores: false }
+					)
+					.unwrap(),
 					BigUint::zero()
 				);
 				assert_eq!(
-					BigUint::from_string_in_base("123", 10).unwrap(),
+					BigUint::from_string(
+						"123",
+						FromStringFormat { base: 10, allow_underscores: false }
+					)
+					.unwrap(),
 					BigUint::from(123u64)
 				);
 				assert_eq!(
-					BigUint::from_string_in_base("123000", 10).unwrap(),
+					BigUint::from_string(
+						"123000",
+						FromStringFormat { base: 10, allow_underscores: false }
+					)
+					.unwrap(),
 					BigUint::from(123000u64)
 				);
 				assert_eq!(
-					BigUint::from_string_in_base("ffffffff", 16).unwrap(),
+					BigUint::from_string(
+						"ffffffff",
+						FromStringFormat { base: 16, allow_underscores: false }
+					)
+					.unwrap(),
 					BigUint::from(0xffffffffu64)
 				);
 				assert_eq!(
-					BigUint::from_string_in_base("1010101010101010", 2).unwrap(),
+					BigUint::from_string(
+						"1010101010101010",
+						FromStringFormat { base: 2, allow_underscores: false }
+					)
+					.unwrap(),
 					BigUint::from(0b1010101010101010u64)
 				);
 
-				assert!(BigUint::from_string_in_base("ffffffff", 10).is_err());
-				assert!(BigUint::from_string_in_base("100w001", 10).is_err());
-				assert!(BigUint::from_string_in_base("100w001", 10).is_err());
-				assert!(BigUint::from_string_in_base("@0", 10).is_err());
+				assert!(BigUint::from_string(
+					"ffffffff",
+					FromStringFormat { base: 10, allow_underscores: false }
+				)
+				.is_err());
+				assert!(BigUint::from_string(
+					"100w001",
+					FromStringFormat { base: 10, allow_underscores: false }
+				)
+				.is_err());
+				assert!(BigUint::from_string(
+					"100w001",
+					FromStringFormat { base: 10, allow_underscores: false }
+				)
+				.is_err());
+				assert!(BigUint::from_string(
+					"@0",
+					FromStringFormat { base: 10, allow_underscores: false }
+				)
+				.is_err());
+
+				assert_eq!(
+					BigUint::from_string(
+						"1_2_3",
+						FromStringFormat { base: 10, allow_underscores: true }
+					)
+					.unwrap(),
+					BigUint::from(123u64)
+				);
+				assert!(BigUint::from_string(
+					"1_2_3",
+					FromStringFormat { base: 10, allow_underscores: false }
+				)
+				.is_err());
 			}
 
 			#[test]
-			fn to_string_in_base() {
-				assert_eq!(BigUint::from(0u64).to_string_in_base(10, false), "0");
-				assert_eq!(BigUint::from(123u64).to_string_in_base(10, false), "123");
+			fn to_string() {
 				assert_eq!(
-					BigUint::from(123000u64).to_string_in_base(10, false),
+					BigUint::from(0u64).to_string(ToStringFormat { base: 10, upper_case: false }),
+					"0"
+				);
+				assert_eq!(
+					BigUint::from(123u64).to_string(ToStringFormat { base: 10, upper_case: false }),
+					"123"
+				);
+				assert_eq!(
+					BigUint::from(123000u64)
+						.to_string(ToStringFormat { base: 10, upper_case: false }),
 					"123000"
 				);
 				assert_eq!(
-					BigUint::from(0xffffffffu64).to_string_in_base(16, false),
+					BigUint::from(0xffffffffu64)
+						.to_string(ToStringFormat { base: 16, upper_case: false }),
 					"ffffffff"
 				);
 				assert_eq!(
-					BigUint::from(0b1010101010101010u64).to_string_in_base(2, false),
+					BigUint::from(0xffffffffu64)
+						.to_string(ToStringFormat { base: 16, upper_case: true }),
+					"FFFFFFFF"
+				);
+				assert_eq!(
+					BigUint::from(0b1010101010101010u64)
+						.to_string(ToStringFormat { base: 2, upper_case: false }),
 					"1010101010101010"
 				);
 			}
@@ -1117,7 +1210,7 @@ mod big_sint {
 		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
 	};
 
-	use super::{big_unit::BigUint, DoesNotFitInPrimitive};
+	use super::{big_uint::BigUint, DoesNotFitInPrimitive};
 
 	/// Big signed integer.
 	#[derive(Clone, Debug)]
@@ -1167,7 +1260,7 @@ mod big_sint {
 		}
 	}
 
-	impl<T: super::big_unit::LocalIntoU64> From<T> for BigSint {
+	impl<T: super::big_uint::LocalIntoU64> From<T> for BigSint {
 		fn from(value: T) -> BigSint {
 			let value: u64 = value.into();
 			BigSint {
@@ -1806,6 +1899,151 @@ mod big_sint {
 			let _does_not_work = BigSint::from(69u64).div_euclidian(&BigSint::from(-8i64));
 		}
 	}
+
+	pub mod string_conversion {
+		use super::super::{big_uint, big_uint::BigUint, CharIsNoDigitInBase};
+		use super::BigSint;
+
+		pub struct FromStringFormat {
+			pub uint_format: big_uint::string_conversion::FromStringFormat,
+			pub allow_sign: bool,
+		}
+
+		pub struct ToStringFormat {
+			pub uint_format: big_uint::string_conversion::ToStringFormat,
+			/// If a minus sign is not present, then a plus sign will be.
+			pub plus_sign: bool,
+		}
+
+		impl BigSint {
+			/// Converts a string representing an signed integer
+			/// in the given format to a `BigSint`.
+			pub fn from_string(
+				string: &str,
+				format: FromStringFormat,
+			) -> Result<BigSint, CharIsNoDigitInBase> {
+				// Extract optional sign.
+				let (string, sign) = match (format.allow_sign, string.chars().next()) {
+					(true, Some('-')) => (&string[1..], -1),
+					(true, Some('+')) => (&string[1..], 1),
+					_ => (&string[..], 1),
+				};
+
+				let bu = BigUint::from_string(string, format.uint_format)?;
+				let su = BigSint::from(bu) * BigSint::from(sign);
+				Ok(su)
+			}
+
+			/// Produces a string representation in the given format.
+			pub fn to_string(self, format: ToStringFormat) -> String {
+				let sign_string = if self.is_strictly_negative() {
+					"-"
+				} else if format.plus_sign {
+					"+"
+				} else {
+					""
+				};
+				let abs_value_string = self.abs_value.to_string(format.uint_format);
+				sign_string.to_string() + &abs_value_string
+			}
+		}
+
+		#[cfg(test)]
+		mod tests {
+			use super::*;
+
+			#[test]
+			fn from_string() {
+				assert_eq!(
+					BigSint::from_string(
+						"123",
+						FromStringFormat {
+							uint_format: big_uint::string_conversion::FromStringFormat {
+								base: 10,
+								allow_underscores: false
+							},
+							allow_sign: false
+						}
+					)
+					.unwrap(),
+					BigSint::from(123u64)
+				);
+				assert_eq!(
+					BigSint::from_string(
+						"+123",
+						FromStringFormat {
+							uint_format: big_uint::string_conversion::FromStringFormat {
+								base: 10,
+								allow_underscores: false
+							},
+							allow_sign: true
+						}
+					)
+					.unwrap(),
+					BigSint::from(123u64)
+				);
+				assert_eq!(
+					BigSint::from_string(
+						"-123",
+						FromStringFormat {
+							uint_format: big_uint::string_conversion::FromStringFormat {
+								base: 10,
+								allow_underscores: false
+							},
+							allow_sign: true
+						}
+					)
+					.unwrap(),
+					BigSint::from(-123i64)
+				);
+				assert!(BigSint::from_string(
+					"-123",
+					FromStringFormat {
+						uint_format: big_uint::string_conversion::FromStringFormat {
+							base: 10,
+							allow_underscores: false
+						},
+						allow_sign: false
+					}
+				)
+				.is_err());
+			}
+
+			#[test]
+			fn to_string() {
+				assert_eq!(
+					BigSint::from(123u64).to_string(ToStringFormat {
+						uint_format: big_uint::string_conversion::ToStringFormat {
+							base: 10,
+							upper_case: false,
+						},
+						plus_sign: false
+					}),
+					"123"
+				);
+				assert_eq!(
+					BigSint::from(-123i64).to_string(ToStringFormat {
+						uint_format: big_uint::string_conversion::ToStringFormat {
+							base: 10,
+							upper_case: false,
+						},
+						plus_sign: false
+					}),
+					"-123"
+				);
+				assert_eq!(
+					BigSint::from(0).to_string(ToStringFormat {
+						uint_format: big_uint::string_conversion::ToStringFormat {
+							base: 10,
+							upper_case: false,
+						},
+						plus_sign: true
+					}),
+					"+0"
+				);
+			}
+		}
+	}
 }
 
 mod big_frac {
@@ -1845,7 +2083,7 @@ mod big_frac {
 
 		/// Denominator.
 		///
-		/// It is equal to one when the fraction is an integer (even zero).
+		/// It is equal to one iff the fraction is an integer (even zero).
 		fn den(&self) -> &BigSint {
 			&self.den
 		}
@@ -1889,7 +2127,7 @@ mod big_frac {
 		}
 	}
 
-	impl<T: super::big_unit::LocalIntoU64> From<T> for BigFrac {
+	impl<T: super::big_uint::LocalIntoU64> From<T> for BigFrac {
 		fn from(value: T) -> BigFrac {
 			BigFrac::from(BigSint::from(value))
 		}
@@ -2308,6 +2546,144 @@ mod big_frac {
 			let expected_result =
 				BigFrac::from_num_and_den(1693474895426141u64, 109739368890260631u64);
 			assert_eq!(bf_division, expected_result);
+		}
+	}
+
+	mod string_conversion {
+		use super::super::{big_sint, big_sint::BigSint, big_uint, CharIsNoDigitInBase};
+		use super::BigFrac;
+
+		pub enum ToStringFormat {
+			/// Represents the fraction in a "numerator/denominator" form.
+			Slash {
+				num_sint_format: big_sint::string_conversion::ToStringFormat,
+				den_sint_format: big_sint::string_conversion::ToStringFormat,
+				/// Forces the representation of the denominator even if it is one (e.g. "17/1").
+				shash_even_for_integer: bool,
+			},
+			Point {
+				// TODO
+				todo: (),
+			},
+		}
+
+		impl BigFrac {
+			/// Converts a string representing an signed integer
+			/// in the given format to a `BigFrac`.
+			pub fn from_integer_string(
+				string: &str,
+				format: big_sint::string_conversion::FromStringFormat,
+			) -> Result<BigFrac, CharIsNoDigitInBase> {
+				big_sint::BigSint::from_string(string, format).map(|bs| BigFrac::from(bs))
+			}
+
+			/// Produces a string representation in the given format.
+			pub fn to_string(self, format: ToStringFormat) -> String {
+				match format {
+					ToStringFormat::Slash {
+						num_sint_format,
+						den_sint_format,
+						shash_even_for_integer,
+					} => {
+						let BigFrac { num, den } = self;
+						let num_string = num.to_string(num_sint_format);
+						if den != BigSint::from(1) || shash_even_for_integer {
+							let den_string = den.to_string(den_sint_format);
+							num_string + "/" + &den_string
+						} else {
+							num_string
+						}
+					},
+					ToStringFormat::Point { .. } => todo!(),
+				}
+			}
+		}
+
+		#[cfg(test)]
+		mod tests {
+			use super::*;
+
+			#[test]
+			fn from_integer_string() {
+				assert_eq!(
+					BigFrac::from_integer_string(
+						"123",
+						big_sint::string_conversion::FromStringFormat {
+							uint_format: big_uint::string_conversion::FromStringFormat {
+								base: 10,
+								allow_underscores: false
+							},
+							allow_sign: false
+						}
+					)
+					.unwrap(),
+					BigFrac::from(123u64)
+				);
+			}
+
+			#[test]
+			fn to_string() {
+				assert_eq!(
+					BigFrac::from(123u64).to_string(ToStringFormat::Slash {
+						num_sint_format: big_sint::string_conversion::ToStringFormat {
+							uint_format: big_uint::string_conversion::ToStringFormat {
+								base: 10,
+								upper_case: false,
+							},
+							plus_sign: false
+						},
+						den_sint_format: big_sint::string_conversion::ToStringFormat {
+							uint_format: big_uint::string_conversion::ToStringFormat {
+								base: 10,
+								upper_case: false,
+							},
+							plus_sign: false
+						},
+						shash_even_for_integer: false
+					}),
+					"123"
+				);
+				assert_eq!(
+					BigFrac::from(123u64).to_string(ToStringFormat::Slash {
+						num_sint_format: big_sint::string_conversion::ToStringFormat {
+							uint_format: big_uint::string_conversion::ToStringFormat {
+								base: 10,
+								upper_case: false,
+							},
+							plus_sign: false
+						},
+						den_sint_format: big_sint::string_conversion::ToStringFormat {
+							uint_format: big_uint::string_conversion::ToStringFormat {
+								base: 10,
+								upper_case: false,
+							},
+							plus_sign: false
+						},
+						shash_even_for_integer: true
+					}),
+					"123/1"
+				);
+				assert_eq!(
+					BigFrac::from_num_and_den(123u64, -11).to_string(ToStringFormat::Slash {
+						num_sint_format: big_sint::string_conversion::ToStringFormat {
+							uint_format: big_uint::string_conversion::ToStringFormat {
+								base: 10,
+								upper_case: false,
+							},
+							plus_sign: false
+						},
+						den_sint_format: big_sint::string_conversion::ToStringFormat {
+							uint_format: big_uint::string_conversion::ToStringFormat {
+								base: 10,
+								upper_case: false,
+							},
+							plus_sign: false
+						},
+						shash_even_for_integer: false
+					}),
+					"-123/11"
+				);
+			}
 		}
 	}
 }
