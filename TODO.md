@@ -210,3 +210,7 @@ Not that it should replace LaTeX, but it could be kinda cool to have that in the
 ## Logo
 
 GitHub project embeds seem to work best when given a 1280×640px image to illustrate the repo. One should be drawn with Inkscape or something to fit the size requirement while still being vector graphics. Why not putting the SFLK logo on the left, and writing SFLK on the center and right ?
+
+## Architecture
+
+Take inspiration from cool stuff like [Rome](https://github.com/rome/tools) to refractor the parsing stage into something really solid (and maybe even usable by a language server). 
