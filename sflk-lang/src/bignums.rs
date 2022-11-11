@@ -1204,7 +1204,7 @@ pub mod big_uint {
 	}
 }
 
-mod big_sint {
+pub mod big_sint {
 	use std::{
 		cmp::Ordering,
 		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
@@ -2046,7 +2046,7 @@ mod big_sint {
 	}
 }
 
-mod big_frac {
+pub mod big_frac {
 	use std::{
 		cmp::Ordering,
 		ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
@@ -2058,7 +2058,7 @@ mod big_frac {
 	///
 	/// Is always simplified after creation or any operation.
 	#[derive(Clone, Debug)]
-	struct BigFrac {
+	pub struct BigFrac {
 		/// Numerator, bears the sign when simplified.
 		num: BigSint,
 		/// Denominator, must be positive when simplified.
@@ -2068,11 +2068,23 @@ mod big_frac {
 	}
 
 	impl BigFrac {
-		fn zero() -> BigFrac {
+		pub fn zero() -> BigFrac {
 			BigFrac { num: BigSint::zero(), den: BigSint::from(1) }
 		}
 
-		fn is_zero(&self) -> bool {
+		fn one() -> BigFrac {
+			BigFrac { num: BigSint::from(1), den: BigSint::from(1) }
+		}
+
+		pub fn from_bool(boolean: bool) -> BigFrac {
+			if boolean {
+				BigFrac::one()
+			} else {
+				BigFrac::zero()
+			}
+		}
+
+		pub fn is_zero(&self) -> bool {
 			self.num.is_zero()
 		}
 
@@ -2104,7 +2116,7 @@ mod big_frac {
 	}
 
 	#[derive(Debug)]
-	struct NotAnInteger;
+	pub struct NotAnInteger;
 
 	impl TryFrom<&BigFrac> for BigSint {
 		type Error = NotAnInteger;
@@ -2320,10 +2332,7 @@ mod big_frac {
 	impl Mul<&BigFrac> for &BigFrac {
 		type Output = BigFrac;
 		fn mul(self, rhs: &BigFrac) -> BigFrac {
-			BigFrac {
-				num: &self.num * &rhs.num,
-				den: &self.den * &rhs.den,
-			}
+			BigFrac::from_num_and_den(&self.num * &rhs.num, &self.den * &rhs.den)
 		}
 	}
 	impl Mul<&BigFrac> for BigFrac {
@@ -2358,10 +2367,7 @@ mod big_frac {
 	impl Div<&BigFrac> for &BigFrac {
 		type Output = BigFrac;
 		fn div(self, rhs: &BigFrac) -> BigFrac {
-			BigFrac {
-				num: &self.num * &rhs.den,
-				den: &self.den * &rhs.num,
-			}
+			BigFrac::from_num_and_den(&self.num * &rhs.den, &self.den * &rhs.num)
 		}
 	}
 	impl Div<&BigFrac> for BigFrac {
@@ -2549,7 +2555,7 @@ mod big_frac {
 		}
 	}
 
-	mod string_conversion {
+	pub mod string_conversion {
 		use super::super::{big_sint, big_sint::BigSint, big_uint, CharIsNoDigitInBase};
 		use super::BigFrac;
 
