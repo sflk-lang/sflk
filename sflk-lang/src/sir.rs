@@ -18,7 +18,7 @@
 //!
 //! Frames hold data such as the stack of temporary values used for the
 //! execution of a sequence of instructions.
-//! The frames are arranges in a stack (no need for a tree here, there
+//! The frames are arranged in a stack (no need for a tree here, there
 //! must be a top frame that is the one in which the execution is taking
 //! place at the moment).
 
