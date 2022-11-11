@@ -24,7 +24,7 @@
 
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
-	bigint::{BigFraction, BigSint},
+	bignums::{big_frac::BigFrac, big_sint::BigSint},
 	parser::Parser,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
@@ -177,7 +177,7 @@ impl Block {
 enum Object {
 	/// The `()` literal is an expression that evaluates to that.
 	Nothing,
-	Number(BigFraction),
+	Number(BigFrac),
 	String(String),
 	/// A block of code is an expression that evaluates to that,
 	/// without being executed (it may be executed later, but
@@ -542,9 +542,7 @@ impl Execution {
 				let value = self.pop_obj();
 				match value {
 					Object::Number(value) => {
-						self.push_obj(Object::Number(BigFraction::from(BigSint::from_bool(
-							value.is_zero(),
-						))));
+						self.push_obj(Object::Number(BigFrac::from_bool(value.is_zero())));
 					},
 					obj => unimplemented!(
 						"Logical not operation on object of type {}",
@@ -558,9 +556,8 @@ impl Execution {
 				let right = self.pop_obj();
 				match (left, right) {
 					(Object::Number(left_value), Object::Number(right_value)) => {
-						let value = BigFraction::from(BigSint::from_bool(
-							!left_value.is_zero() && !right_value.is_zero(),
-						));
+						let value =
+							BigFrac::from_bool(!left_value.is_zero() && !right_value.is_zero());
 						self.push_obj(Object::Number(value));
 					},
 					(left, right) => unimplemented!(
@@ -589,9 +586,7 @@ impl Execution {
 							[_, _] => panic!(),
 							_ => panic!(),
 						});
-						self.push_obj(Object::Number(BigFraction::from(BigSint::from_bool(
-							is_ordered,
-						))));
+						self.push_obj(Object::Number(BigFrac::from_bool(is_ordered)));
 					},
 					obj => {
 						unimplemented!("Is ordered operation on object of type {}", obj.type_name())
@@ -617,9 +612,7 @@ impl Execution {
 							[_, _] => panic!(),
 							_ => panic!(),
 						});
-						self.push_obj(Object::Number(BigFraction::from(BigSint::from_bool(
-							is_ordered,
-						))));
+						self.push_obj(Object::Number(BigFrac::from_bool(is_ordered)));
 					},
 					obj => {
 						unimplemented!(
@@ -634,12 +627,10 @@ impl Execution {
 				let obj = self.pop_obj();
 				match obj {
 					Object::List(vec) => {
-						self.push_obj(Object::Number(BigFraction::from(vec.len() as u64)));
+						self.push_obj(Object::Number(BigFrac::from(vec.len() as u64)));
 					},
 					Object::String(string) => {
-						self.push_obj(Object::Number(BigFraction::from(
-							string.chars().count() as u64
-						)));
+						self.push_obj(Object::Number(BigFrac::from(string.chars().count() as u64)));
 					},
 					obj => {
 						unimplemented!("Length operation on object of type {}", obj.type_name())
@@ -652,7 +643,7 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value.add(&right_value)));
+						self.push_obj(Object::Number(left_value + right_value));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
 						self.push_obj(Object::String(left_string + &right_string));
@@ -673,11 +664,10 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value.subtract(&right_value)));
+						self.push_obj(Object::Number(left_value - right_value));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
-						let value =
-							BigFraction::from(BigSint::from_bool(left_string != right_string));
+						let value = BigFrac::from_bool(left_string != right_string);
 						self.push_obj(Object::Number(value));
 					},
 					(left, right) => unimplemented!(
@@ -693,7 +683,7 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value.multiply(&right_value)));
+						self.push_obj(Object::Number(left_value * right_value));
 					},
 					(Object::String(left_string), Object::Number(right_value)) => {
 						let right_as_usize =
@@ -723,12 +713,12 @@ impl Execution {
 				let left = self.pop_obj();
 				match (left, right) {
 					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value.divide(&right_value)));
+						self.push_obj(Object::Number(left_value / right_value));
 					},
 					(Object::String(left_string), Object::String(right_string)) => {
-						self.push_obj(Object::Number(BigFraction::from(BigSint::from(
+						self.push_obj(Object::Number(BigFrac::from(
 							left_string.matches(right_string.as_str()).count() as i64,
-						))));
+						)));
 					},
 					(left, right) => unimplemented!(
 						"Slash operation on objects of type {} and {}",
@@ -1109,13 +1099,27 @@ fn perform_signal_past_root(signal: Object) -> Object {
 		Object::Context(var_table) => match var_table.get("name") {
 			Some(Object::String(sig_name)) if sig_name == "print" => match var_table.get("value") {
 				Some(Object::Number(value)) => {
-					let numerator_str = value.numerator().to_string_base10();
-					if value.denominator() == &BigSint::from(1u64) {
-						print!("{}", numerator_str);
-					} else {
-						let denominator_str = value.denominator().to_string_base10();
-						print!("{}/{}", numerator_str, denominator_str);
-					}
+					use crate::bignums::{big_frac, big_sint, big_uint};
+					let value_as_string = value.clone().to_string(
+						big_frac::string_conversion::ToStringFormat::Slash {
+							num_sint_format: big_sint::string_conversion::ToStringFormat {
+								uint_format: big_uint::string_conversion::ToStringFormat {
+									base: 10,
+									upper_case: false,
+								},
+								plus_sign: false,
+							},
+							den_sint_format: big_sint::string_conversion::ToStringFormat {
+								uint_format: big_uint::string_conversion::ToStringFormat {
+									base: 10,
+									upper_case: false,
+								},
+								plus_sign: false,
+							},
+							shash_even_for_integer: false,
+						},
+					);
+					print!("{value_as_string}");
 					Object::Nothing
 				},
 				Some(Object::String(string)) => {
@@ -1263,8 +1267,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 			let has_loop_counter = !sp_stmts.is_empty();
 			if has_loop_counter {
 				// Loop counter for the separator.
-				sir_instrs
-					.push(SirInstr::PushConstant { value: Object::Number(BigFraction::zero()) });
+				sir_instrs.push(SirInstr::PushConstant { value: Object::Number(BigFrac::zero()) });
 			}
 			let mut sp_sir = Vec::new();
 			if !sp_stmts.is_empty() {
@@ -1286,7 +1289,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				if has_loop_counter {
 					// Increment the loop counter.
 					bd_sir.push(SirInstr::PushConstant {
-						value: Object::Number(BigFraction::from(BigSint::from(1i64))),
+						value: Object::Number(BigFrac::from(BigSint::from(1i64))),
 					});
 					bd_sir.push(SirInstr::Plus);
 				}
@@ -1386,11 +1389,24 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 			sir_instrs.push(SirInstr::VarToPush { var_name: var_name.clone() });
 		},
 		Expr::NothingLiteral => sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing }),
-		Expr::IntegerLiteral(integer_string) => sir_instrs.push(SirInstr::PushConstant {
-			value: Object::Number(BigFraction::from(
-				BigSint::from_string_base10(integer_string).expect("TODO: better integer parsing"),
-			)),
-		}),
+		Expr::IntegerLiteral(integer_string) => {
+			use crate::bignums::{big_sint, big_uint};
+			sir_instrs.push(SirInstr::PushConstant {
+				value: Object::Number(
+					BigFrac::from_integer_string(
+						integer_string,
+						big_sint::string_conversion::FromStringFormat {
+							uint_format: big_uint::string_conversion::FromStringFormat {
+								base: 10,
+								allow_underscores: false,
+							},
+							allow_sign: false,
+						},
+					)
+					.unwrap(),
+				),
+			})
+		},
 		Expr::StringLiteral(string_string) => {
 			sir_instrs.push(SirInstr::PushConstant { value: Object::String(string_string.clone()) })
 		},
@@ -1413,9 +1429,8 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 		Expr::Unop(unop) => match unop {
 			Unop::Negate(expr) => {
 				expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
-				sir_instrs.push(SirInstr::PushConstant {
-					value: Object::Number(BigFraction::from(BigSint::from(-1i64))),
-				});
+				sir_instrs
+					.push(SirInstr::PushConstant { value: Object::Number(BigFrac::from(-1i64)) });
 				sir_instrs.push(SirInstr::Star);
 			},
 			Unop::ReadFile(expr) => {

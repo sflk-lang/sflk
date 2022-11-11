@@ -127,10 +127,6 @@ Instead of attempting replacements implicitely like proposed previously, we coul
 
 It could also be nice to have maps from anything to anything, it is highly probable that SFLK will get some in one way or another. To avoid confusion between these types, we could call the type discussed in this entry by the name of *context*, and the for futur general-purpose maps *dictionaries*.
 
-### Big fractions
-
-Have every number be a normalized fraction of big ints so that we can manipulate arbitraly precise rational numbers.
-
 ### Real numbers
 
 Have the ability to define numbers with stuff like code that returns the i-th decimal in base b or something, so that they can be used up to any precision. Then make them behave like numbers (stuff like be printed, be multiplied by 2, etc.). Then make a variable like `e` (for error) be used as a parameter for their use that can indicate that their use is only guarenteed up to some precision with the error being less than the content of `e` or something (and of course if `e` is something like `()` then their use must be of infinite precision and printing them hould take an infinite amount of time to terminate for example).
