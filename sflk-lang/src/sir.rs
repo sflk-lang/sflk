@@ -1289,7 +1289,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				if has_loop_counter {
 					// Increment the loop counter.
 					bd_sir.push(SirInstr::PushConstant {
-						value: Object::Number(BigFrac::from(BigSint::from(1i64))),
+						value: Object::Number(BigFrac::one()),
 					});
 					bd_sir.push(SirInstr::Plus);
 				}

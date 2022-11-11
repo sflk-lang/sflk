@@ -1,7 +1,27 @@
-//! Cleaner version of the `bigint` module.
+//! This module powers the arbitrarly precise fractions of SFLK by providing
+//! an implementation of "big fractions" (fractions of big integers) that
+//! relies on an implementation of big integers (arbitrarly big integers).
 //!
-//! TODO: Reimplement every feature of `bigint` but cleaner.
-//! TODO: Comment the module.
+//! There is 3 layers of abstraction here:
+//! - The `big_uint` submodule is the "low level" part of `bignums`, it provides
+//! an implementation of unsigned big integers and it contains the hardest part
+//! of the math implemented here (addition, subtraction, multiplication,
+//! euclidian division, etc.).
+//! - The `big_sint` submodule is built on top of `big_uint` and extends the
+//! big integers by adding a sign to it.
+//! - The `big_frac` submodule is built on top of `big_sint` and provides
+//! fractions of big integers.
+//!
+//! This module is meant to be almost a stand-alone implementation of
+//! big fractions, and it is to remain pure and free of all SFLK-related concerns.
+//! 
+//! TODO: There is stuff to optimize here and there.
+//! 
+//! TODO: Make bigint types that use `u64` or `i64` when the value fits
+//! and converts it to big int when needed. This will spare a lot of allocations,
+//! and it will speed up operations on small numbers.
+//! 
+//! TODO: Get a full coverage with the unit tests.
 
 /// A conversion from a big number into a primitive integer type have failed due
 /// to the value being ouside the representable range of values supported by the
@@ -9,12 +29,17 @@
 #[derive(Debug)]
 pub struct DoesNotFitInPrimitive;
 
+/// When converting a string to a number, the base in which the string is expected
+/// to be written is given, and this error is returned in the event that a character
+/// is not a digit in that base (for example, `f` is a digit in base 16 but not in
+/// base 10, and `@` is not a digit in any base).
 #[derive(Debug)]
 pub struct CharIsNoDigitInBase {
 	character: char,
 	base: u64,
 }
 
+/// Provide an implementation of unsigned big integers.
 pub mod big_uint {
 	use super::DoesNotFitInPrimitive;
 	use std::{
@@ -61,6 +86,14 @@ pub mod big_uint {
 
 		pub fn is_zero(&self) -> bool {
 			self.digits.is_empty()
+		}
+
+		pub fn one() -> BigUint {
+			BigUint { digits: vec![1] }
+		}
+
+		pub fn is_one(&self) -> bool {
+			self.digits == [1]
 		}
 
 		/// Removes the insignificant leading zeros that may have been added
@@ -1204,6 +1237,7 @@ pub mod big_uint {
 	}
 }
 
+/// Provide an implementation of signed big integers, built on top of `big_uint`.
 pub mod big_sint {
 	use std::{
 		cmp::Ordering,
@@ -1227,6 +1261,14 @@ pub mod big_sint {
 
 		pub fn is_zero(&self) -> bool {
 			self.abs_value.is_zero()
+		}
+
+		pub fn one() -> BigSint {
+			BigSint { abs_value: BigUint::one(), is_negative: false }
+		}
+
+		pub fn is_one(&self) -> bool {
+			self.abs_value.is_one() && !self.is_negative
 		}
 
 		pub fn is_positive(&self) -> bool {
@@ -2046,13 +2088,15 @@ pub mod big_sint {
 	}
 }
 
+/// Provide an implementation of big (arbitrarly precise) fractions,
+/// built on top of `big_sint`.
 pub mod big_frac {
 	use std::{
 		cmp::Ordering,
 		ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 	};
 
-	use super::{big_sint::BigSint, DoesNotFitInPrimitive};
+	use super::big_sint::BigSint;
 
 	/// Big fraction (arbitrarly precise).
 	///
@@ -2069,11 +2113,11 @@ pub mod big_frac {
 
 	impl BigFrac {
 		pub fn zero() -> BigFrac {
-			BigFrac { num: BigSint::zero(), den: BigSint::from(1) }
+			BigFrac { num: BigSint::zero(), den: BigSint::one() }
 		}
 
-		fn one() -> BigFrac {
-			BigFrac { num: BigSint::from(1), den: BigSint::from(1) }
+		pub fn one() -> BigFrac {
+			BigFrac { num: BigSint::one(), den: BigSint::one() }
 		}
 
 		pub fn from_bool(boolean: bool) -> BigFrac {
@@ -2089,6 +2133,8 @@ pub mod big_frac {
 		}
 
 		/// Numerator.
+		///
+		/// It bears the sign of the fraction.
 		fn num(&self) -> &BigSint {
 			&self.num
 		}
@@ -2096,6 +2142,7 @@ pub mod big_frac {
 		/// Denominator.
 		///
 		/// It is equal to one iff the fraction is an integer (even zero).
+		/// It is always (strictly) positive.
 		fn den(&self) -> &BigSint {
 			&self.den
 		}
@@ -2105,13 +2152,13 @@ pub mod big_frac {
 		}
 
 		fn is_integer(&self) -> bool {
-			self.den == BigSint::from(1)
+			self.den.is_one()
 		}
 	}
 
 	impl From<BigSint> for BigFrac {
 		fn from(value: BigSint) -> BigFrac {
-			BigFrac { num: value, den: BigSint::from(1) }
+			BigFrac { num: value, den: BigSint::one() }
 		}
 	}
 
@@ -2205,7 +2252,7 @@ pub mod big_frac {
 
 			if self.num.is_zero() {
 				// The denominator is expected to be one when the numerator is zero.
-				self.den = BigSint::from(1);
+				self.den = BigSint::one();
 			} else {
 				// A fraction can be simplified by dividing both the numerator and the denominator
 				// by their GCD. For example, 18 / 12 = (18/6) / (12/6) = 3 / 2, with GCD(18, 12) = 6.
@@ -2409,7 +2456,7 @@ pub mod big_frac {
 					true
 				} else if self.den.is_zero() {
 					true
-				} else if self.num.is_zero() && self.den != BigSint::from(1) {
+				} else if self.num.is_zero() && self.den != BigSint::one() {
 					true
 				} else {
 					let mut simplified = self.clone();
@@ -2556,7 +2603,7 @@ pub mod big_frac {
 	}
 
 	pub mod string_conversion {
-		use super::super::{big_sint, big_sint::BigSint, big_uint, CharIsNoDigitInBase};
+		use super::super::{big_sint, big_sint::BigSint, CharIsNoDigitInBase};
 		use super::BigFrac;
 
 		pub enum ToStringFormat {
@@ -2593,7 +2640,7 @@ pub mod big_frac {
 					} => {
 						let BigFrac { num, den } = self;
 						let num_string = num.to_string(num_sint_format);
-						if den != BigSint::from(1) || shash_even_for_integer {
+						if den != BigSint::one() || shash_even_for_integer {
 							let den_string = den.to_string(den_sint_format);
 							num_string + "/" + &den_string
 						} else {
@@ -2607,6 +2654,7 @@ pub mod big_frac {
 
 		#[cfg(test)]
 		mod tests {
+			use super::super::super::big_uint;
 			use super::*;
 
 			#[test]
