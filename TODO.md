@@ -121,6 +121,25 @@ Maybe it is not a good idea, the marker seems important to help be more explicit
 
 Instead of attempting replacements implicitely like proposed previously, we could provide an unary operator that attemps the replacements.
 
+##### Even better
+
+```sflk
+a! < {
+	x! < .jej > v
+	v < v
+		+ {pr "uwu"}
+		+ {
+			pr " "
+			pr x~k
+			pr " "
+		}
+		+ {nl}
+	v ? .k
+}
+```
+
+Consider how in this example the `?` operator (can be an other syntax) (with `.k` as its right operand) makes it clear when `x~k` is replaced.
+
 **This looks like it is the better decision.**
 
 ### Contexts vs general maps
@@ -130,6 +149,14 @@ It could also be nice to have maps from anything to anything, it is highly proba
 ### Real numbers
 
 Have the ability to define numbers with stuff like code that returns the i-th decimal in base b or something, so that they can be used up to any precision. Then make them behave like numbers (stuff like be printed, be multiplied by 2, etc.). Then make a variable like `e` (for error) be used as a parameter for their use that can indicate that their use is only guarenteed up to some precision with the error being less than the content of `e` or something (and of course if `e` is something like `()` then their use must be of infinite precision and printing them hould take an infinite amount of time to terminate for example).
+
+### Even better signals
+
+A print signal does nothing as it goes through contexts and travels toward the root, but a variable writing signal does stuff at each signal it encounters. The way this is made possible by the interpreter is that the name of some signals (e.g. variable writing) is considered a special case by the interpreter. Not very elegant and general.
+
+Not sure how to make it better tho.. Making each signal having blocks of code to run in every contexts it passes through may let interceptors a bit clueless as (for now) there is no way to study what a block of code does or do stuff with it; so a signal could name itself "readvar" but its block of code may actually do more stuff than just reading a variable or something.
+
+TODO: Think about it.
 
 ## Everything is a function, a list and a context
 
@@ -167,13 +194,15 @@ Output to file instead of standard output.
 
 ### Send error signals instead of panicking
 
-Do that.
-
-### Have a signal format dedicated to errors
-
-That, and print them in red in stderr or something.
+Do that. Also, use a dedicated signal type instead of just print signal. Use the difference in signal type to print them in red in stderr or something.
 
 ## Interpreter
+
+### Object stack
+
+Replace the object stack by a stack of something else. The goal here is to make the stack better represent the stack of nested scopes of operations that we are in, and contain relevant operation information in a better way. For example, a loop will push a loop scope or somthing that holds the loop counter and all the loop information that are needed to make it work (no more loop counter pushed as an SFLK number object).
+
+More generally, when an operation involves having an instruction pushing some information on the stack, and having an other instruction pop this information later (with every instruction inbetween expected to not interact with this information) then making this information into a dedicated type and type checking every pop makes sense (easier debgging when poping too much or not enough, etc.).
 
 ### Execution time debugging
 
@@ -196,6 +225,12 @@ The code shoud be made more readable and more commented.
 No more empty `unimplemented!`s and dangerous `unwrap`s. When the interpreted explodes for some reason, the reason should try its best to be clear to whoever is using the interpreter.
 
 ## Standard library
+
+### Assembly and machine-code generation and execution
+
+Allow an SFLK progam to produce machine code (with the help of some assembly pieces provided by the standard library or something) and to run the produced machine code by directly jumping in it or something.
+
+This would be very unsafe, but very fun as it will bring very low level considerations into funcky SFLK code!
 
 ### PDF creation
 

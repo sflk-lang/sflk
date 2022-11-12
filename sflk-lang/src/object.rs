@@ -191,4 +191,6 @@ impl Object {
 			}),
 		}
 	}
+
+	// TODO: Move the rest of the object operations from `sir` to here.
 }
