@@ -2,6 +2,7 @@ mod ast;
 mod bignums;
 mod log;
 mod log_indent;
+mod object;
 mod parser;
 mod scu;
 mod settings;

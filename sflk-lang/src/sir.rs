@@ -25,6 +25,7 @@
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
 	bignums::{big_frac::BigFrac, big_sint::BigSint},
+	object::Object,
 	parser::Parser,
 	scu::SourceCodeUnit,
 	tokenizer::{CharReadingHead, TokBuffer},
@@ -161,49 +162,13 @@ impl Execution {
 }
 
 #[derive(Debug, Clone)]
-struct Block {
+pub struct Block {
 	sir_block: SirBlock,
 }
 
 impl Block {
-	fn concat(self, right: Block) -> Block {
+	pub fn concat(self, right: Block) -> Block {
 		Block { sir_block: self.sir_block.concat(right.sir_block) }
-	}
-}
-
-/// An `Object` is a value that can manipulated by SFLK code.
-/// Every expression evaluates to an `Object`.
-#[derive(Debug, Clone)]
-enum Object {
-	/// The `()` literal is an expression that evaluates to that.
-	Nothing,
-	Number(BigFrac),
-	String(String),
-	/// A block of code is an expression that evaluates to that,
-	/// without being executed (it may be executed later, but
-	/// not by the evaluation of the literal itself).
-	///
-	/// Here is an example of a block of code literal:
-	/// `{pr "SFLK stands for Sus Fucking Language for Kernel dev" nl}`
-	Block(Block),
-	List(Vec<Object>),
-	/// A context object is a dictionary of variable names and their values.
-	/// A context object can be obtained from a context (from the context tree
-	/// that holds data about actual variables) via the `cx` keyword, and
-	/// can be injected in a context (from the context tree) via the `cy` keyword.
-	Context(HashMap<String, Object>),
-}
-
-impl Object {
-	fn type_name(&self) -> &str {
-		match self {
-			Object::Nothing => "nothing",
-			Object::Number(_) => "number",
-			Object::String(_) => "string",
-			Object::Block(_) => "block",
-			Object::List(_) => "list",
-			Object::Context(_) => "context",
-		}
 	}
 }
 
@@ -539,143 +504,43 @@ impl Execution {
 				}
 			},
 			SirInstr::LogicalNot => {
-				let value = self.pop_obj();
-				match value {
-					Object::Number(value) => {
-						self.push_obj(Object::Number(BigFrac::from_bool(value.is_zero())));
-					},
-					obj => unimplemented!(
-						"Logical not operation on object of type {}",
-						obj.type_name(),
-					),
-				}
+				let obj = self.pop_obj();
+				let res = obj.logical_not().unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::LogicalAnd => {
 				let left = self.pop_obj();
 				let right = self.pop_obj();
-				match (left, right) {
-					(Object::Number(left_value), Object::Number(right_value)) => {
-						let value =
-							BigFrac::from_bool(!left_value.is_zero() && !right_value.is_zero());
-						self.push_obj(Object::Number(value));
-					},
-					(left, right) => unimplemented!(
-						"Logical and operation on objects of type {} and {}",
-						left.type_name(),
-						right.type_name()
-					),
-				}
+				let res = left.logical_and(&right).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
-			SirInstr::IsOrdered => {
+			instr @ (SirInstr::IsOrdered | SirInstr::IsOrderedStrictly) => {
+				let strictly = matches!(instr, SirInstr::IsOrderedStrictly);
 				let obj = self.pop_obj();
-				match obj {
-					Object::List(vec) => {
-						let not_a_number = vec.iter().find(|obj| !matches!(obj, Object::Number(_)));
-						if let Some(obj) = not_a_number {
-							unimplemented!(
-								"Is ordered operation on a list that is not \
-								exclusively composed of numbers (at least one \
-								object is type {} is in the list)",
-								obj.type_name()
-							);
-						}
-						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
-							[Object::Number(left), Object::Number(right)] => left <= right,
-							[_, _] => panic!(),
-							_ => panic!(),
-						});
-						self.push_obj(Object::Number(BigFrac::from_bool(is_ordered)));
-					},
-					obj => {
-						unimplemented!("Is ordered operation on object of type {}", obj.type_name())
-					},
-				}
-				self.advance_instr_index();
-			},
-			SirInstr::IsOrderedStrictly => {
-				let obj = self.pop_obj();
-				match obj {
-					Object::List(vec) => {
-						let not_a_number = vec.iter().find(|obj| !matches!(obj, Object::Number(_)));
-						if let Some(obj) = not_a_number {
-							unimplemented!(
-								"Is ordered strictly operation on a list that is not \
-								exclusively composed of numbers (at least one \
-								object is type {} is in the list)",
-								obj.type_name()
-							);
-						}
-						let is_ordered = vec.as_slice().windows(2).all(|window| match window {
-							[Object::Number(left), Object::Number(right)] => left < right,
-							[_, _] => panic!(),
-							_ => panic!(),
-						});
-						self.push_obj(Object::Number(BigFrac::from_bool(is_ordered)));
-					},
-					obj => {
-						unimplemented!(
-							"Is ordered strictly operation on object of type {}",
-							obj.type_name()
-						)
-					},
-				}
+				let res = obj.is_ordered(strictly).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::Length => {
 				let obj = self.pop_obj();
-				match obj {
-					Object::List(vec) => {
-						self.push_obj(Object::Number(BigFrac::from(vec.len() as u64)));
-					},
-					Object::String(string) => {
-						self.push_obj(Object::Number(BigFrac::from(string.chars().count() as u64)));
-					},
-					obj => {
-						unimplemented!("Length operation on object of type {}", obj.type_name())
-					},
-				}
+				let res = obj.length().unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::Plus => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match (left, right) {
-					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value + right_value));
-					},
-					(Object::String(left_string), Object::String(right_string)) => {
-						self.push_obj(Object::String(left_string + &right_string));
-					},
-					(Object::Block(left_block), Object::Block(right_block)) => {
-						self.push_obj(Object::Block(left_block.concat(right_block)))
-					},
-					(left, right) => unimplemented!(
-						"Plus operation on objects of type {} and {}",
-						left.type_name(),
-						right.type_name()
-					),
-				}
+				let res = left.plus(right).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::Minus => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match (left, right) {
-					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value - right_value));
-					},
-					(Object::String(left_string), Object::String(right_string)) => {
-						let value = BigFrac::from_bool(left_string != right_string);
-						self.push_obj(Object::Number(value));
-					},
-					(left, right) => unimplemented!(
-						"Minus operation on objects of type {} and {}",
-						left.type_name(),
-						right.type_name()
-					),
-				}
+				let res = left.minus(right).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::Star => {
@@ -1288,9 +1153,7 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 				}
 				if has_loop_counter {
 					// Increment the loop counter.
-					bd_sir.push(SirInstr::PushConstant {
-						value: Object::Number(BigFrac::one()),
-					});
+					bd_sir.push(SirInstr::PushConstant { value: Object::Number(BigFrac::one()) });
 					bd_sir.push(SirInstr::Plus);
 				}
 			}
