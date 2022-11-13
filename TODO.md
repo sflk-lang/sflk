@@ -176,6 +176,22 @@ The idea here is to be able to `cy` anything and get useful information.
 
 For example, `cy`ing a list can put the first element in `f` (front), the last in `b` (back), the length in `l`, etc. `cy`ing a number can put the numerator in `n` and the denominator in `d`, the integral part in `i`, etc. etc.
 
+## Lazy operations when necessary
+
+Doing something like `{pr "a"} * n` with `n` being too large will fail because the star operation actually constructs a block that is the concatenation of `n` copies of the left operand block. This was easy to program, but it makes this operation limited.
+
+A solution would be to make `{pr "a"} * n` construct an object that just contains the left opereand block and the value of `n` and it being a variant form of a block. Like, a block can be a sequence of instruction or a repetition (n times) of a sub-block.
+
+However, this makes everything more complicated. What about `{pr "a"} * n + {pr "b"}`? To handle this case, now a block must also have a variant for a lazy plus (because the left operand given to `+` here is not a sequence of instructions to which the right sequence of instruction can be concatenated to).
+
+This should also apply to strings, lists, etc. Handle indexing correctly. Handle execution of such blocks correctly. And all the other issues that I have not thought about yet.
+
+## Easy loading bar handling
+
+Make it very easy (somehow) to make a long operation or whatever communicate its progress in the form of a loading bar.
+
+This may be doable by introducing a new signal type that an operation emits regularly to communicate its progress, and some interceptor is free to use these to redraw a loading bar. Maybe? Would it be easy to use such thing?
+
 ## Syntax cool stuff
 
 ### Everything should be doable with only alphabetical characters and whitespace
@@ -187,6 +203,14 @@ Imagine only keywords and variable names. Huge potential for polyglots.
 Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means something. It would be so cool, huge potential for obfuscation.
 
 ## Small language features
+
+### Statement about feature with generic syntax
+
+There are features (a lot of which are quite simple) that are to be added to SFLK but the syntax have not been decided yet. Then, there should be a generic way to use such features with a generic syntax that allow the stdlib to wrap such use of the feature in a block of code that looks better.
+
+For example, there is not yet a syntax for writing to a file (the fact that this feature is not yet implemented anyway is irrelevant here xd). Then, `gs .writefile ag "some text"` would be a nice temporary solution.
+
+`gs` (Generic Syntax) statement expects an expression that should evaluate to a string that designate a feature (for example, "writefile") and takes any number of `ag` (argument) statement extention that each expect an expression that evaluates into whatever. Its effect depends on the feature name.
 
 ### File IO
 
@@ -224,13 +248,27 @@ The code shoud be made more readable and more commented.
 
 No more empty `unimplemented!`s and dangerous `unwrap`s. When the interpreted explodes for some reason, the reason should try its best to be clear to whoever is using the interpreter.
 
-## Standard library
+## Built-in cool features
 
 ### Assembly and machine-code generation and execution
 
 Allow an SFLK progam to produce machine code (with the help of some assembly pieces provided by the standard library or something) and to run the produced machine code by directly jumping in it or something.
 
 This would be very unsafe, but very fun as it will bring very low level considerations into funcky SFLK code!
+
+### Graphics window
+
+Allow an SFLK program to create windows, recieve events and draw on the surface, etc.
+
+Beware the dependencies! Maybe make it opt-out with cargo feature and `#[cfg(stuff)]` attributes. Also, avoid the `sdl2` crate (as it requires SDL2 dev lib and is a mess to make it link statically). The dependency MUST link statically and not require any setup from someone who just want to clone and compile SFLK with all the features (thus a standalone crate is required).
+
+### Sound
+
+Allow an SFLK program to play sound. Something that could be really cool would be to allow to give a list of bytes and give it directly to the system mixer. Then the stdlib and the programs can synthesize sound and mix and all.
+
+Beware the dependencies! Maybe make it opt-out with cargo feature and `#[cfg(stuff)]` attributes. Also, avoid the `sdl2` crate (as it requires SDL2 dev lib and is a mess to make it link statically). The dependency MUST link statically and not require any setup from someone who just want to clone and compile SFLK with all the features (thus a standalone crate is required).
+
+## Standard library
 
 ### PDF creation
 

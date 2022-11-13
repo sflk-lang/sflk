@@ -24,7 +24,7 @@
 
 use crate::{
 	ast::{Chop, Expr, Program, Stmt, TargetExpr, Unop},
-	bignums::{big_frac::BigFrac, big_sint::BigSint},
+	bignums::big_frac::BigFrac,
 	object::Object,
 	parser::Parser,
 	scu::SourceCodeUnit,
@@ -546,130 +546,36 @@ impl Execution {
 			SirInstr::Star => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match (left, right) {
-					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value * right_value));
-					},
-					(Object::String(left_string), Object::Number(right_value)) => {
-						let right_as_usize =
-							i64::try_from(&BigSint::try_from(&right_value).unwrap()).unwrap()
-								as usize;
-						self.push_obj(Object::String(left_string.repeat(right_as_usize)));
-					},
-					(Object::Block(left_block), Object::Number(right_value)) => {
-						let mut block = left_block.clone();
-						let right_as_i64 =
-							i64::try_from(&BigSint::try_from(&right_value).unwrap()).unwrap();
-						for _ in 0..right_as_i64 {
-							block = block.concat(left_block.clone());
-						}
-						self.push_obj(Object::Block(block));
-					},
-					(left, right) => unimplemented!(
-						"Star operation on objects of type {} and {}",
-						left.type_name(),
-						right.type_name()
-					),
-				}
+				let res = left.star(right).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::Slash => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match (left, right) {
-					(Object::Number(left_value), Object::Number(right_value)) => {
-						self.push_obj(Object::Number(left_value / right_value));
-					},
-					(Object::String(left_string), Object::String(right_string)) => {
-						self.push_obj(Object::Number(BigFrac::from(
-							left_string.matches(right_string.as_str()).count() as i64,
-						)));
-					},
-					(left, right) => unimplemented!(
-						"Slash operation on objects of type {} and {}",
-						left.type_name(),
-						right.type_name()
-					),
-				}
+				let res = left.slash(right).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::Comma => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match (left, right) {
-					(Object::Nothing, right) => {
-						self.push_obj(Object::List(vec![right]));
-					},
-					(Object::List(mut vec), right) => {
-						vec.push(right);
-						self.push_obj(Object::List(vec));
-					},
-					(left, _) => unimplemented!(
-						"Comma operation with the left object of type {}",
-						left.type_name(),
-					),
-				}
+				let res = left.comma(right).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::DoubleComma => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				self.push_obj(Object::List(vec![left, right]));
+				let res = left.double_comma(right);
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::Index => {
 				let right = self.pop_obj();
 				let left = self.pop_obj();
-				match (left, right) {
-					(Object::List(vec), Object::Number(index)) => {
-						let index_as_usize =
-							i64::try_from(&BigSint::try_from(&index).unwrap()).unwrap() as usize;
-						self.push_obj(
-							vec.get(index_as_usize)
-								.unwrap_or_else(|| {
-									panic!(
-										"List index {} out of range {}-{}",
-										index_as_usize,
-										0,
-										vec.len() - 1
-									)
-								})
-								.clone(),
-						);
-					},
-					(Object::String(string), Object::Number(index)) => {
-						let index_as_usize =
-							i64::try_from(&BigSint::try_from(&index).unwrap()).unwrap() as usize;
-						self.push_obj(Object::String(
-							string
-								.chars()
-								.nth(index_as_usize)
-								.unwrap_or_else(|| {
-									panic!(
-										"String index {} out of range {}-{}",
-										index_as_usize,
-										0,
-										string.chars().count() - 1
-									)
-								})
-								.to_string(),
-						));
-					},
-					(Object::Context(var_table), Object::String(string)) => {
-						self.push_obj(
-							var_table
-								.get(&string)
-								.unwrap_or_else(|| panic!("Context index {} not present", string))
-								.clone(),
-						);
-						self.advance_instr_index();
-					},
-					(left, right) => unimplemented!(
-						"Index operation on objects of type {} and {}",
-						left.type_name(),
-						right.type_name()
-					),
-				}
+				let res = left.index(right).unwrap();
+				self.push_obj(res);
 				self.advance_instr_index();
 			},
 			SirInstr::ToRight => {
@@ -707,30 +613,14 @@ impl Execution {
 						self.advance_instr_index();
 						self.frame_stack.push(sub_frame);
 					},
-					(Object::Number(index), Object::List(vec)) => {
-						let index_as_usize =
-							i64::try_from(&BigSint::try_from(&index).unwrap()).unwrap() as usize;
-						self.push_obj(
-							vec.get(index_as_usize)
-								.unwrap_or_else(|| {
-									panic!(
-										"List index {} out of range {}-{}",
-										index_as_usize,
-										0,
-										vec.len() - 1
-									)
-								})
-								.clone(),
-						);
+					(index @ Object::Number(_), list @ Object::List(_)) => {
+						let res = list.index(index).unwrap();
+						self.push_obj(res);
 						self.advance_instr_index();
 					},
-					(Object::String(string), Object::Context(var_table)) => {
-						self.push_obj(
-							var_table
-								.get(&string)
-								.unwrap_or_else(|| panic!("Context index {} not present", string))
-								.clone(),
-						);
+					(string_index @ Object::String(_), var_table @ Object::Context(_)) => {
+						let res = var_table.index(string_index).unwrap();
+						self.push_obj(res);
 						self.advance_instr_index();
 					},
 					(left, right) => unimplemented!(
