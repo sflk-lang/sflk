@@ -1,20 +1,19 @@
 
-pr "\
-         *** SFLK REPL TEST ***
+pr "\e[35m
+            *** SFLK REPL ***
 
-Please note that this is not a true REPL yet
-and is quite shitty for now. It will get
-better with time aha..
-
-Each input line should be a statement.
-To print stuff, enter `pr stuff`.
-To exit, enter erroneous garbage.
+Each input line should be one or more statements.
+Try to type `pr 8 + 34` to see if it works.
+To exit, enter `do quit` or an empty line.\e[39m
 
 "
 
-lp bd dh {
-	pr "$ "
-	line < in
-	dh line
-	nl
+run! < 1
+quit! < {run < 0}
+lp wh run bd dh {
+	pr "\e[33m$\e[39m "
+	line! < in
+	if line - "\n"
+		el do quit
+		th dh line th nl
 }
