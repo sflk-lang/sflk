@@ -1132,6 +1132,34 @@ impl LanguageDescr {
 				extentions: HashMap::new(),
 			},
 		);
+		stmts.insert(
+			Kw::Gs,
+			StmtDescr {
+				name_article: "a".to_string(),
+				name: "generic syntax".to_string(),
+				content_type: ContentType::Expr,
+				extentions: {
+					let mut exts = HashMap::new();
+					exts.insert(
+						Kw::Ag,
+						StmtExtDescr {
+							content_type: ContentType::Expr,
+							optional: true,
+							can_stack: true,
+						},
+					);
+					exts.insert(
+						Kw::Rs,
+						StmtExtDescr {
+							content_type: ContentType::Targ,
+							optional: true,
+							can_stack: false,
+						},
+					);
+					exts
+				},
+			},
+		);
 		let mut binops = HashMap::new();
 		binops.insert(SimpleTok::Op(Op::Plus), Binop::Plus);
 		binops.insert(SimpleTok::Op(Op::Minus), Binop::Minus);
@@ -1363,6 +1391,42 @@ fn temporary_into_ast_stmt(
 						_ => panic!(),
 					})
 				},
+			},
+			kw_loc,
+		),
+		Kw::Gs => Node::from(
+			Stmt::GenericSyntax {
+				expr: {
+					let node = content.unwrap();
+					node.map(|ext| match ext {
+						StmtExt::Expr(expr) => expr,
+						_ => panic!(),
+					})
+				},
+				ar_exprs: exts
+					.remove(&Kw::Ag)
+					.unwrap()
+					.into_iter()
+					.map(|expr_ext| {
+						let loc = expr_ext.loc().clone();
+						match expr_ext.unwrap() {
+							StmtExt::Expr(expr) => Node::from(expr, loc),
+							_ => panic!(),
+						}
+					})
+					.collect(),
+				target: exts
+					.remove(&Kw::Rs)
+					.unwrap()
+					.into_iter()
+					.next()
+					.map(|targ_ext| {
+						let loc = targ_ext.loc().clone();
+						match targ_ext.unwrap() {
+							StmtExt::Targ(targ) => Node::from(targ, loc),
+							_ => panic!(),
+						}
+					}),
 			},
 			kw_loc,
 		),

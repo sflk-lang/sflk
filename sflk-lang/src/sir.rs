@@ -85,8 +85,9 @@ enum SirInstr {
 	ToRight,     // (l r -- (l > r))
 
 	// Other operations
-	Do,     // (block intercepror -- )
-	DoHere, // (block -- )
+	Do,             // (block interceptor -- )
+	DoHere,         // (block -- )
+	GenericFeature, // (name (arg list) -- res)
 }
 
 #[derive(Debug, Clone)]
@@ -708,6 +709,43 @@ impl Execution {
 				self.push_obj(Object::Context(var_table));
 				self.advance_instr_index();
 			},
+			SirInstr::GenericFeature => {
+				let arg_list = self.pop_obj();
+				let feature_name = self.pop_obj();
+
+				let arg_vec = match arg_list {
+					Object::Nothing => Vec::new(),
+					Object::List(vec) => vec,
+					_ => panic!(),
+				};
+
+				// Test.
+				match feature_name {
+					Object::String(feature_name) if feature_name == "testgs" => {
+						let mut res_string = String::new();
+						res_string += "test generic syntax";
+						for arg in arg_vec {
+							match arg {
+								Object::String(string) => {
+									res_string += " ";
+									res_string += &string;
+								},
+								_ => unimplemented!(),
+							}
+						}
+						self.push_obj(Object::String(res_string));
+					},
+					Object::String(feature_name) => unimplemented!(
+						"Generic syntax operation with feature name \"{}\"",
+						feature_name
+					),
+					obj => unimplemented!(
+						"Generic syntax operation with feature name object of type {}",
+						obj.type_name()
+					),
+				}
+				self.advance_instr_index();
+			},
 		}
 	}
 
@@ -1123,6 +1161,31 @@ fn stmt_to_sir_instrs(stmt: &Stmt, sir_instrs: &mut Vec<SirInstr>) {
 		Stmt::DeployContext { expr } => {
 			expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
 			sir_instrs.push(SirInstr::DeployContext);
+		},
+		Stmt::GenericSyntax { expr, ar_exprs, target } => {
+			// Feature name.
+			expr_to_sir_instrs(expr.unwrap_ref(), sir_instrs);
+
+			// Argument list.
+			sir_instrs.push(SirInstr::PushConstant { value: Object::Nothing });
+			for ar_expr in ar_exprs {
+				expr_to_sir_instrs(ar_expr.unwrap_ref(), sir_instrs);
+				sir_instrs.push(SirInstr::Comma);
+			}
+
+			sir_instrs.push(SirInstr::GenericFeature);
+
+			// Assign to target if any.
+			if let Some(target_expr) = target {
+				match target_expr.unwrap_ref() {
+					TargetExpr::VariableName(var_name) => {
+						sir_instrs.push(SirInstr::PopToVar { var_name: var_name.clone() });
+					},
+					_ => unimplemented!(),
+				}
+			} else {
+				sir_instrs.push(SirInstr::Discard);
+			}
 		},
 		Stmt::Invalid { error_expr } => {
 			expr_to_sir_instrs(error_expr.unwrap_ref(), sir_instrs);

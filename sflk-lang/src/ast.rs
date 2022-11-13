@@ -146,6 +146,11 @@ pub enum Stmt {
 	DeployContext {
 		expr: Node<Expr>,
 	},
+	GenericSyntax {
+		expr: Node<Expr>,
+		ar_exprs: Vec<Node<Expr>>,
+		target: Option<Node<TargetExpr>>,
+	},
 	Invalid {
 		error_expr: Node<Expr>,
 	},
@@ -457,6 +462,27 @@ impl Treeable for Stmt {
 				styles::NORMAL,
 				vec![StringTree::from(expr)],
 			),
+			Stmt::GenericSyntax { expr, ar_exprs, target } => StringTree::new_node(
+				"generic syntax".to_string(),
+				styles::NORMAL,
+				vec![
+					StringTree::from(expr),
+					if !ar_exprs.is_empty() {
+						StringTree::new_node(
+							"arguments".to_string(),
+							styles::NORMAL,
+							ar_exprs.iter().map(StringTree::from).collect(),
+						)
+					} else {
+						StringTree::new_leaf("no arguments".to_string(), styles::NORMAL)
+					},
+					if let Some(target_expr) = target {
+						StringTree::from(target_expr)
+					} else {
+						StringTree::new_leaf("no target".to_string(), styles::NORMAL)
+					},
+				],
+			),
 			Stmt::Invalid { error_expr } => StringTree::new_node(
 				"invalid".to_string(),
 				styles::BOLD_LIGHT_RED,
@@ -527,6 +553,17 @@ impl Stmt {
 					.unwrap_or(false)
 			},
 			Stmt::DeployContext { expr } => expr.content.is_invalid(),
+			#[rustfmt::skip]
+			Stmt::GenericSyntax { expr, ar_exprs, target } => {
+				expr.content.is_invalid()
+				|| ar_exprs
+					.iter()
+					.any(|expr| (*expr).content.is_invalid())
+				|| target
+					.as_ref()
+					.map(|target_expr| (*target_expr).content.is_invalid())
+					.unwrap_or(false)
+			},
 			Stmt::Invalid { .. } => true,
 		}
 	}

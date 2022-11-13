@@ -37,8 +37,8 @@ fn main() {
 	// Get the tokenizer ready.
 	let tfr = TokBuffer::from(CharReadingHead::from_scu(scu));
 
-	// Don't execute any code, only display tokens.
 	if settings.display_tokens() {
+		// Don't execute any code, only display tokens.
 		tfr.display_all(settings.debug_lines());
 		return;
 	}

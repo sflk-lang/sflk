@@ -108,3 +108,4 @@ pr 100000000000000000000000000000000000000000000000 -1 /9 nl
 pr "after line comment" nl
 pr (1/10) + (1/10) + (1/10) nl
 if ((1/10) + (1/10) + (1/10)) - (3/10) el dh {pr "no float bs" nl}
+gs .testgs ag .a ag .b rs x pr x nl

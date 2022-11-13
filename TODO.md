@@ -204,14 +204,6 @@ Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means s
 
 ## Small language features
 
-### Statement about feature with generic syntax
-
-There are features (a lot of which are quite simple) that are to be added to SFLK but the syntax have not been decided yet. Then, there should be a generic way to use such features with a generic syntax that allow the stdlib to wrap such use of the feature in a block of code that looks better.
-
-For example, there is not yet a syntax for writing to a file (the fact that this feature is not yet implemented anyway is irrelevant here xd). Then, `gs .writefile ag "some text"` would be a nice temporary solution.
-
-`gs` (Generic Syntax) statement expects an expression that should evaluate to a string that designate a feature (for example, "writefile") and takes any number of `ag` (argument) statement extention that each expect an expression that evaluates into whatever. Its effect depends on the feature name.
-
 ### File IO
 
 Output to file instead of standard output.
@@ -261,6 +253,8 @@ This would be very unsafe, but very fun as it will bring very low level consider
 Allow an SFLK program to create windows, recieve events and draw on the surface, etc.
 
 Beware the dependencies! Maybe make it opt-out with cargo feature and `#[cfg(stuff)]` attributes. Also, avoid the `sdl2` crate (as it requires SDL2 dev lib and is a mess to make it link statically). The dependency MUST link statically and not require any setup from someone who just want to clone and compile SFLK with all the features (thus a standalone crate is required).
+
+How about [notan](https://crates.io/crates/notan)? It seem to be the first crate in the #windowing cathegory that does not says that installing it requires anything else than adding it via cargo like a normal simple crate. See some [examples](https://nazariglez.github.io/notan-web/) maybe.
 
 ### Sound
 
