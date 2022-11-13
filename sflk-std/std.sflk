@@ -1,41 +1,26 @@
-# SFLK Standard Library, version 0.0.0 #
 
-# This standard library should be updated later with multiple files
-| Each section could be put in another file, be careful about your usage until
-| the development period isn't done. Things could not work about std with new
-| versions. #
-
-# Section : input/output (io.sflk) #
+# SFLK Standard Library, version 0.0.1 #
 
 # Prints the input followed by a newline.
-| Returns the input.
-| NOTE: May be removed in future versions. #
-prnl! < {pr v nl}
-
-# Section : conversions (co.sflk) #
-
-# Converts an integer value to a string one 
-| Note : Waiting for equality operator to check `0` #
-itos! < {
-    lp
-    wh v
-    bd dh {
-        # Todo : Append string with the converted number part to char 
-        | The following code is doing nothing good #
-        v < 0
-    }
-    sp np
+| Returns the input. #
+prnl! < {
+	pr v nl
 }
 
-# Converts a string value to an integer one #
-stoi! < {
-    v < 1
-}
-
-# Section : mathematics (mt.sflk) #
-
-# Power function
-| Arguments : (n, pow, base) #
-pow! < {
-    v < "pow result baby"
+# Prints text to a file.
+| Takes an input of the form `content,, path` or `content,, path, mode`
+| and writes `content` to the file at `path`
+| using mode `mode` (or `.append` if mode is not provided).
+| Returns `content`. #
+prf! < {
+	content! < v ix 0
+	path! < v ix 1
+	if os ln v. ,, 3
+		th mode! < .append
+		el mode! < v ix 2
+	gs .writefile
+		ag content
+		ag path
+		ag mode
+	v < content
 }
