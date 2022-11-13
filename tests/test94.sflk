@@ -1,0 +1,5 @@
+
+gs .writefile
+	ag "hello file\n"
+	ag "test-output/test94.out.txt"
+	ag .append

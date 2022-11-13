@@ -32,7 +32,7 @@ use crate::{
 	ParserDebuggingLogger,
 };
 
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, io::Write, rc::Rc};
 
 #[derive(Debug, Clone)]
 enum SirInstr {
@@ -387,7 +387,8 @@ impl Execution {
 		}
 	}
 
-	/// This is the core of the whole SIR machine.
+	/// This is the core of the whole SIR machine. This function executes at most one (1)
+	/// SIR instruction (`SirInstr`) per call.
 	///
 	/// TODO: Document what goes on in there.
 	fn perform_one_step(&mut self, context_table: &mut ContextTable) {
@@ -719,7 +720,6 @@ impl Execution {
 					_ => panic!(),
 				};
 
-				// Test.
 				match feature_name {
 					Object::String(feature_name) if feature_name == "testgs" => {
 						let mut res_string = String::new();
@@ -734,6 +734,57 @@ impl Execution {
 							}
 						}
 						self.push_obj(Object::String(res_string));
+						self.advance_instr_index();
+					},
+					Object::String(feature_name) if feature_name == "writefile" => {
+						// What to write to the file.
+						let content = match arg_vec.get(0) {
+							Some(Object::String(string)) => string,
+							Some(obj) => panic!(
+								"Feature {feature_name} expects the first argument \
+								to be a string and not a {}",
+								obj.type_name()
+							),
+							None => panic!(
+								"Feature {feature_name} expects a first argument \
+								that is the content written to the file"
+							),
+						};
+
+						// File path.
+						let path = match arg_vec.get(1) {
+							Some(Object::String(string)) => string,
+							Some(obj) => panic!(
+								"Feature {feature_name} expects the second argument \
+								to be a string and not a {}",
+								obj.type_name()
+							),
+							None => panic!(
+								"Feature {feature_name} expects a second argument \
+								that is the file path of the file to write in"
+							),
+						};
+
+						// Write mode, like "append", "overwrite", etc.
+						let mode = match arg_vec.get(2) {
+							Some(Object::String(string)) => string,
+							Some(obj) => panic!(
+								"Feature {feature_name} expects the third argument \
+								to be a string and not a {}",
+								obj.type_name()
+							),
+							None => panic!(
+								"Feature {feature_name} expects a third argument \
+								that is the write mode like \"append\" or \"overwrite\""
+							),
+						};
+
+						let mut signal = HashMap::new();
+						signal.insert("name".to_string(), Object::String("writefile".to_string()));
+						signal.insert("value".to_string(), Object::String(content.to_string()));
+						signal.insert("path".to_string(), Object::String(path.to_string()));
+						signal.insert("mode".to_string(), Object::String(mode.to_string()));
+						self.emit_signal_and_advance(context_table, Object::Context(signal), true);
 					},
 					Object::String(feature_name) => unimplemented!(
 						"Generic syntax operation with feature name \"{}\"",
@@ -744,7 +795,6 @@ impl Execution {
 						obj.type_name()
 					),
 				}
-				self.advance_instr_index();
 			},
 		}
 	}
@@ -931,11 +981,53 @@ fn perform_signal_past_root(signal: Object) -> Object {
 				Object::Nothing
 			},
 			Some(Object::String(sig_name)) if sig_name == "input" => {
-				use std::io::Write;
 				std::io::stdout().flush().ok();
 				let mut input = String::new();
 				std::io::stdin().read_line(&mut input).expect("h");
 				Object::String(input)
+			},
+			Some(Object::String(sig_name)) if sig_name == "writefile" => {
+				let content = match var_table.get("value") {
+					Some(Object::String(string)) => string,
+					Some(obj) => {
+						unimplemented!(
+							"Write file signal with value object of type {} past root",
+							obj.type_name()
+						)
+					},
+					None => unimplemented!("Write file signal but without any value past root"),
+				};
+				let path = match var_table.get("path") {
+					Some(Object::String(string)) => std::path::Path::new(string),
+					Some(obj) => {
+						unimplemented!(
+							"Write file signal with path object of type {} past root",
+							obj.type_name()
+						)
+					},
+					None => unimplemented!("Write file signal but without any path past root"),
+				};
+				let mode = match var_table.get("mode") {
+					Some(Object::String(string)) => string,
+					Some(obj) => {
+						unimplemented!(
+							"Write file signal with mode object of type {} past root",
+							obj.type_name()
+						)
+					},
+					None => unimplemented!("Write file signal but without any mode past root"),
+				};
+				if let Some(parent) = path.parent() {
+					std::fs::create_dir_all(parent).unwrap();
+				}
+				let mut file = std::fs::File::options()
+					.create(true)
+					.write(true)
+					.append(mode == "append")
+					.open(path)
+					.unwrap();
+				write!(file, "{content}").unwrap();
+				Object::Nothing
 			},
 			Some(Object::String(sig_name)) if sig_name == "readfile" => {
 				match var_table.get("value") {

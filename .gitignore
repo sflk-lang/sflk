@@ -17,3 +17,7 @@ target/
 
 # Whatever you want
 local/
+
+# Some test programs want to interact with the file system and might require or produce files.
+# These files should remain in this directory and not pollute the repo.
+test-output/
