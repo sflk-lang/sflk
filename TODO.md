@@ -204,9 +204,23 @@ Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means s
 
 ## Small language features
 
-### File IO
+### Block statements
 
-Output to file instead of standard output.
+New token `.{` (no whitespace between the `.` and the `{`) that opens a block that is closed with `}` (just like the regular `{`) but instead of producing a block of code literal that is an expression, it produces a block statement that is a statement. When executed, its effect is to execute the sequence of statements it contains. It would allow to replace stuff like `if x th dh { ... }` by `if x th .{ ... }` which is clearly more elegant.
+
+Note: For some time I thought about using `( ... )` for block statements, but now I don't think this is a good idea. It seems better to stick to the implicit rules that say "parenthesis are for expressions" and "code is in curly-braces".
+
+### Chop-like assign
+
+New token `.>` (no whitespace between the `.` and the `>`) that behaves *similarly* to a chop (chain operator) and does what `<` allows to do. Consider `ev 2 + 6 .> x .> y`, well this should assign 8 to `x` and then to `y`. `.>` is not a chop tho (as what is on the right of it is not an expression but a *target expression*). Note that `ev 2 + 6 .> x! .> y!` should be valid and do what we expect it to do (declare `x` and assign 8 to `x` then declare `y` and assign 8 to `y`).
+
+### `rs` in the `em` statement should accept `x!`
+
+This. All target expressions should be accepted where a target expression is expected. The fact that it is currently not the case is kinda a bug.
+
+### Some equivalent of `repr`
+
+In Python there is a `repr` function (or whatever calls `__repr__`) that is different from `str` (that calls `__str__`). `repr` is supposed to return a string that is a Python expression that evaluates into the object. SFLK should have something like that.
 
 ### Send error signals instead of panicking
 
