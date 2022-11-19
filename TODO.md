@@ -150,6 +150,8 @@ It could also be nice to have maps from anything to anything, it is highly proba
 
 Have the ability to define numbers with stuff like code that returns the i-th decimal in base b or something, so that they can be used up to any precision. Then make them behave like numbers (stuff like be printed, be multiplied by 2, etc.). Then make a variable like `e` (for error) be used as a parameter for their use that can indicate that their use is only guarenteed up to some precision with the error being less than the content of `e` or something (and of course if `e` is something like `()` then their use must be of infinite precision and printing them hould take an infinite amount of time to terminate for example).
 
+BETTER IDEA: Define a real number by two infinite sequences of rationals (one always below the other, they must converge toward the same number)!
+
 ### Even better signals
 
 A print signal does nothing as it goes through contexts and travels toward the root, but a variable writing signal does stuff at each signal it encounters. The way this is made possible by the interpreter is that the name of some signals (e.g. variable writing) is considered a special case by the interpreter. Not very elegant and general.
@@ -203,6 +205,14 @@ Imagine only keywords and variable names. Huge potential for polyglots.
 Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means something. It would be so cool, huge potential for obfuscation.
 
 ## Small language features
+
+### Bools (yes/no)
+
+Boolean type. True is `ye` and false is `no`. Instead of stating about the truthiness of some fact, it awnsers a yes/no question.
+
+### Is defined expression
+
+Expression `x?!` that is true iff `x` is defined in the current context.
 
 ### Block statements
 
