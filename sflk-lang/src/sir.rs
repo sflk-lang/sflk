@@ -109,7 +109,7 @@ impl SirBlock {
 #[derive(Debug)]
 struct Frame {
 	sir_block: SirBlock,
-	/// Refers to the next instruction in the `sir_block` that is to be executed at7
+	/// Refers to the next instruction in the `sir_block` that is to be executed at
 	/// the next call to `perform_one_step`. Such step shall set `instr_index` to
 	/// the instruction that has to be executed in the next step, eventually chosing
 	/// an other instruction that the one that follows (when executing a jumping

@@ -206,13 +206,20 @@ Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means s
 
 ## Small language features
 
+### Context list
+
+The way to mutate a context object is to `cy` it into a context, change the context, and then `cx` it back into an object. Why not make the same thing with lists? Like every context has a list in it, there are a few ways to mutate that list and interact with it, and a few ways to make it into a list and to make a list into the context list or something.
+
+This needs more thoughts tho...
+
 ### Bools (yes/no)
 
 Boolean type. True is `ye` and false is `no`. Instead of stating about the truthiness of some fact, it awnsers a yes/no question.
 
-### Is defined expression
+### Is defined expressions
 
-Expression `x?!` that is true iff `x` is defined in the current context.
+- Expression `x?!` that is true iff `x` is defined in the current context.
+- Other forms of such expression ?
 
 ### Block statements
 
