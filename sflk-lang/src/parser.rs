@@ -48,7 +48,7 @@ enum ParsingData {
 	Expr {
 		init: Option<Node<Expr>>,
 		chops: Vec<Chop>,
-		left_paren: Option<Node<()>>,
+		_left_paren: Option<Node<()>>,
 	},
 	LeftParen(Node<()>),
 	Binop(Node<Binop>),
@@ -682,6 +682,8 @@ impl Parser {
 				if simple_tok.is_some()
 					&& self.lang.unops.contains_key(simple_tok.as_ref().unwrap())
 				{
+					// Clippy is annoying on this one.
+					#[allow(clippy::unnecessary_unwrap)]
 					self.data_stack.push(ParsingData::Unop(Node::from(
 						*self.lang.unops.get(&simple_tok.unwrap()).unwrap(),
 						loc,
@@ -693,22 +695,22 @@ impl Parser {
 						Tok::Kw(Kw::In) => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::Input, loc)),
 							chops: Vec::new(),
-							left_paren: None,
+							_left_paren: None,
 						}),
 						Tok::Kw(Kw::Cx) => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::Context, loc)),
 							chops: Vec::new(),
-							left_paren: None,
+							_left_paren: None,
 						}),
 						Tok::Integer(integer_string) => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::IntegerLiteral(integer_string), loc)),
 							chops: Vec::new(),
-							left_paren: None,
+							_left_paren: None,
 						}),
 						Tok::String { content, .. } => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::StringLiteral(content), loc)),
 							chops: Vec::new(),
-							left_paren: None,
+							_left_paren: None,
 						}),
 						Tok::Op(Op::Dot) => {
 							self.action_stack.push(ParsingAction::ParseDottedString);
@@ -716,7 +718,7 @@ impl Parser {
 						Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::VariableName(string), loc)),
 							chops: Vec::new(),
-							left_paren: None,
+							_left_paren: None,
 						}),
 						Tok::Left(Matched::Curly) => {
 							self.data_stack.push(ParsingData::BlockLevel {
@@ -750,7 +752,7 @@ impl Parser {
 									loc,
 								)),
 								chops: Vec::new(),
-								left_paren: None,
+								_left_paren: None,
 							})
 						},
 					}
@@ -762,12 +764,12 @@ impl Parser {
 					Tok::Name { string, .. } => self.data_stack.push(ParsingData::Expr {
 						init: Some(Node::from(Expr::StringLiteral(string), loc)),
 						chops: Vec::new(),
-						left_paren: None,
+						_left_paren: None,
 					}),
 					Tok::Kw(kw) => self.data_stack.push(ParsingData::Expr {
 						init: Some(Node::from(Expr::StringLiteral(kw.to_string()), loc)),
 						chops: Vec::new(),
-						left_paren: None,
+						_left_paren: None,
 					}),
 					_ => {
 						let error_string = format!("Unexpected token {} for dotted string", tok);
@@ -784,7 +786,7 @@ impl Parser {
 								loc,
 							)),
 							chops: Vec::new(),
-							left_paren: None,
+							_left_paren: None,
 						})
 					},
 				}
@@ -798,7 +800,7 @@ impl Parser {
 						self.data_stack.push(ParsingData::Expr {
 							init: Some(Node::from(Expr::NothingLiteral, left_loc + loc)),
 							chops: Vec::new(),
-							left_paren: None,
+							_left_paren: None,
 						});
 					} else {
 						panic!();
@@ -831,7 +833,7 @@ impl Parser {
 						unop_loc + expr_loc,
 					)),
 					chops: Vec::new(),
-					left_paren: None,
+					_left_paren: None,
 				});
 			},
 			ParsingAction::ParseChopOrStop => {
@@ -892,7 +894,7 @@ impl Parser {
 					self.data_stack.push(ParsingData::Expr {
 						init: Some(Node::from(Expr::BlockLiteral(stmts), loc)),
 						chops: Vec::new(),
-						left_paren: None,
+						_left_paren: None,
 					})
 				} else {
 					panic!();

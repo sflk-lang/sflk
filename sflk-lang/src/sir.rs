@@ -9,7 +9,7 @@
 //!
 //! Temporary data is handled via a stack of SFLK objects.
 //!
-//!	Contexts hold data such as the declared variables and their value.
+//! Contexts hold data such as the declared variables and their value.
 //! The contexts are arranged in a tree, as a simple stack cannot handle
 //! the case of an interceptor creating a new context (its parent is the
 //! same context as an other context from which the intercepted signal comes
@@ -189,13 +189,13 @@ struct Context {
 	/// ```sflk
 	/// # Code here runs in context A. #
 	/// do {
-	/// 	# Code here runs in context B
-	/// 	| (a context that was created just for
-	/// 	| the execution of this block of code). #
+	///     # Code here runs in context B
+	///     | (a context that was created just for
+	///     | the execution of this block of code). #
 	/// } wi {
-	/// 	# Code here runs in context A, despite
-	/// 	| the object representing this interceptor
-	/// 	| being stored in the context B. #
+	///     # Code here runs in context A, despite
+	///     | the object representing this interceptor
+	///     | being stored in the context B. #
 	/// }
 	/// ```
 	///
@@ -943,7 +943,7 @@ fn perform_signal_past_root(signal: Object) -> Object {
 			Some(Object::String(sig_name)) if sig_name == "print" => match var_table.get("value") {
 				Some(Object::Number(value)) => {
 					use crate::bignums::{big_frac, big_sint, big_uint};
-					let value_as_string = value.clone().to_string(
+					let value_as_string = value.clone().into_string(
 						big_frac::string_conversion::ToStringFormat::Slash {
 							num_sint_format: big_sint::string_conversion::ToStringFormat {
 								uint_format: big_uint::string_conversion::ToStringFormat {
@@ -1395,7 +1395,6 @@ fn expr_to_sir_instrs(expr: &Expr, sir_instrs: &mut Vec<SirInstr>) {
 						expr_to_sir_instrs(right.unwrap_ref(), sir_instrs);
 						sir_instrs.push(SirInstr::ToRight);
 					},
-					_ => unimplemented!(),
 				}
 			}
 		},

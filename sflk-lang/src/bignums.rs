@@ -14,13 +14,13 @@
 //!
 //! This module is meant to be almost a stand-alone implementation of
 //! big fractions, and it is to remain pure and free of all SFLK-related concerns.
-//! 
+//!
 //! TODO: There is stuff to optimize here and there.
-//! 
+//!
 //! TODO: Make bigint types that use `u64` or `i64` when the value fits
 //! and converts it to big int when needed. This will spare a lot of allocations,
 //! and it will speed up operations on small numbers.
-//! 
+//!
 //! TODO: Get a full coverage with the unit tests.
 
 /// A conversion from a big number into a primitive integer type have failed due
@@ -34,6 +34,9 @@ pub struct DoesNotFitInPrimitive;
 /// is not a digit in that base (for example, `f` is a digit in base 16 but not in
 /// base 10, and `@` is not a digit in any base).
 #[derive(Debug)]
+// The fields ARE used when their values are printed by `unwrap`, but for some reason
+// (see [https://github.com/rust-lang/rust/issues/88900]) the compiler says they are not.
+#[allow(unused)]
 pub struct CharIsNoDigitInBase {
 	character: char,
 	base: u64,
@@ -156,7 +159,7 @@ pub mod big_uint {
 			// with the most significants digits at the back
 			// (same layout in BigUint so faster conversion).
 			while value > 0 {
-				digits.push((u64::from(value) % BASE) as Digit);
+				digits.push((value % BASE) as Digit);
 				value = value as u64 / BASE;
 			}
 
@@ -202,10 +205,9 @@ pub mod big_uint {
 		fn cmp(&self, rhs: &BigUint) -> Ordering {
 			// First, look if one inetger has more digits than the `rhs`
 			// in which case that would be the bigger one.
-			if self.digits.len() < rhs.digits.len() {
-				return Ordering::Less;
-			} else if self.digits.len() > rhs.digits.len() {
-				return Ordering::Greater;
+			match self.digits.len().cmp(&rhs.digits.len()) {
+				ord @ (Ordering::Less | Ordering::Greater) => return ord,
+				Ordering::Equal => (),
 			}
 
 			// Both integers have the same number of digits.
@@ -465,8 +467,7 @@ pub mod big_uint {
 	impl Mul<BigUint> for &BigUint {
 		type Output = BigUint;
 		fn mul(self, rhs: BigUint) -> BigUint {
-			let res = self * &rhs;
-			res
+			self * &rhs
 		}
 	}
 	impl Mul<&BigUint> for BigUint {
@@ -1043,7 +1044,7 @@ pub mod big_uint {
 			}
 
 			/// Produces a string representation in the given format.
-			pub fn to_string(mut self, format: ToStringFormat) -> String {
+			pub fn into_string(mut self, format: ToStringFormat) -> String {
 				assert!(format.base >= 1);
 				assert!(
 					format.base <= 10 + 26,
@@ -1065,9 +1066,9 @@ pub mod big_uint {
 
 					// Convert the extracted digit to an alphanumeric character.
 					let digit_as_char = if digit_in_base < 10 {
-						'0' as u8 + digit_in_base
+						b'0' + digit_in_base
 					} else {
-						(if format.upper_case { 'A' } else { 'a' }) as u8 - 10 + digit_in_base
+						(if format.upper_case { b'A' } else { b'a' }) - 10 + digit_in_base
 					} as char;
 
 					char_digits_reversed.push(digit_as_char);
@@ -1203,33 +1204,34 @@ pub mod big_uint {
 			}
 
 			#[test]
-			fn to_string() {
+			fn into_string() {
 				assert_eq!(
-					BigUint::from(0u64).to_string(ToStringFormat { base: 10, upper_case: false }),
+					BigUint::from(0u64).into_string(ToStringFormat { base: 10, upper_case: false }),
 					"0"
 				);
 				assert_eq!(
-					BigUint::from(123u64).to_string(ToStringFormat { base: 10, upper_case: false }),
+					BigUint::from(123u64)
+						.into_string(ToStringFormat { base: 10, upper_case: false }),
 					"123"
 				);
 				assert_eq!(
 					BigUint::from(123000u64)
-						.to_string(ToStringFormat { base: 10, upper_case: false }),
+						.into_string(ToStringFormat { base: 10, upper_case: false }),
 					"123000"
 				);
 				assert_eq!(
 					BigUint::from(0xffffffffu64)
-						.to_string(ToStringFormat { base: 16, upper_case: false }),
+						.into_string(ToStringFormat { base: 16, upper_case: false }),
 					"ffffffff"
 				);
 				assert_eq!(
 					BigUint::from(0xffffffffu64)
-						.to_string(ToStringFormat { base: 16, upper_case: true }),
+						.into_string(ToStringFormat { base: 16, upper_case: true }),
 					"FFFFFFFF"
 				);
 				assert_eq!(
 					BigUint::from(0b1010101010101010u64)
-						.to_string(ToStringFormat { base: 2, upper_case: false }),
+						.into_string(ToStringFormat { base: 2, upper_case: false }),
 					"1010101010101010"
 				);
 			}
@@ -1968,7 +1970,7 @@ pub mod big_sint {
 				let (string, sign) = match (format.allow_sign, string.chars().next()) {
 					(true, Some('-')) => (&string[1..], -1),
 					(true, Some('+')) => (&string[1..], 1),
-					_ => (&string[..], 1),
+					_ => (string, 1),
 				};
 
 				let bu = BigUint::from_string(string, format.uint_format)?;
@@ -1977,7 +1979,7 @@ pub mod big_sint {
 			}
 
 			/// Produces a string representation in the given format.
-			pub fn to_string(self, format: ToStringFormat) -> String {
+			pub fn into_string(self, format: ToStringFormat) -> String {
 				let sign_string = if self.is_strictly_negative() {
 					"-"
 				} else if format.plus_sign {
@@ -1985,7 +1987,7 @@ pub mod big_sint {
 				} else {
 					""
 				};
-				let abs_value_string = self.abs_value.to_string(format.uint_format);
+				let abs_value_string = self.abs_value.into_string(format.uint_format);
 				sign_string.to_string() + &abs_value_string
 			}
 		}
@@ -2052,9 +2054,9 @@ pub mod big_sint {
 			}
 
 			#[test]
-			fn to_string() {
+			fn into_string() {
 				assert_eq!(
-					BigSint::from(123u64).to_string(ToStringFormat {
+					BigSint::from(123u64).into_string(ToStringFormat {
 						uint_format: big_uint::string_conversion::ToStringFormat {
 							base: 10,
 							upper_case: false,
@@ -2064,7 +2066,7 @@ pub mod big_sint {
 					"123"
 				);
 				assert_eq!(
-					BigSint::from(-123i64).to_string(ToStringFormat {
+					BigSint::from(-123i64).into_string(ToStringFormat {
 						uint_format: big_uint::string_conversion::ToStringFormat {
 							base: 10,
 							upper_case: false,
@@ -2074,7 +2076,7 @@ pub mod big_sint {
 					"-123"
 				);
 				assert_eq!(
-					BigSint::from(0).to_string(ToStringFormat {
+					BigSint::from(0).into_string(ToStringFormat {
 						uint_format: big_uint::string_conversion::ToStringFormat {
 							base: 10,
 							upper_case: false,
@@ -2135,7 +2137,7 @@ pub mod big_frac {
 		/// Numerator.
 		///
 		/// It bears the sign of the fraction.
-		fn num(&self) -> &BigSint {
+		pub fn num(&self) -> &BigSint {
 			&self.num
 		}
 
@@ -2143,15 +2145,15 @@ pub mod big_frac {
 		///
 		/// It is equal to one iff the fraction is an integer (even zero).
 		/// It is always (strictly) positive.
-		fn den(&self) -> &BigSint {
+		pub fn den(&self) -> &BigSint {
 			&self.den
 		}
 
-		fn is_positive(&self) -> bool {
+		pub fn is_positive(&self) -> bool {
 			self.num.is_positive()
 		}
 
-		fn is_integer(&self) -> bool {
+		pub fn is_integer(&self) -> bool {
 			self.den.is_one()
 		}
 	}
@@ -2452,6 +2454,8 @@ pub mod big_frac {
 
 		impl BigFrac {
 			fn is_not_properly_simplified(&self) -> bool {
+				// This dumb else if chain is written this way for readability.
+				#[allow(clippy::if_same_then_else)]
 				if self.den.is_negative() {
 					true
 				} else if self.den.is_zero() {
@@ -2627,11 +2631,11 @@ pub mod big_frac {
 				string: &str,
 				format: big_sint::string_conversion::FromStringFormat,
 			) -> Result<BigFrac, CharIsNoDigitInBase> {
-				big_sint::BigSint::from_string(string, format).map(|bs| BigFrac::from(bs))
+				big_sint::BigSint::from_string(string, format).map(BigFrac::from)
 			}
 
 			/// Produces a string representation in the given format.
-			pub fn to_string(self, format: ToStringFormat) -> String {
+			pub fn into_string(self, format: ToStringFormat) -> String {
 				match format {
 					ToStringFormat::Slash {
 						num_sint_format,
@@ -2639,9 +2643,9 @@ pub mod big_frac {
 						shash_even_for_integer,
 					} => {
 						let BigFrac { num, den } = self;
-						let num_string = num.to_string(num_sint_format);
+						let num_string = num.into_string(num_sint_format);
 						if den != BigSint::one() || shash_even_for_integer {
-							let den_string = den.to_string(den_sint_format);
+							let den_string = den.into_string(den_sint_format);
 							num_string + "/" + &den_string
 						} else {
 							num_string
@@ -2676,9 +2680,9 @@ pub mod big_frac {
 			}
 
 			#[test]
-			fn to_string() {
+			fn into_string() {
 				assert_eq!(
-					BigFrac::from(123u64).to_string(ToStringFormat::Slash {
+					BigFrac::from(123u64).into_string(ToStringFormat::Slash {
 						num_sint_format: big_sint::string_conversion::ToStringFormat {
 							uint_format: big_uint::string_conversion::ToStringFormat {
 								base: 10,
@@ -2698,7 +2702,7 @@ pub mod big_frac {
 					"123"
 				);
 				assert_eq!(
-					BigFrac::from(123u64).to_string(ToStringFormat::Slash {
+					BigFrac::from(123u64).into_string(ToStringFormat::Slash {
 						num_sint_format: big_sint::string_conversion::ToStringFormat {
 							uint_format: big_uint::string_conversion::ToStringFormat {
 								base: 10,
@@ -2718,7 +2722,7 @@ pub mod big_frac {
 					"123/1"
 				);
 				assert_eq!(
-					BigFrac::from_num_and_den(123u64, -11).to_string(ToStringFormat::Slash {
+					BigFrac::from_num_and_den(123u64, -11).into_string(ToStringFormat::Slash {
 						num_sint_format: big_sint::string_conversion::ToStringFormat {
 							uint_format: big_uint::string_conversion::ToStringFormat {
 								base: 10,

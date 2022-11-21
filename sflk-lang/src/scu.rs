@@ -4,9 +4,9 @@ use std::{
 };
 
 pub struct SourceCodeUnit {
-	name: String,
+	_name: String,
 	pub content: String,
-	line_offsets: Vec<usize>,
+	_line_offsets: Vec<usize>,
 }
 
 impl SourceCodeUnit {
@@ -32,7 +32,7 @@ impl SourceCodeUnit {
 			line_offsets.push(content.len());
 			// If the content didn't end by a `\n`, then now it does.
 		}
-		SourceCodeUnit { name, content, line_offsets }
+		SourceCodeUnit { _name: name, content, _line_offsets: line_offsets }
 	}
 }
 

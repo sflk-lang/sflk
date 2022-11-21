@@ -3,7 +3,7 @@ use crate::{
 	parser::ParsingWarning,
 	scu::Loc,
 	stringtree::StringTree,
-	utils::{escape_string, styles, Style},
+	utils::{escape_string, styles},
 };
 
 pub struct Node<T> {
@@ -30,47 +30,25 @@ impl<T> Node<T> {
 	pub fn unwrap_ref(&self) -> &T {
 		&self.content
 	}
-
-	pub fn add_left_comments(&mut self, comments: Vec<Node<Comment>>) {
-		self.comments.left_comments.extend(
-			comments
-				.into_iter()
-				.map(|node_comment| node_comment.unwrap()),
-		);
-	}
-
-	pub fn add_internal_comments(&mut self, comments: Vec<Node<Comment>>) {
-		self.comments.internal_comments.extend(
-			comments
-				.into_iter()
-				.map(|node_comment| node_comment.unwrap()),
-		);
-	}
 }
 
 #[derive(Debug)]
 pub struct Comment {
-	content: String,
-	delimitation_thickness: usize,
-}
-
-impl Comment {
-	pub fn new(content: String, delimitation_thickness: usize) -> Comment {
-		Comment { content, delimitation_thickness }
-	}
+	_content: String,
+	_delimitation_thickness: usize,
 }
 
 #[derive(Debug)]
 struct Comments {
-	left_comments: Vec<Comment>,
-	internal_comments: Vec<Comment>,
+	_left_comments: Vec<Comment>,
+	_internal_comments: Vec<Comment>,
 }
 
 impl Comments {
 	fn new() -> Comments {
 		Comments {
-			left_comments: Vec::new(),
-			internal_comments: Vec::new(),
+			_left_comments: Vec::new(),
+			_internal_comments: Vec::new(),
 		}
 	}
 }
@@ -78,15 +56,6 @@ impl Comments {
 impl<T> Node<T> {
 	pub fn loc(&self) -> &Loc {
 		&self.loc
-	}
-
-	pub fn add_loc(mut self, loc: Loc) -> Node<T> {
-		// TODO:
-		// Change the + impl for Loc so that this looks better
-		// like seriously wtf is even that
-		self.loc = &loc + &self.loc;
-		self.loc += loc;
-		self
 	}
 }
 
@@ -193,7 +162,6 @@ pub enum Chop {
 	DoubleComma(Node<Expr>),
 	Index(Node<Expr>),
 	ToRight(Node<Expr>),
-	Invalid, // TODO: Add error details
 }
 
 pub trait Treeable {
@@ -252,7 +220,6 @@ impl Treeable for Chop {
 				styles::NORMAL,
 				vec![StringTree::from(expr_node)],
 			),
-			Chop::Invalid => StringTree::new_leaf("invalid".to_string(), styles::BOLD_LIGHT_RED), // TODO
 		}
 	}
 }
@@ -502,119 +469,6 @@ impl Treeable for Program {
 	}
 }
 
-impl Stmt {
-	fn is_invalid(&self) -> bool {
-		match self {
-			Stmt::Nop => false,
-			Stmt::Print { expr } => expr.content.is_invalid(),
-			Stmt::Newline => false,
-			Stmt::Assign { target, expr } => {
-				target.content.is_invalid() || expr.content.is_invalid()
-			},
-			Stmt::Evaluate { expr } => expr.content.is_invalid(),
-			Stmt::Do { expr, wi_expr } => {
-				expr.content.is_invalid()
-					|| wi_expr
-						.as_ref()
-						.map_or(false, |expr| expr.content.is_invalid())
-			},
-			Stmt::DoHere { expr } => expr.content.is_invalid(),
-			#[rustfmt::skip]
-			Stmt::If { cond_expr, th_stmts, el_stmts } => {
-				cond_expr.content.is_invalid()
-				|| th_stmts
-					.iter()
-					.any(|stmt| (*stmt).content.is_invalid())
-				|| el_stmts
-					.iter()
-					.any(|stmt| (*stmt).content.is_invalid())
-			},
-			#[rustfmt::skip]
-			Stmt::Loop { wh_exprs, bd_stmts, sp_stmts, ao_flag: _ } => {
-				wh_exprs
-					.iter()
-					.any(|expr| (*expr).content.is_invalid())
-				|| bd_stmts
-					.iter()
-					.any(|stmt| (*stmt).content.is_invalid())
-				|| sp_stmts
-					.iter()
-					.any(|stmt| (*stmt).content.is_invalid())
-			},
-			Stmt::RegisterInterceptor { expr } => expr.content.is_invalid(),
-			#[rustfmt::skip]
-			Stmt::Emit { expr, target } => {
-				expr
-					.content
-					.is_invalid()
-				|| target
-					.as_ref()
-					.map(|target_expr| (*target_expr).content.is_invalid())
-					.unwrap_or(false)
-			},
-			Stmt::DeployContext { expr } => expr.content.is_invalid(),
-			#[rustfmt::skip]
-			Stmt::GenericSyntax { expr, ar_exprs, target } => {
-				expr.content.is_invalid()
-				|| ar_exprs
-					.iter()
-					.any(|expr| (*expr).content.is_invalid())
-				|| target
-					.as_ref()
-					.map(|target_expr| (*target_expr).content.is_invalid())
-					.unwrap_or(false)
-			},
-			Stmt::Invalid { .. } => true,
-		}
-	}
-}
-
-impl TargetExpr {
-	fn is_invalid(&self) -> bool {
-		match self {
-			TargetExpr::VariableName(_) => false,
-			TargetExpr::DeclVariableName(_) => false,
-			TargetExpr::Invalid => true,
-		}
-	}
-}
-
-impl Expr {
-	fn is_invalid(&self) -> bool {
-		match self {
-			Expr::VariableName(_varname) => false,
-			Expr::NothingLiteral => false,
-			Expr::IntegerLiteral(_integer_string) => false,
-			Expr::StringLiteral(_string_string) => false,
-			Expr::BlockLiteral(_stmts) => false,
-			Expr::Input => false,
-			Expr::Context => false,
-			Expr::Unop(_stmts) => false,
-			Expr::Chain { init, chops } => {
-				(*init).content.is_invalid()
-					|| chops.iter().any(|chop| (*chop).content.is_invalid())
-			},
-			Expr::Invalid { .. } => true,
-		}
-	}
-}
-
-impl Chop {
-	fn is_invalid(&self) -> bool {
-		match self {
-			Chop::Plus(expr) => expr.content.is_invalid(),
-			Chop::Minus(expr) => expr.content.is_invalid(),
-			Chop::Star(expr) => expr.content.is_invalid(),
-			Chop::Slash(expr) => expr.content.is_invalid(),
-			Chop::ToRight(expr) => expr.content.is_invalid(),
-			Chop::Comma(expr) => expr.content.is_invalid(),
-			Chop::DoubleComma(expr) => expr.content.is_invalid(),
-			Chop::Index(expr) => expr.content.is_invalid(),
-			Chop::Invalid => true,
-		}
-	}
-}
-
 impl Node<Program> {
 	pub fn print(&self) {
 		// TODO: Clean this old wird stuff.
@@ -626,20 +480,6 @@ impl Node<Program> {
 		impl DebugMem {
 			pub fn new() -> DebugMem {
 				DebugMem { log: IndentedLog::new() }
-			}
-		}
-
-		impl DebugMem {
-			fn log_indent(&mut self, string: String, is_context: bool, style: Style) {
-				self.log.indent(string, is_context, style);
-			}
-
-			fn log_deindent(&mut self) {
-				self.log.deindent();
-			}
-
-			fn log_line(&mut self, string: String, style: Style) {
-				self.log.log_line(string, style);
 			}
 		}
 

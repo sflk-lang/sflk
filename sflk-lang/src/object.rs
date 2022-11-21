@@ -196,7 +196,7 @@ impl Object {
 				};
 				let is_ordered = vec.as_slice().windows(2).all(|window| match window {
 					[Object::Number(left), Object::Number(right)] => {
-						ordering_tester(left.cmp(&right))
+						ordering_tester(left.cmp(right))
 					},
 					_ => unreachable!(),
 				});

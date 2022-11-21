@@ -25,10 +25,6 @@ impl IndentedLogger {
 		}
 	}
 
-	pub fn for_writer(writer: Box<dyn std::fmt::Write>) -> IndentedLogger {
-		IndentedLogger { indents: Vec::new(), writer }
-	}
-
 	pub fn indent(&mut self, string: &str, is_important: bool, style: Style) {
 		// TODO: Make this more readable or something.
 		let new_indent = Indent { is_important, style };

@@ -13,11 +13,13 @@ impl IndentedLog {
 		self.items.push(item);
 	}
 
+	#[allow(unused)]
 	pub fn indent(&mut self, string: String, is_context: bool, style: Style) {
 		assert!(!string.contains('\n'));
 		self.push(Item::IndentAdd { string, indent: Indent { is_context, style } });
 	}
 
+	#[allow(unused)]
 	pub fn deindent(&mut self) {
 		self.push(Item::IndentRemove);
 	}
