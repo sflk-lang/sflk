@@ -487,14 +487,22 @@ impl Execution {
 						}
 					},
 					Object::Number(frac) => {
-						context_table.table.get_mut(&self.cx_id()).unwrap().set_var(
-							"n".to_string(),
-							Object::Number(BigFrac::from(frac.num().clone())),
-						);
-						context_table.table.get_mut(&self.cx_id()).unwrap().set_var(
-							"d".to_string(),
-							Object::Number(BigFrac::from(frac.den().clone())),
-						);
+						context_table
+							.table
+							.get_mut(&self.cx_id())
+							.unwrap()
+							.decl_var_and_set(
+								"n".to_string(),
+								Object::Number(BigFrac::from(frac.num().clone())),
+							);
+						context_table
+							.table
+							.get_mut(&self.cx_id())
+							.unwrap()
+							.decl_var_and_set(
+								"d".to_string(),
+								Object::Number(BigFrac::from(frac.den().clone())),
+							);
 					},
 					obj => unimplemented!(
 						"Deploy context operation on object of type {}",

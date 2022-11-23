@@ -118,3 +118,4 @@ do {gs .writefile ag "gaming" ag testfile ag .overwrite } wi {
 	} th em v rs v
 }
 x < "abcdefgh" ev x ix (ln x. - 1) ,, testfile > prf + "\n" ,, testfile > prf
+ev 8/3 > {cy v pr n pr "/" pr d pr " " pr v nl}
