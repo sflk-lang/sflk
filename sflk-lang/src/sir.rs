@@ -91,7 +91,7 @@ enum SirInstr {
 }
 
 #[derive(Debug, Clone)]
-pub struct SirBlock {
+pub(crate) struct SirBlock {
 	instrs: Vec<SirInstr>,
 }
 
@@ -163,12 +163,12 @@ impl Execution {
 }
 
 #[derive(Debug, Clone)]
-pub struct Block {
+pub(crate) struct Block {
 	sir_block: SirBlock,
 }
 
 impl Block {
-	pub fn concat(self, right: Block) -> Block {
+	pub(crate) fn concat(self, right: Block) -> Block {
 		Block { sir_block: self.sir_block.concat(right.sir_block) }
 	}
 }
@@ -485,6 +485,16 @@ impl Execution {
 								.unwrap()
 								.decl_var_and_set(var_name, value);
 						}
+					},
+					Object::Number(frac) => {
+						context_table.table.get_mut(&self.cx_id()).unwrap().set_var(
+							"n".to_string(),
+							Object::Number(BigFrac::from(frac.num().clone())),
+						);
+						context_table.table.get_mut(&self.cx_id()).unwrap().set_var(
+							"d".to_string(),
+							Object::Number(BigFrac::from(frac.den().clone())),
+						);
 					},
 					obj => unimplemented!(
 						"Deploy context operation on object of type {}",
@@ -1078,7 +1088,7 @@ fn perform_signal_past_root(signal: Object) -> Object {
 	}
 }
 
-pub fn exec_sir_block(sir_block: SirBlock) {
+pub(crate) fn exec_sir_block(sir_block: SirBlock) {
 	let mut machine = Machine::new();
 	let root_cx_id = machine.context_table.create_context(None);
 	let first_frame = Frame::for_sir_block(sir_block, root_cx_id);
@@ -1094,7 +1104,7 @@ pub fn exec_sir_block(sir_block: SirBlock) {
 //
 // TODO: Document.
 
-pub fn program_to_sir_block(program: &Program) -> SirBlock {
+pub(crate) fn program_to_sir_block(program: &Program) -> SirBlock {
 	let mut sir_instrs = Vec::new();
 	for stmt in program.stmts.iter() {
 		stmt_to_sir_instrs(stmt.unwrap_ref(), &mut sir_instrs);

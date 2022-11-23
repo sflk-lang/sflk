@@ -6,7 +6,7 @@ use crate::{
 	utils::{escape_string, styles},
 };
 
-pub struct Node<T> {
+pub(crate) struct Node<T> {
 	content: T,
 	loc: Loc,
 	comments: Comments,
@@ -14,7 +14,7 @@ pub struct Node<T> {
 }
 
 impl<T> Node<T> {
-	pub fn from(content: T, loc: Loc) -> Node<T> {
+	pub(crate) fn from(content: T, loc: Loc) -> Node<T> {
 		Node {
 			content,
 			loc,
@@ -23,17 +23,17 @@ impl<T> Node<T> {
 		}
 	}
 
-	pub fn unwrap(self) -> T {
+	pub(crate) fn unwrap(self) -> T {
 		self.content
 	}
 
-	pub fn unwrap_ref(&self) -> &T {
+	pub(crate) fn unwrap_ref(&self) -> &T {
 		&self.content
 	}
 }
 
 #[derive(Debug)]
-pub struct Comment {
+pub(crate) struct Comment {
 	_content: String,
 	_delimitation_thickness: usize,
 }
@@ -54,13 +54,13 @@ impl Comments {
 }
 
 impl<T> Node<T> {
-	pub fn loc(&self) -> &Loc {
+	pub(crate) fn loc(&self) -> &Loc {
 		&self.loc
 	}
 }
 
 impl<T> Node<T> {
-	pub fn map<U>(self, func: impl FnOnce(T) -> U) -> Node<U> {
+	pub(crate) fn map<U>(self, func: impl FnOnce(T) -> U) -> Node<U> {
 		Node {
 			content: func(self.content),
 			loc: self.loc,
@@ -70,11 +70,11 @@ impl<T> Node<T> {
 	}
 }
 
-pub struct Program {
-	pub stmts: Vec<Node<Stmt>>,
+pub(crate) struct Program {
+	pub(crate) stmts: Vec<Node<Stmt>>,
 }
 
-pub enum Stmt {
+pub(crate) enum Stmt {
 	Nop,
 	Print {
 		expr: Node<Expr>,
@@ -126,13 +126,13 @@ pub enum Stmt {
 }
 
 #[derive(Debug)]
-pub enum TargetExpr {
+pub(crate) enum TargetExpr {
 	VariableName(String),
 	DeclVariableName(String),
 	Invalid, // TODO: Add error details
 }
 
-pub enum Expr {
+pub(crate) enum Expr {
 	VariableName(String),
 	NothingLiteral,
 	IntegerLiteral(String),
@@ -145,7 +145,7 @@ pub enum Expr {
 	Invalid { error_expr: Box<Node<Expr>> },
 }
 
-pub enum Unop {
+pub(crate) enum Unop {
 	Negate(Box<Node<Expr>>),
 	ReadFile(Box<Node<Expr>>),
 	Ordered(Box<Node<Expr>>),
@@ -153,7 +153,7 @@ pub enum Unop {
 	Length(Box<Node<Expr>>),
 }
 
-pub enum Chop {
+pub(crate) enum Chop {
 	Plus(Node<Expr>),
 	Minus(Node<Expr>),
 	Star(Node<Expr>),
@@ -164,7 +164,7 @@ pub enum Chop {
 	ToRight(Node<Expr>),
 }
 
-pub trait Treeable {
+pub(crate) trait Treeable {
 	fn tree(&self, loc: &Loc) -> StringTree;
 }
 
@@ -470,15 +470,15 @@ impl Treeable for Program {
 }
 
 impl Node<Program> {
-	pub fn print(&self) {
+	pub(crate) fn print(&self) {
 		// TODO: Clean this old wird stuff.
 
-		pub struct DebugMem {
-			pub log: IndentedLog,
+		pub(crate) struct DebugMem {
+			pub(crate) log: IndentedLog,
 		}
 
 		impl DebugMem {
-			pub fn new() -> DebugMem {
+			pub(crate) fn new() -> DebugMem {
 				DebugMem { log: IndentedLog::new() }
 			}
 		}

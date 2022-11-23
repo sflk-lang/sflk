@@ -3,20 +3,20 @@ use std::{
 	rc::Rc,
 };
 
-pub struct SourceCodeUnit {
+pub(crate) struct SourceCodeUnit {
 	_name: String,
-	pub content: String,
+	pub(crate) content: String,
 	_line_offsets: Vec<usize>,
 }
 
 impl SourceCodeUnit {
-	pub fn from_filename(filename: &str) -> SourceCodeUnit {
+	pub(crate) fn from_filename(filename: &str) -> SourceCodeUnit {
 		let src = std::fs::read_to_string(filename)
 			.unwrap_or_else(|_| panic!("source file `{}` couldn't be read", filename));
 		SourceCodeUnit::from_str(src, filename.to_string())
 	}
 
-	pub fn from_str(string: String, name: String) -> SourceCodeUnit {
+	pub(crate) fn from_str(string: String, name: String) -> SourceCodeUnit {
 		let line_offsets_iter = string.bytes().enumerate().filter_map(|(i, ch)| {
 			if ch as char == '\n' {
 				Some(i + 1)
@@ -37,7 +37,7 @@ impl SourceCodeUnit {
 }
 
 impl Loc {
-	pub fn total_of(scu: Rc<SourceCodeUnit>) -> Loc {
+	pub(crate) fn total_of(scu: Rc<SourceCodeUnit>) -> Loc {
 		Loc {
 			scu: Rc::clone(&scu),
 			line_start: 1,
@@ -48,15 +48,15 @@ impl Loc {
 }
 
 #[derive(Clone)]
-pub struct Loc {
-	pub scu: Rc<SourceCodeUnit>,
-	pub line_start: usize,
-	pub raw_index_start: usize,
-	pub raw_length: usize,
+pub(crate) struct Loc {
+	pub(crate) scu: Rc<SourceCodeUnit>,
+	pub(crate) line_start: usize,
+	pub(crate) raw_index_start: usize,
+	pub(crate) raw_length: usize,
 }
 
 impl Loc {
-	pub fn line(&self) -> usize {
+	pub(crate) fn line(&self) -> usize {
 		self.line_start
 	}
 }

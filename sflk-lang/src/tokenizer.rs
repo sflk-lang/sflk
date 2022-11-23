@@ -4,14 +4,14 @@ use crate::{
 };
 use std::{collections::VecDeque, convert::TryFrom, fmt, rc::Rc};
 
-pub struct CharReadingHead {
+pub(crate) struct CharReadingHead {
 	scu: Rc<SourceCodeUnit>,
 	raw_index: usize,
 	line: usize,
 }
 
 impl CharReadingHead {
-	pub fn from_scu(scu: Rc<SourceCodeUnit>) -> CharReadingHead {
+	pub(crate) fn from_scu(scu: Rc<SourceCodeUnit>) -> CharReadingHead {
 		CharReadingHead { scu, raw_index: 0, line: 1 }
 	}
 }
@@ -53,13 +53,13 @@ impl CharReadingHead {
 }
 
 impl CharReadingHead {
-	pub fn scu(&self) -> Rc<SourceCodeUnit> {
+	pub(crate) fn scu(&self) -> Rc<SourceCodeUnit> {
 		Rc::clone(&self.scu)
 	}
 }
 
 #[derive(PartialEq, Eq, Hash)]
-pub enum SimpleTok {
+pub(crate) enum SimpleTok {
 	Kw(Kw),
 	Op(Op),
 }
@@ -77,36 +77,36 @@ impl TryFrom<&Tok> for SimpleTok {
 }
 
 #[derive(Debug, Clone)]
-pub enum Tok {
+pub(crate) enum Tok {
 	Kw(Kw),
 	Op(Op),
 	Left(Matched),
 	Right(Matched),
 	Name {
 		string: String,
-		unstable_warning: bool,
+		_unstable_warning: bool,
 	},
 	Integer(String),
 	String {
 		content: String,
-		no_end_quote_warning: bool,
-		invalid_escape_sequence_errors: Vec<(EscapeSequenceError, usize)>,
+		_no_end_quote_warning: bool,
+		_invalid_escape_sequence_errors: Vec<(EscapeSequenceError, usize)>,
 		// The usize is the `\` character index in the literal.
 	},
 	InvalidCharacter(char),
 	CommentBlock {
-		content: String,
-		delimitation_thickness: usize,
-		no_end_hash_warning: bool,
+		_content: String,
+		_delimitation_thickness: usize,
+		_no_end_hash_warning: bool,
 	},
 	CommentLine {
-		content: String,
+		_content: String,
 	},
 	Eof,
 }
 
 #[derive(Debug, Clone)]
-pub enum EscapeSequenceError {
+pub(crate) enum EscapeSequenceError {
 	InvalidFirstCharacter(char),
 	InvalidDigitCharacter(char),
 	UnexpectedEof,
@@ -114,7 +114,7 @@ pub enum EscapeSequenceError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Kw {
+pub(crate) enum Kw {
 	Np,
 	Pr,
 	Nl,
@@ -147,7 +147,7 @@ pub enum Kw {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Op {
+pub(crate) enum Op {
 	Plus,
 	Minus,
 	Star,
@@ -161,22 +161,22 @@ pub enum Op {
 }
 
 #[derive(Debug, Clone)]
-pub enum Matched {
+pub(crate) enum Matched {
 	Paren,
 	Curly,
 	Bracket,
 }
 
-pub struct Tokenizer {}
+pub(crate) struct Tokenizer {}
 
 impl Tokenizer {
-	pub fn new() -> Tokenizer {
+	pub(crate) fn new() -> Tokenizer {
 		Tokenizer {}
 	}
 }
 
 impl Tokenizer {
-	pub fn pop_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
+	pub(crate) fn pop_tok(&mut self, crh: &mut CharReadingHead) -> (Tok, Loc) {
 		crh.skip_ws();
 		let loc = crh.loc();
 		match crh.peek() {
@@ -312,7 +312,7 @@ impl Tokenizer {
 			"ag" => Tok::Kw(Kw::Ag),
 			_ => {
 				let len = word.len();
-				Tok::Name { string: word, unstable_warning: len == 2 }
+				Tok::Name { string: word, _unstable_warning: len == 2 }
 			},
 		}
 	}
@@ -376,8 +376,8 @@ impl Tokenizer {
 		(
 			Tok::String {
 				content,
-				no_end_quote_warning,
-				invalid_escape_sequence_errors,
+				_no_end_quote_warning: no_end_quote_warning,
+				_invalid_escape_sequence_errors: invalid_escape_sequence_errors,
 			},
 			loc,
 		)
@@ -593,13 +593,13 @@ impl Tokenizer {
 			}
 		}
 		if comment_line {
-			(Tok::CommentLine { content }, loc)
+			(Tok::CommentLine { _content: content }, loc)
 		} else {
 			(
 				Tok::CommentBlock {
-					content,
-					delimitation_thickness,
-					no_end_hash_warning,
+					_content: content,
+					_delimitation_thickness: delimitation_thickness,
+					_no_end_hash_warning: no_end_hash_warning,
 				},
 				loc,
 			)
@@ -607,14 +607,14 @@ impl Tokenizer {
 	}
 }
 
-pub struct TokBuffer {
+pub(crate) struct TokBuffer {
 	crh: CharReadingHead,
 	tokenizer: Tokenizer,
 	toks_ahead: VecDeque<(Tok, Loc)>,
 }
 
 impl TokBuffer {
-	pub fn from(crh: CharReadingHead) -> TokBuffer {
+	pub(crate) fn from(crh: CharReadingHead) -> TokBuffer {
 		TokBuffer {
 			crh,
 			tokenizer: Tokenizer::new(),
@@ -622,7 +622,7 @@ impl TokBuffer {
 		}
 	}
 
-	pub fn scu(&self) -> Rc<SourceCodeUnit> {
+	pub(crate) fn scu(&self) -> Rc<SourceCodeUnit> {
 		self.crh.scu()
 	}
 
@@ -635,7 +635,7 @@ impl TokBuffer {
 		}
 	}
 
-	pub fn prepare_max_index(&mut self, n: usize) {
+	pub(crate) fn prepare_max_index(&mut self, n: usize) {
 		if self.toks_ahead.len() < n + 1 {
 			self.toks_ahead.reserve(n - self.toks_ahead.len());
 		}
@@ -645,12 +645,12 @@ impl TokBuffer {
 		}
 	}
 
-	pub fn peek(&mut self, n: usize) -> &(Tok, Loc) {
+	pub(crate) fn peek(&mut self, n: usize) -> &(Tok, Loc) {
 		self.prepare_max_index(n);
 		&self.toks_ahead[n]
 	}
 
-	pub fn pop(&mut self) -> (Tok, Loc) {
+	pub(crate) fn pop(&mut self) -> (Tok, Loc) {
 		self.peek(0);
 		let tok_loc_opt = self.toks_ahead.pop_front();
 		if let Some(tok_loc) = tok_loc_opt {
@@ -660,7 +660,7 @@ impl TokBuffer {
 		}
 	}
 
-	pub fn display_all(mut self, line_numbers: bool) {
+	pub(crate) fn display_all(mut self, line_numbers: bool) {
 		let mut last_line = 0;
 		loop {
 			let (tok, loc) = self.tokenizer.pop_tok(&mut self.crh);

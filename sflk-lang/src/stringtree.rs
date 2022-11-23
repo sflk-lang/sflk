@@ -1,17 +1,17 @@
 use crate::utils::Style;
 
-pub struct StringTree {
+pub(crate) struct StringTree {
 	string: String,
 	style: Style,
 	sub_trees: Vec<StringTree>,
 }
 
 impl StringTree {
-	pub fn new_leaf(string: String, style: Style) -> StringTree {
+	pub(crate) fn new_leaf(string: String, style: Style) -> StringTree {
 		StringTree { string, style, sub_trees: Vec::new() }
 	}
 
-	pub fn new_node(string: String, style: Style, sub_trees: Vec<StringTree>) -> StringTree {
+	pub(crate) fn new_node(string: String, style: Style, sub_trees: Vec<StringTree>) -> StringTree {
 		StringTree { string, style, sub_trees }
 	}
 }
@@ -59,7 +59,7 @@ impl RightTube {
 }
 
 impl StringTree {
-	pub fn print(&self, writer: &mut impl std::fmt::Write) {
+	pub(crate) fn print(&self, writer: &mut impl std::fmt::Write) {
 		self.print_aux(writer, &mut Vec::new(), false);
 	}
 

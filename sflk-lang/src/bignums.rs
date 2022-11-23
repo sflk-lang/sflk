@@ -27,7 +27,7 @@
 /// to the value being ouside the representable range of values supported by the
 /// primitive integer type.
 #[derive(Debug)]
-pub struct DoesNotFitInPrimitive;
+pub(crate) struct DoesNotFitInPrimitive;
 
 /// When converting a string to a number, the base in which the string is expected
 /// to be written is given, and this error is returned in the event that a character
@@ -37,13 +37,13 @@ pub struct DoesNotFitInPrimitive;
 // The fields ARE used when their values are printed by `unwrap`, but for some reason
 // (see [https://github.com/rust-lang/rust/issues/88900]) the compiler says they are not.
 #[allow(unused)]
-pub struct CharIsNoDigitInBase {
+pub(crate) struct CharIsNoDigitInBase {
 	character: char,
 	base: u64,
 }
 
 /// Provide an implementation of unsigned big integers.
-pub mod big_uint {
+pub(crate) mod big_uint {
 	use super::DoesNotFitInPrimitive;
 	use std::{
 		cmp::Ordering,
@@ -70,7 +70,7 @@ pub mod big_uint {
 	/// Unsigned big integer. Actually a list of digits in base `BASE`
 	/// represented with the integer type `Digit`.
 	#[derive(Clone, Debug)]
-	pub struct BigUint {
+	pub(crate) struct BigUint {
 		/// The most significants digits are at the back.
 		/// There shall not be insignificant leading zeros.
 		/// The value zero is represented by an empty list of digits.
@@ -83,19 +83,19 @@ pub mod big_uint {
 	}
 
 	impl BigUint {
-		pub fn zero() -> BigUint {
+		pub(crate) fn zero() -> BigUint {
 			BigUint { digits: Vec::new() }
 		}
 
-		pub fn is_zero(&self) -> bool {
+		pub(crate) fn is_zero(&self) -> bool {
 			self.digits.is_empty()
 		}
 
-		pub fn one() -> BigUint {
+		pub(crate) fn one() -> BigUint {
 			BigUint { digits: vec![1] }
 		}
 
-		pub fn is_one(&self) -> bool {
+		pub(crate) fn is_one(&self) -> bool {
 			self.digits == [1]
 		}
 
@@ -140,7 +140,7 @@ pub mod big_uint {
 	/// Locat trait used to tag a few primitive integer types that can be converted
 	/// to `BigUint`. Bounding to this local trait is allowed by the orphan rule,
 	/// unlike bounding directly to `Into<u64>`.
-	pub trait LocalIntoU64: Into<u64> {}
+	pub(crate) trait LocalIntoU64: Into<u64> {}
 	macro_rules! impl_local_into_u64 {
 		($($primitive_type:ty),*) => {
 			$(
@@ -499,7 +499,7 @@ pub mod big_uint {
 		/// Performs the euclidian division `self / rhs`,
 		/// returns `(quotient, remainder)`.
 		#[must_use]
-		pub fn div_euclidian(&self, rhs: &BigUint) -> (BigUint, BigUint) {
+		pub(crate) fn div_euclidian(&self, rhs: &BigUint) -> (BigUint, BigUint) {
 			// Classic long division algorithm.
 			// Surprisingly, it is pretty hard to find a readable and complete implementation
 			// or pseudocode of this algorithm on the Internet (or I haven't searched good enough),
@@ -975,7 +975,7 @@ pub mod big_uint {
 		}
 	}
 
-	pub mod string_conversion {
+	pub(crate) mod string_conversion {
 		use super::super::CharIsNoDigitInBase;
 		use super::BigUint;
 
@@ -1007,23 +1007,23 @@ pub mod big_uint {
 			}
 		}
 
-		pub struct FromStringFormat {
-			pub base: u64,
+		pub(crate) struct FromStringFormat {
+			pub(crate) base: u64,
 			/// Allows underscores that will be ignored.
-			pub allow_underscores: bool,
+			pub(crate) allow_underscores: bool,
 		}
 
-		pub struct ToStringFormat {
-			pub base: u64,
+		pub(crate) struct ToStringFormat {
+			pub(crate) base: u64,
 			/// Produces upper case characters for higer-than-9 digits
 			/// (e.g. "FF" instead of "ff" for 255 in base 16).
-			pub upper_case: bool,
+			pub(crate) upper_case: bool,
 		}
 
 		impl BigUint {
 			/// Converts a string representing an unsigned integer
 			/// in the given format to a `BigUint`.
-			pub fn from_string(
+			pub(crate) fn from_string(
 				string: &str,
 				format: FromStringFormat,
 			) -> Result<BigUint, CharIsNoDigitInBase> {
@@ -1044,7 +1044,7 @@ pub mod big_uint {
 			}
 
 			/// Produces a string representation in the given format.
-			pub fn into_string(mut self, format: ToStringFormat) -> String {
+			pub(crate) fn into_string(mut self, format: ToStringFormat) -> String {
 				assert!(format.base >= 1);
 				assert!(
 					format.base <= 10 + 26,
@@ -1240,7 +1240,7 @@ pub mod big_uint {
 }
 
 /// Provide an implementation of signed big integers, built on top of `big_uint`.
-pub mod big_sint {
+pub(crate) mod big_sint {
 	use std::{
 		cmp::Ordering,
 		ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
@@ -1250,50 +1250,58 @@ pub mod big_sint {
 
 	/// Big signed integer.
 	#[derive(Clone, Debug)]
-	pub struct BigSint {
+	pub(crate) struct BigSint {
 		abs_value: BigUint,
 		/// There is no constraint on this when the value is zero.
 		is_negative: bool,
 	}
 
 	impl BigSint {
-		pub fn zero() -> BigSint {
+		pub(crate) fn zero() -> BigSint {
 			BigSint { abs_value: BigUint::zero(), is_negative: false }
 		}
 
-		pub fn is_zero(&self) -> bool {
+		pub(crate) fn is_zero(&self) -> bool {
 			self.abs_value.is_zero()
 		}
 
-		pub fn one() -> BigSint {
+		pub(crate) fn one() -> BigSint {
 			BigSint { abs_value: BigUint::one(), is_negative: false }
 		}
 
-		pub fn is_one(&self) -> bool {
+		pub(crate) fn is_one(&self) -> bool {
 			self.abs_value.is_one() && !self.is_negative
 		}
 
-		pub fn is_positive(&self) -> bool {
+		// TODO: Use or remove or something.
+		// This is still here as some sort of remeinder that just reading the `is_negative`
+		// field is not enough to know the positivity/negativity of the represented value.
+		#[allow(unused)]
+		pub(crate) fn is_positive(&self) -> bool {
 			(!self.is_negative) || self.is_zero()
 		}
 
-		pub fn is_strictly_positive(&self) -> bool {
+		pub(crate) fn is_strictly_positive(&self) -> bool {
 			(!self.is_negative) && (!self.is_zero())
 		}
 
-		pub fn is_negative(&self) -> bool {
+		// TODO: Use or remove or something.
+		// This is still here as some sort of remeinder that just reading the `is_negative`
+		// field is not enough to know the positivity/negativity of the represented value.
+		#[allow(unused)]
+		pub(crate) fn is_negative(&self) -> bool {
 			self.is_negative || self.is_zero()
 		}
 
-		pub fn is_strictly_negative(&self) -> bool {
+		pub(crate) fn is_strictly_negative(&self) -> bool {
 			self.is_negative && (!self.is_zero())
 		}
 
-		pub fn negate(&mut self) {
+		pub(crate) fn negate(&mut self) {
 			self.is_negative = !self.is_negative;
 		}
 
-		pub fn abs(self) -> BigSint {
+		pub(crate) fn abs(self) -> BigSint {
 			BigSint { abs_value: self.abs_value, is_negative: false }
 		}
 	}
@@ -1594,7 +1602,7 @@ pub mod big_sint {
 		///
 		/// Only accepts a (strictly) positive `rhs`.
 		#[must_use]
-		pub fn div_euclidian(&self, rhs: &BigSint) -> (BigSint, BigSint) {
+		pub(crate) fn div_euclidian(&self, rhs: &BigSint) -> (BigSint, BigSint) {
 			assert!(
 				!(rhs.is_negative || rhs.is_zero()),
 				"dividing a BigSint by zero or negative"
@@ -1944,25 +1952,25 @@ pub mod big_sint {
 		}
 	}
 
-	pub mod string_conversion {
+	pub(crate) mod string_conversion {
 		use super::super::{big_uint, big_uint::BigUint, CharIsNoDigitInBase};
 		use super::BigSint;
 
-		pub struct FromStringFormat {
-			pub uint_format: big_uint::string_conversion::FromStringFormat,
-			pub allow_sign: bool,
+		pub(crate) struct FromStringFormat {
+			pub(crate) uint_format: big_uint::string_conversion::FromStringFormat,
+			pub(crate) allow_sign: bool,
 		}
 
-		pub struct ToStringFormat {
-			pub uint_format: big_uint::string_conversion::ToStringFormat,
+		pub(crate) struct ToStringFormat {
+			pub(crate) uint_format: big_uint::string_conversion::ToStringFormat,
 			/// If a minus sign is not present, then a plus sign will be.
-			pub plus_sign: bool,
+			pub(crate) plus_sign: bool,
 		}
 
 		impl BigSint {
 			/// Converts a string representing an signed integer
 			/// in the given format to a `BigSint`.
-			pub fn from_string(
+			pub(crate) fn from_string(
 				string: &str,
 				format: FromStringFormat,
 			) -> Result<BigSint, CharIsNoDigitInBase> {
@@ -1979,7 +1987,7 @@ pub mod big_sint {
 			}
 
 			/// Produces a string representation in the given format.
-			pub fn into_string(self, format: ToStringFormat) -> String {
+			pub(crate) fn into_string(self, format: ToStringFormat) -> String {
 				let sign_string = if self.is_strictly_negative() {
 					"-"
 				} else if format.plus_sign {
@@ -2092,7 +2100,7 @@ pub mod big_sint {
 
 /// Provide an implementation of big (arbitrarly precise) fractions,
 /// built on top of `big_sint`.
-pub mod big_frac {
+pub(crate) mod big_frac {
 	use std::{
 		cmp::Ordering,
 		ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
@@ -2104,7 +2112,7 @@ pub mod big_frac {
 	///
 	/// Is always simplified after creation or any operation.
 	#[derive(Clone, Debug)]
-	pub struct BigFrac {
+	pub(crate) struct BigFrac {
 		/// Numerator, bears the sign when simplified.
 		num: BigSint,
 		/// Denominator, must be positive when simplified.
@@ -2114,15 +2122,15 @@ pub mod big_frac {
 	}
 
 	impl BigFrac {
-		pub fn zero() -> BigFrac {
+		pub(crate) fn zero() -> BigFrac {
 			BigFrac { num: BigSint::zero(), den: BigSint::one() }
 		}
 
-		pub fn one() -> BigFrac {
+		pub(crate) fn one() -> BigFrac {
 			BigFrac { num: BigSint::one(), den: BigSint::one() }
 		}
 
-		pub fn from_bool(boolean: bool) -> BigFrac {
+		pub(crate) fn from_bool(boolean: bool) -> BigFrac {
 			if boolean {
 				BigFrac::one()
 			} else {
@@ -2130,14 +2138,14 @@ pub mod big_frac {
 			}
 		}
 
-		pub fn is_zero(&self) -> bool {
+		pub(crate) fn is_zero(&self) -> bool {
 			self.num.is_zero()
 		}
 
 		/// Numerator.
 		///
 		/// It bears the sign of the fraction.
-		pub fn num(&self) -> &BigSint {
+		pub(crate) fn num(&self) -> &BigSint {
 			&self.num
 		}
 
@@ -2145,15 +2153,11 @@ pub mod big_frac {
 		///
 		/// It is equal to one iff the fraction is an integer (even zero).
 		/// It is always (strictly) positive.
-		pub fn den(&self) -> &BigSint {
+		pub(crate) fn den(&self) -> &BigSint {
 			&self.den
 		}
 
-		pub fn is_positive(&self) -> bool {
-			self.num.is_positive()
-		}
-
-		pub fn is_integer(&self) -> bool {
+		pub(crate) fn is_integer(&self) -> bool {
 			self.den.is_one()
 		}
 	}
@@ -2165,7 +2169,7 @@ pub mod big_frac {
 	}
 
 	#[derive(Debug)]
-	pub struct NotAnInteger;
+	pub(crate) struct NotAnInteger;
 
 	impl TryFrom<&BigFrac> for BigSint {
 		type Error = NotAnInteger;
@@ -2457,10 +2461,14 @@ pub mod big_frac {
 				// This dumb else if chain is written this way for readability.
 				#[allow(clippy::if_same_then_else)]
 				if self.den.is_negative() {
+					// The numerator must bear the sign, not the denominator.
 					true
 				} else if self.den.is_zero() {
+					// The denominator must never be zero (it makes no sense anyway).
 					true
 				} else if self.num.is_zero() && self.den != BigSint::one() {
+					// The denominator must be one when the fraction is an integer,
+					// even when that integer is zero (by design choice).
 					true
 				} else {
 					let mut simplified = self.clone();
@@ -2604,13 +2612,18 @@ pub mod big_frac {
 				BigFrac::from_num_and_den(1693474895426141u64, 109739368890260631u64);
 			assert_eq!(bf_division, expected_result);
 		}
+
+		#[test]
+		fn num_bears_the_sign() {
+			assert!(BigFrac::from_num_and_den(8, -17).num().is_negative());
+		}
 	}
 
-	pub mod string_conversion {
+	pub(crate) mod string_conversion {
 		use super::super::{big_sint, big_sint::BigSint, CharIsNoDigitInBase};
 		use super::BigFrac;
 
-		pub enum ToStringFormat {
+		pub(crate) enum ToStringFormat {
 			/// Represents the fraction in a "numerator/denominator" form.
 			Slash {
 				num_sint_format: big_sint::string_conversion::ToStringFormat,
@@ -2618,6 +2631,7 @@ pub mod big_frac {
 				/// Forces the representation of the denominator even if it is one (e.g. "17/1").
 				shash_even_for_integer: bool,
 			},
+			#[allow(unused)]
 			Point {
 				// TODO
 				todo: (),
@@ -2627,7 +2641,7 @@ pub mod big_frac {
 		impl BigFrac {
 			/// Converts a string representing an signed integer
 			/// in the given format to a `BigFrac`.
-			pub fn from_integer_string(
+			pub(crate) fn from_integer_string(
 				string: &str,
 				format: big_sint::string_conversion::FromStringFormat,
 			) -> Result<BigFrac, CharIsNoDigitInBase> {
@@ -2635,7 +2649,7 @@ pub mod big_frac {
 			}
 
 			/// Produces a string representation in the given format.
-			pub fn into_string(self, format: ToStringFormat) -> String {
+			pub(crate) fn into_string(self, format: ToStringFormat) -> String {
 				match format {
 					ToStringFormat::Slash {
 						num_sint_format,

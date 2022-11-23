@@ -45,29 +45,29 @@ const NO_WARRANTY_NOTE: &str = "\
 	FITNESS FOR A PARTICULAR PURPOSE.";
 
 #[derive(Debug)]
-pub struct Settings {
+pub(crate) struct Settings {
 	/// Path to the interpreter binary (actually `argv[0]`).
 	path: String,
 	/// Given SFLK source code to parse, run, etc.
-	pub src: Option<Source>,
-	pub debug: bool,
-	pub debug_lines: bool,
+	pub(crate) src: Option<Source>,
+	pub(crate) debug: bool,
+	pub(crate) debug_lines: bool,
 	debug_actions: bool,
-	pub debug_sir: bool,
+	pub(crate) debug_sir: bool,
 	wants_help: bool,
 	wants_version: bool,
-	pub display_tokens: bool,
+	pub(crate) display_tokens: bool,
 }
 
 #[derive(Debug)]
-pub enum Source {
+pub(crate) enum Source {
 	FilePath(String),
 	Code(String),
 }
 
 impl Settings {
 	/// Retrieves and parse command line arguments, returns the according settings.
-	pub fn from_args() -> Settings {
+	pub(crate) fn from_args() -> Settings {
 		let mut args = env::args();
 		let mut settings = Settings {
 			path: args.next().unwrap_or_else(|| "sflk".to_string()),
@@ -146,7 +146,7 @@ impl Settings {
 	}
 
 	/// Prints stuff like version, help message, "no source code", etc.
-	pub fn print_info(&self) {
+	pub(crate) fn print_info(&self) {
 		let mut did_something = false;
 
 		if self.wants_version {
@@ -174,7 +174,7 @@ impl Settings {
 		}
 	}
 
-	pub fn parser_debugging_logger(&self) -> ParserDebuggingLogger {
+	pub(crate) fn parser_debugging_logger(&self) -> ParserDebuggingLogger {
 		let mut logger: Option<IndentedLogger> = None;
 		if self.debug {
 			logger = Some(IndentedLogger::new());

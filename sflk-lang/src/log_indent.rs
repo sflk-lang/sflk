@@ -12,20 +12,20 @@
 
 use crate::utils::{styles, StdoutWriter, Style};
 
-pub struct IndentedLogger {
+pub(crate) struct IndentedLogger {
 	indents: Vec<Indent>,
 	writer: Box<dyn std::fmt::Write>,
 }
 
 impl IndentedLogger {
-	pub fn new() -> IndentedLogger {
+	pub(crate) fn new() -> IndentedLogger {
 		IndentedLogger {
 			indents: Vec::new(),
 			writer: Box::new(StdoutWriter::new()),
 		}
 	}
 
-	pub fn indent(&mut self, string: &str, is_important: bool, style: Style) {
+	pub(crate) fn indent(&mut self, string: &str, is_important: bool, style: Style) {
 		// TODO: Make this more readable or something.
 		let new_indent = Indent { is_important, style };
 		let mut lines = string.lines();
@@ -38,7 +38,7 @@ impl IndentedLogger {
 		}
 	}
 
-	pub fn deindent(&mut self, string: &str) {
+	pub(crate) fn deindent(&mut self, string: &str) {
 		// TODO: Make this more readable or something.
 		assert!(!self.indents.is_empty());
 		let style = self.indents.last().unwrap().style;
@@ -52,13 +52,13 @@ impl IndentedLogger {
 		writeln!(self.writer, "{}{}{}", style.0, last_line, style.1).unwrap();
 	}
 
-	pub fn log_line(&mut self, line: &str, style: Style) {
+	pub(crate) fn log_line(&mut self, line: &str, style: Style) {
 		assert!(!line.contains('\n'));
 		self.print_indents(None);
 		writeln!(self.writer, "{}{}{}", style.0, line, style.1).unwrap();
 	}
 
-	pub fn log_string(&mut self, string: &str, style: Style) {
+	pub(crate) fn log_string(&mut self, string: &str, style: Style) {
 		for line in string.lines() {
 			self.log_line(line, style);
 		}

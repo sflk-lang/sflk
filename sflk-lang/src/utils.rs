@@ -1,17 +1,17 @@
-pub type Style = (&'static str, &'static str);
+pub(crate) type Style = (&'static str, &'static str);
 
-pub mod styles {
-	pub const NORMAL: super::Style = ("", "");
-	pub const NEGATIVE: super::Style = ("\x1b[7m", "\x1b[27m");
-	pub const CYAN: super::Style = ("\x1b[36m", "\x1b[39m");
-	pub const YELLOW: super::Style = ("\x1b[33m", "\x1b[39m");
-	pub const BLUE: super::Style = ("\x1b[34m", "\x1b[39m");
-	pub const UNDERLINE: super::Style = ("\x1b[4m", "\x1b[24m");
-	pub const BOLD_LIGHT_RED: super::Style = ("\x1b[91m\x1b[1m", "\x1b[22m\x1b[39m");
-	pub const BOLD: super::Style = ("\x1b[1m", "\x1b[22m");
+pub(crate) mod styles {
+	pub(crate) const NORMAL: super::Style = ("", "");
+	pub(crate) const NEGATIVE: super::Style = ("\x1b[7m", "\x1b[27m");
+	pub(crate) const CYAN: super::Style = ("\x1b[36m", "\x1b[39m");
+	pub(crate) const YELLOW: super::Style = ("\x1b[33m", "\x1b[39m");
+	pub(crate) const BLUE: super::Style = ("\x1b[34m", "\x1b[39m");
+	pub(crate) const UNDERLINE: super::Style = ("\x1b[4m", "\x1b[24m");
+	pub(crate) const BOLD_LIGHT_RED: super::Style = ("\x1b[91m\x1b[1m", "\x1b[22m\x1b[39m");
+	pub(crate) const BOLD: super::Style = ("\x1b[1m", "\x1b[22m");
 }
 
-pub fn escape_string(string: &str, escape_style: &Style) -> String {
+pub(crate) fn escape_string(string: &str, escape_style: &Style) -> String {
 	let mut ret = String::new();
 	string.chars().for_each(|ch| {
 		if let Some(escaped) = escape_character(ch) {
@@ -44,7 +44,7 @@ fn escape_character(ch: char) -> Option<String> {
 	}
 }
 
-pub struct StdoutWriter;
+pub(crate) struct StdoutWriter;
 
 impl std::fmt::Write for StdoutWriter {
 	fn write_str(&mut self, string: &str) -> Result<(), std::fmt::Error> {
@@ -54,7 +54,7 @@ impl std::fmt::Write for StdoutWriter {
 }
 
 impl StdoutWriter {
-	pub fn new() -> StdoutWriter {
+	pub(crate) fn new() -> StdoutWriter {
 		StdoutWriter {}
 	}
 }

@@ -1,11 +1,11 @@
 use crate::utils::{styles, StdoutWriter, Style};
 
-pub struct IndentedLog {
+pub(crate) struct IndentedLog {
 	items: Vec<Item>,
 }
 
 impl IndentedLog {
-	pub fn new() -> IndentedLog {
+	pub(crate) fn new() -> IndentedLog {
 		IndentedLog { items: Vec::new() }
 	}
 
@@ -14,22 +14,22 @@ impl IndentedLog {
 	}
 
 	#[allow(unused)]
-	pub fn indent(&mut self, string: String, is_context: bool, style: Style) {
+	pub(crate) fn indent(&mut self, string: String, is_context: bool, style: Style) {
 		assert!(!string.contains('\n'));
 		self.push(Item::IndentAdd { string, indent: Indent { is_context, style } });
 	}
 
 	#[allow(unused)]
-	pub fn deindent(&mut self) {
+	pub(crate) fn deindent(&mut self) {
 		self.push(Item::IndentRemove);
 	}
 
-	pub fn log_line(&mut self, string: String, style: Style) {
+	pub(crate) fn log_line(&mut self, string: String, style: Style) {
 		assert!(!string.contains('\n'));
 		self.push(Item::String { string, is_line: true, style });
 	}
 
-	pub fn log_string(&mut self, string: String, style: Style) {
+	pub(crate) fn log_string(&mut self, string: String, style: Style) {
 		self.push(Item::String { string, is_line: false, style });
 	}
 }
@@ -42,7 +42,7 @@ impl std::fmt::Write for IndentedLog {
 }
 
 impl IndentedLog {
-	pub fn print_to_stdout(&self) {
+	pub(crate) fn print_to_stdout(&self) {
 		self.print(&mut StdoutWriter::new());
 	}
 }
@@ -65,7 +65,7 @@ const INDENT_NORMAL: &str = "│";
 const INDENT_WEAK: &str = "╎";
 
 impl IndentedLog {
-	pub fn print(&self, writer: &mut impl std::fmt::Write) {
+	pub(crate) fn print(&self, writer: &mut impl std::fmt::Write) {
 		let mut indents: Vec<Indent> = Vec::new();
 		let mut is_newline: bool = true;
 		for item in &self.items {

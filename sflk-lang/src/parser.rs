@@ -24,7 +24,7 @@ use crate::{
 use std::{collections::HashMap, convert::TryFrom, fmt};
 
 #[derive(Debug)]
-pub struct ParsingWarning {
+pub(crate) struct ParsingWarning {
 	// TODO
 }
 
@@ -163,11 +163,11 @@ impl fmt::Display for ParsingAction {
 	}
 }
 
-pub struct ParserDebuggingLogger {
-	pub logger: Option<IndentedLogger>,
-	pub log_lines: bool,
-	pub log_actions: bool,
-	pub last_line: usize,
+pub(crate) struct ParserDebuggingLogger {
+	pub(crate) logger: Option<IndentedLogger>,
+	pub(crate) log_lines: bool,
+	pub(crate) log_actions: bool,
+	pub(crate) last_line: usize,
 }
 
 impl ParserDebuggingLogger {
@@ -233,7 +233,7 @@ impl ParserDebuggingLogger {
 	}
 }
 
-pub struct Parser {
+pub(crate) struct Parser {
 	tb: TokBuffer,
 	data_stack: Vec<ParsingData>,
 	action_stack: Vec<ParsingAction>,
@@ -242,7 +242,7 @@ pub struct Parser {
 }
 
 impl Parser {
-	pub fn new(tb: TokBuffer, debug: ParserDebuggingLogger) -> Parser {
+	pub(crate) fn new(tb: TokBuffer, debug: ParserDebuggingLogger) -> Parser {
 		Parser {
 			tb,
 			data_stack: Vec::new(),
@@ -252,7 +252,7 @@ impl Parser {
 		}
 	}
 
-	pub fn parse_program(&mut self) -> Node<Program> {
+	pub(crate) fn parse_program(&mut self) -> Node<Program> {
 		self.data_stack.push(ParsingData::BlockLevel {
 			stmts: Vec::new(),
 			expected_terminator: BlockLevelExpectedTerminator::Eof,

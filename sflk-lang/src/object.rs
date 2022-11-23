@@ -11,7 +11,7 @@ use std::{cmp::Ordering, collections::HashMap};
 /// An `Object` is a value that can manipulated by SFLK code.
 /// Every expression evaluates to an `Object`.
 #[derive(Debug, Clone)]
-pub enum Object {
+pub(crate) enum Object {
 	/// The `()` literal is an expression that evaluates to that.
 	Nothing,
 	Number(BigFrac),
@@ -38,7 +38,10 @@ pub enum Object {
 /// code safe for copy-pasting error construction without having to think about
 /// changing the function name).
 #[derive(Debug)]
-pub enum ObjectOperationError {
+// The fields ARE used when their values are printed by `unwrap`, but for some reason
+// (see [https://github.com/rust-lang/rust/issues/88900]) the compiler says they are not.
+#[allow(unused)]
+pub(crate) enum ObjectOperationError {
 	/// An unary operation did not support the given type.
 	UnsupportedType {
 		function_name: &'static str,
@@ -76,7 +79,7 @@ pub enum ObjectOperationError {
 }
 
 #[derive(Debug)]
-pub enum UnsupportedNumberError {
+pub(crate) enum UnsupportedNumberError {
 	DoesNotFitInPrimitive(DoesNotFitInPrimitive),
 	NotAnInteger(NotAnInteger),
 }
@@ -136,7 +139,7 @@ where
 }
 
 impl Object {
-	pub fn type_name(&self) -> &'static str {
+	pub(crate) fn type_name(&self) -> &'static str {
 		match self {
 			Object::Nothing => "nothing",
 			Object::Number(_) => "number",
@@ -148,7 +151,7 @@ impl Object {
 	}
 
 	/// Returns the logical not of the given number intrepreted as a boolean.
-	pub fn logical_not(&self) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn logical_not(&self) -> Result<Object, ObjectOperationError> {
 		match self {
 			Object::Number(value) => Ok(Object::Number(BigFrac::from_bool(value.is_zero()))),
 			obj => Err(ObjectOperationError::UnsupportedType {
@@ -159,7 +162,7 @@ impl Object {
 	}
 
 	/// Returns the logical and of the given numbers intrepreted as booleans.
-	pub fn logical_and(&self, rhs: &Object) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn logical_and(&self, rhs: &Object) -> Result<Object, ObjectOperationError> {
 		match (self, rhs) {
 			(Object::Number(left_value), Object::Number(right_value)) => {
 				let value = BigFrac::from_bool(!left_value.is_zero() && !right_value.is_zero());
@@ -176,7 +179,7 @@ impl Object {
 	/// Returns a number boolean that is true (non-zero) iff the given list of numbers
 	/// is ordered (increasing) (strictly or not, depending of the parameter `strictly`).
 	/// Lists of 0 or 1 numbers are considered to be ordered.
-	pub fn is_ordered(&self, strictly: bool) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn is_ordered(&self, strictly: bool) -> Result<Object, ObjectOperationError> {
 		match self {
 			Object::List(vec) => {
 				// Only numbers are supported by order test for now,
@@ -209,7 +212,7 @@ impl Object {
 		}
 	}
 
-	pub fn length(&self) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn length(&self) -> Result<Object, ObjectOperationError> {
 		match self {
 			Object::List(vec) => Ok(Object::Number(BigFrac::from(vec.len() as u64))),
 			Object::String(string) => {
@@ -222,7 +225,7 @@ impl Object {
 		}
 	}
 
-	pub fn plus(self, rhs: Object) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn plus(self, rhs: Object) -> Result<Object, ObjectOperationError> {
 		match (self, rhs) {
 			(Object::Number(left_value), Object::Number(right_value)) => {
 				Ok(Object::Number(left_value + right_value))
@@ -241,7 +244,7 @@ impl Object {
 		}
 	}
 
-	pub fn minus(self, rhs: Object) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn minus(self, rhs: Object) -> Result<Object, ObjectOperationError> {
 		match (self, rhs) {
 			(Object::Number(left_value), Object::Number(right_value)) => {
 				Ok(Object::Number(left_value - right_value))
@@ -258,7 +261,7 @@ impl Object {
 		}
 	}
 
-	pub fn star(self, rhs: Object) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn star(self, rhs: Object) -> Result<Object, ObjectOperationError> {
 		match (self, rhs) {
 			(Object::Number(left_value), Object::Number(right_value)) => {
 				Ok(Object::Number(left_value * right_value))
@@ -286,7 +289,7 @@ impl Object {
 		}
 	}
 
-	pub fn slash(self, rhs: Object) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn slash(self, rhs: Object) -> Result<Object, ObjectOperationError> {
 		match (self, rhs) {
 			(Object::Number(left_value), Object::Number(right_value)) => {
 				Ok(Object::Number(left_value / right_value))
@@ -302,7 +305,7 @@ impl Object {
 		}
 	}
 
-	pub fn comma(self, rhs: Object) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn comma(self, rhs: Object) -> Result<Object, ObjectOperationError> {
 		match (self, rhs) {
 			(Object::Nothing, right) => Ok(Object::List(vec![right])),
 			(Object::List(mut vec), right) => {
@@ -316,12 +319,12 @@ impl Object {
 		}
 	}
 
-	pub fn double_comma(self, rhs: Object) -> Object {
+	pub(crate) fn double_comma(self, rhs: Object) -> Object {
 		Object::List(vec![self, rhs])
 	}
 
 	/// Returns `self[rhs]`.
-	pub fn index(&self, rhs: Object) -> Result<Object, ObjectOperationError> {
+	pub(crate) fn index(&self, rhs: Object) -> Result<Object, ObjectOperationError> {
 		match (self, rhs) {
 			(Object::List(vec), Object::Number(index)) => {
 				let index_as_usize =
