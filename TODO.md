@@ -206,6 +206,28 @@ Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means s
 
 ## Small language features
 
+### Create parent context with interceptor
+
+The idea is to be able to create a new context inbetween the current context and the parent of the current context (thus the created context will be a child of our old parent, and out new parent), and with an interceptor that will intercept signals from the current context (the interceptor will run in the created context).
+
+```sflk
+A...
+newstatement context C interceptor I
+B...
+```
+
+will be *somewhat* equivalent to
+
+```sflk
+A...
+do {
+	cy C
+	do B wi I
+}
+```
+
+but not really because what `A...` does to its current context should end up in the context in which `B` is executed...
+
 ### Context list
 
 The way to mutate a context object is to `cy` it into a context, change the context, and then `cx` it back into an object. Why not make the same thing with lists? Like every context has a list in it, there are a few ways to mutate that list and interact with it, and a few ways to make it into a list and to make a list into the context list or something.
