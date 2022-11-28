@@ -308,3 +308,7 @@ GitHub project embeds seem to work best when given a 1280×640px image to illust
 ## Architecture
 
 Take inspiration from cool stuff like [Rome](https://github.com/rome/tools) to refractor the parsing stage into something really solid (and maybe even usable by a language server). 
+
+## "Marketing"
+
+Add SFLK to [this list of languages written in Rust](https://github.com/alilleybrinker/langs-in-rust) when it is ready. (When should SFLK be considered ready? Idk.)
