@@ -206,6 +206,26 @@ Imagine bs like `&~ $..!: ++, $, ?, ??&--'-().;;<>` etc. and it actually means s
 
 ## Small language features
 
+### Run before and run after
+
+```sflk
+pr "a"
+bf {pr "b"}
+pr "c"
+af {pr "d"}
+pr "e"
+```
+
+This shall print "baced".
+
+The idea is that before running a block, it is scanned for `bf` (before) statements that are collected and run (in some order that is left to specify), and only then it is executed normally (`bf` and `af` statements are ignored during this phase), and then it is scanned for `af` (after) statements that are collected and run (in a similar way to `bf` statements).
+
+This could be so cool if done well. It may need more thoughts.
+
+### Goto and labels
+
+Goto and labels.
+
 ### Create parent context with interceptor
 
 The idea is to be able to create a new context inbetween the current context and the parent of the current context (thus the created context will be a child of our old parent, and out new parent), and with an interceptor that will intercept signals from the current context (the interceptor will run in the created context).
