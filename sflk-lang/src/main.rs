@@ -1,24 +1,43 @@
+#[cfg(old)]
 mod ast;
+#[allow(unused)]
 mod bignums;
+#[cfg(old)]
 mod log;
+#[cfg(old)]
 mod log_indent;
+#[cfg(old)]
 mod object;
+#[cfg(old)]
 mod parser;
+#[cfg(old)]
 mod scu;
+#[cfg(old)]
 mod settings;
+#[cfg(old)]
 mod sir;
+#[cfg(old)]
 mod stringtree;
+#[cfg(old)]
 mod tokenizer;
+#[cfg(old)]
 mod utils;
 
+#[cfg(old)]
 use parser::{Parser, ParserDebuggingLogger};
+#[cfg(old)]
 use scu::SourceCodeUnit;
+#[cfg(old)]
 use settings::Settings;
+#[cfg(old)]
 use settings::Source;
+#[cfg(old)]
 use tokenizer::{CharReadingHead, TokBuffer};
 
+#[cfg(old)]
 use std::rc::Rc;
 
+#[cfg(old)]
 fn main() {
 	// Parse the command line arguments.
 	let settings = Settings::from_args();
@@ -63,4 +82,8 @@ fn main() {
 
 	// Actually run the code.
 	sir::exec_sir_block(sir_block);
+}
+
+fn main() {
+	println!("fresh start!");
 }
