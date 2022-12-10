@@ -123,19 +123,23 @@ fn main() {
 	};
 
 	logger.print_line("\x1b[1mTOKENS:\x1b[22m");
-	let mut some_locs = Vec::new();
+	let mut some_lwms = Vec::new();
 	{
 		let mut i = 0;
 		loop {
 			let (token, loc) = tokenizer.peek(i);
-			if i == 0 || matches!(token, Token::OpenCurly | Token::CloseCurly) {
-				some_locs.push(loc.clone());
+			if matches!(token, Token::OpenCurly | Token::CloseCurly) {
+				some_lwms.push({
+					LocationWithMessage {
+						loc: loc.clone(),
+						message: Some("curly~~ >w<".to_string()),
+					}
+				});
 			}
-			logger.print_line(&format!("token {}", token));
 			if matches!(token, Token::EndOfFile) {
 				break;
 			}
-			logger.print_loc(loc.clone());
+			logger.print_loc(loc.clone(), Some(format!("token {}", token)));
 			i += 1;
 		}
 	}
@@ -145,11 +149,14 @@ fn main() {
 
 	logger.print_line("\x1b[1mSTATEMENTS:\x1b[22m");
 	for statement in program_ast.statements.iter() {
-		logger.print_loc(statement.loc());
+		logger.print_loc(
+			statement.loc(),
+			Some(statement.quick_description().to_string()),
+		);
 	}
 
 	logger.print_line("\x1b[1mTEST MULTIPLE LOCS AT THE SAME TIME:\x1b[22m");
-	logger.print_src_ex(Rc::clone(&src), Some(&some_locs));
+	logger.print_src_ex(Rc::clone(&src), Some(some_lwms));
 
 	let program_block = program_to_boc(&program_ast);
 
@@ -167,9 +174,41 @@ fn main() {
 		machine.execution.perform_one_step();
 	}
 
-	// TODO: Attach messages to locations given to `Logger::print_src_ex`.
+	// TODO: Currently, logging a location with a message prints stuff like
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ──── print statement
+	// but it does not yet support an other style that would look like
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ┬───
+	//          ╰ print statement
+	// . Such style takes more space than the previous one (thus is to remain
+	// optional for such cases where the previous style is possible), but if
+	// there is multiple locations with messages on the same line, then only
+	// the second style can support it, like so
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰ ┬─── ┬───
+	//     ╰ print statement
+	//          ╰ also a print statement
+	// . The task presented here is to implement support for the second style
+	// and use it when the previous style is not usable.
+
+	// TODO: Allow user to select preferred style between
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ──── print statement
+	// and
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ┬───
+	//          ╰ print statement
+	// via a command line parameter.
+
 	// TODO: Make user-friendly error reporting, not leaving any case.
-	// TODO: Make a `Logger` (that will supports everything), and make every step use it.
+	// TODO: Add indentation support to the `Logger`.
+	// TODO: Add tree support to the `Logger`.
 	// TODO: Serialize blocks of code to bytes.
 }
 
@@ -580,6 +619,16 @@ enum Statement {
 	ErrorUnexpectedToken(Token, Location),
 }
 
+impl Statement {
+	fn quick_description(&self) -> &str {
+		match self {
+			Statement::Print(..) => "print statement",
+			Statement::DoHere(..) => "do here statement",
+			Statement::ErrorUnexpectedToken(..) => "error unexpected token",
+		}
+	}
+}
+
 impl AstNode for Statement {
 	fn loc(&self) -> Location {
 		match self {
@@ -828,7 +877,14 @@ impl Execution {
 }
 
 struct Logger {
+	/// If set to `false` then the logger will not print anything.
 	enabled: bool,
+}
+
+struct LocationWithMessage {
+	loc: Location,
+	/// Message to print near the end of the code covered by `loc`.
+	message: Option<String>,
 }
 
 impl Logger {
@@ -841,23 +897,24 @@ impl Logger {
 
 	/// Prints a piece of the given source code.
 	///
-	/// If some `Location`s are provided via `locs_to_print`, then the printing will
-	/// focus on these locations only instead of the whole source code.
+	/// If some `Location`s are provided via `lwms_opt`, then the printing will
+	/// focus on these locations only instead of the whole source code. Messages can
+	/// be attached to the locations and will be printed along the covered code.
 	/// These locations are expected to not overlap, be strictly ordered, and cover
 	/// pieces of `src` (no other `SourceCode`). There must be at least one location
 	/// (just pass `None` to print all the code, or just don't call this method to
 	/// print nothing).
-	fn print_src_ex(&mut self, src: Rc<SourceCode>, locs_to_print: Option<&[Location]>) {
-		if let Some(locs) = locs_to_print {
+	fn print_src_ex(&mut self, src: Rc<SourceCode>, lwms_opt: Option<Vec<LocationWithMessage>>) {
+		if let Some(ref lwms) = lwms_opt {
 			// Making sure the `Location` list verifies the constraints listed in the
 			// method documentation, and on which the rest of the method relies on to
 			// behave as expected.
-			assert!(!locs.is_empty());
-			for loc in locs {
-				assert!(Rc::ptr_eq(&loc.src, &src));
+			assert!(!lwms.is_empty());
+			for lwm in lwms.iter() {
+				assert!(Rc::ptr_eq(&lwm.loc.src, &src));
 			}
-			for window in locs.windows(2) {
-				assert!(window[0].is_strictly_before(&window[1]));
+			for window in lwms.windows(2) {
+				assert!(window[0].loc.is_strictly_before(&window[1].loc));
 			}
 		}
 
@@ -869,53 +926,79 @@ impl Logger {
 		// break them across line boundaries and group the pieces by line so that
 		// we can examine each line at a time to see which parts of the line are
 		// covered by pieces of locations to print.
-		struct LineWithLocs {
+		struct LocationWithMessagePiece {
+			loc: Location,
+			message: Option<String>,
+			/// Is this location piece the last on its line?
+			last_on_line: bool,
+		}
+		struct LineLocationsWithMessages {
 			line_number: u32,
-			/// Does the next `LineWithLocs` have a `line_number` that does not directly follows
-			/// the `line_number` of this `LineWithLocs`?
+			/// Does the next `LineLocationsWithMessages` have a `line_number` that does not
+			/// directly follows the `line_number` of this `LineLocationsWithMessages`?
 			/// This is useful to get some small visual detail right.
 			just_before_gap: bool,
-			/// Pieces of locations in `locs_to_print` that cover the line numbered `line_number`.
-			locs: Vec<Location>,
+			/// Pieces of locations in `lwms_opt` that only cover pieces of the line
+			/// numbered `line_number`, along with potential messages to print nearby.
+			lwm_pieces: Vec<LocationWithMessagePiece>,
 		}
-		let lwls_to_print = match locs_to_print {
-			Some(locs) => {
+		let llwms_opt = match lwms_opt {
+			Some(lwms) => {
 				// Split the given locations into pieces that do not cover multiple lines.
-				let mut line_locs = Vec::new();
-				for loc in locs.iter() {
-					line_locs.append(&mut loc.clone().split_across_lines());
+				let mut lwm_pieces: Vec<LocationWithMessagePiece> = Vec::new();
+				for lwm in lwms.into_iter() {
+					let some_loc_pieces = lwm.loc.clone().split_across_lines();
+					if some_loc_pieces.is_empty() {
+						todo!("Handle locations that cover only'\\n' characters as a special case");
+					}
+					let mut some_lwm_pieces: Vec<LocationWithMessagePiece> = some_loc_pieces
+						.into_iter()
+						.map(|loc| LocationWithMessagePiece {
+							loc,
+							message: None,
+							// Set to correct value later.
+							last_on_line: false,
+						})
+						.collect();
+					some_lwm_pieces.last_mut().unwrap().message = lwm.message;
+					lwm_pieces.append(&mut some_lwm_pieces);
 				}
 				// Group pieces that cover parts of the same line together.
-				let mut lwls: Vec<LineWithLocs> = Vec::new();
-				for line_loc in line_locs {
-					let line_number = line_loc.line_number_start;
-					if matches!(lwls.last(), Some(lwl) if lwl.line_number == line_number) {
+				let mut llwms: Vec<LineLocationsWithMessages> = Vec::new();
+				for lwm_piece in lwm_pieces {
+					let line_number = lwm_piece.loc.line_number_start;
+					if matches!(llwms.last(), Some(llwm) if llwm.line_number == line_number) {
 						// This piece covers part of the same line as the previous piece,
 						// thus it gets in the same group.
-						lwls.last_mut().unwrap().locs.push(line_loc);
+						llwms.last_mut().unwrap().lwm_pieces.push(lwm_piece);
 					} else {
 						// This piece covers part of an other line than the previous piece,
 						// thus it gets in a new group.
-						if let Some(previous_lwl) = lwls.last_mut() {
+						if let Some(previous_llwm) = llwms.last_mut() {
 							// We also now get to know if the last group is about a line
 							// that is just before a gap in the sequence of lines to print.
-							previous_lwl.just_before_gap =
-								previous_lwl.line_number + 1 != line_number;
+							previous_llwm.just_before_gap =
+								previous_llwm.line_number + 1 != line_number;
 						}
-						lwls.push(LineWithLocs {
+						llwms.push(LineLocationsWithMessages {
 							line_number,
+							// If it should be set to `true` then it will be done
+							// in some later iteration of this loop.
 							just_before_gap: false,
-							locs: vec![line_loc],
+							lwm_pieces: vec![lwm_piece],
 						});
 					}
 				}
-				Some(lwls)
+				for llwm in llwms.iter_mut() {
+					llwm.lwm_pieces.last_mut().unwrap().last_on_line = true;
+				}
+				Some(llwms)
 			},
 			None => None,
 		};
 
-		let line_number_max = match &lwls_to_print {
-			Some(lwls) => lwls.last().unwrap().line_number,
+		let line_number_max = match &llwms_opt {
+			Some(llwms) => llwms.last().unwrap().line_number,
 			None => src.line_count() as u32,
 		};
 
@@ -951,7 +1034,7 @@ impl Logger {
 			}
 		}
 		let mut end_of_bar_already_printed = false;
-		match lwls_to_print {
+		match llwms_opt {
 			None => {
 				// Print the whole source code with line numbers. The easy case.
 				for line_number in 1..=line_number_max {
@@ -965,15 +1048,15 @@ impl Logger {
 					);
 				}
 			},
-			Some(lwls) => {
+			Some(llwms) => {
 				// Print parts of the source code, focussing on the locations that were given
 				// via `locs_to_print` and that are already split on '\n' characters and
 				// grouped by lines (and that are asserted to be strictly sorted and to not
 				// overlap). We will only print the lines that are (partly or entirely) covered
 				// by these locations, and will add cool formatting to place emphasis on
 				// covered parts.
-				for lwl in lwls.iter() {
-					let line_number = lwl.line_number;
+				for llwm in llwms.iter() {
+					let line_number = llwm.line_number;
 					let line_index = line_number - 1;
 					let line = src.line(line_index);
 					let line_start_byte_index = src.line_start_byte_indices[line_index as usize];
@@ -1017,11 +1100,11 @@ impl Logger {
 						}
 					}
 					let mut current_byte_index_in_line = 0;
-					for loc in lwl.locs.iter() {
+					for lwm_piece in llwm.lwm_pieces.iter() {
 						// Handle text that comes before the current location
 						// but also after the previous location in this line (if any).
 						let byte_index_loc_start_in_line =
-							(loc.byte_index_start - line_start_byte_index) as usize;
+							(lwm_piece.loc.byte_index_start - line_start_byte_index) as usize;
 						let line_piece_before_loc =
 							&line[current_byte_index_in_line..byte_index_loc_start_in_line];
 						for ch in line_piece_before_loc.chars() {
@@ -1035,10 +1118,10 @@ impl Logger {
 						}
 						current_byte_index_in_line += line_piece_before_loc.len();
 
-						// Handle text that is covered by the current location, putting emphasis.
-						line_formatted += "\x1b[36m\x1b[1m";
-						underline += "\x1b[36m";
-						for ch in loc.covered_src().chars() {
+						// Handle text that is covered by the current location, adding emphasis.
+						line_formatted += "\x1b[33m\x1b[1m";
+						underline += "\x1b[33m";
+						for ch in lwm_piece.loc.covered_src().chars() {
 							handle_character(
 								ch,
 								'─',
@@ -1047,9 +1130,21 @@ impl Logger {
 								&mut still_only_whitespace,
 							);
 						}
+						if let Some(message) = &lwm_piece.message {
+							if !lwm_piece.last_on_line {
+								todo!(
+									"Handle messages attached to locations that are followed by \
+									another location on the same line (on which they end)."
+								);
+								// Just uncomment this `todo!` to see how this case
+								// requires special care for a proper rendering.
+							}
+							underline += " ";
+							underline += message;
+						}
 						line_formatted += "\x1b[22m\x1b[39m";
 						underline += "\x1b[39m";
-						current_byte_index_in_line += loc.length_in_bytes();
+						current_byte_index_in_line += lwm_piece.loc.length_in_bytes();
 					}
 					// Handle text that comes after the last location in this line.
 					line_formatted += &line[current_byte_index_in_line..];
@@ -1066,7 +1161,7 @@ impl Logger {
 						&underline,
 						None,
 						line_number_max_digits,
-						if lwl.line_number == line_number_max {
+						if llwm.line_number == line_number_max {
 							// We try to not end the bar (between line numbers and line content)
 							// on a line that contains source code (as it does not look very good)
 							// but it does look good to end it on a line that contains underline
@@ -1074,7 +1169,7 @@ impl Logger {
 							// underline line (if any)).
 							end_of_bar_already_printed = true;
 							'╰'
-						} else if lwl.just_before_gap {
+						} else if llwm.just_before_gap {
 							'·'
 						} else {
 							'│'
@@ -1093,7 +1188,10 @@ impl Logger {
 		self.print_src_ex(src, None);
 	}
 
-	fn print_loc(&mut self, loc: Location) {
-		self.print_src_ex(Rc::clone(&loc.src), Some(&[loc]));
+	fn print_loc(&mut self, loc: Location, message: Option<String>) {
+		self.print_src_ex(
+			Rc::clone(&loc.src),
+			Some(vec![LocationWithMessage { loc, message }]),
+		);
 	}
 }
