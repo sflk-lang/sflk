@@ -34,6 +34,7 @@ use settings::Source;
 #[cfg(old)]
 use tokenizer::{CharReadingHead, TokBuffer};
 
+use std::ops::AddAssign;
 #[cfg(old)]
 use std::rc::Rc;
 
@@ -111,22 +112,26 @@ fn main() {
 		}
 	};
 
-	logger.println("\x1b[1mSOURCE CODE:\x1b[22m");
+	logger.print_line("\x1b[1mSOURCE CODE:\x1b[22m");
 	logger.print_src(Rc::clone(&src));
 
 	let mut tokenizer = TokenStreamPeekable {
 		token_stream: TokenStream {
-			src_char_stream: SourceCodeCharacterStream::new(src),
+			src_char_stream: SourceCodeCharacterStream::new(Rc::clone(&src)),
 		},
 		tokens_ahead: VecDeque::new(),
 	};
 
-	logger.println("\x1b[1mTOKENS:\x1b[22m");
+	logger.print_line("\x1b[1mTOKENS:\x1b[22m");
+	let mut some_locs = Vec::new();
 	{
 		let mut i = 0;
 		loop {
 			let (token, loc) = tokenizer.peek(i);
-			logger.println(&format!("token {}", token));
+			if i == 0 || matches!(token, Token::OpenCurly | Token::CloseCurly) {
+				some_locs.push(loc.clone());
+			}
+			logger.print_line(&format!("token {}", token));
 			if matches!(token, Token::EndOfFile) {
 				break;
 			}
@@ -138,14 +143,17 @@ fn main() {
 	let mut parser = Parser { tokenizer };
 	let program_ast = parser.pop_full_program();
 
-	logger.println("\x1b[1mSTATEMENTS:\x1b[22m");
+	logger.print_line("\x1b[1mSTATEMENTS:\x1b[22m");
 	for statement in program_ast.statements.iter() {
 		logger.print_loc(statement.loc());
 	}
 
+	logger.print_line("\x1b[1mTEST MULTIPLE LOCS AT THE SAME TIME:\x1b[22m");
+	logger.print_src_ex(Rc::clone(&src), Some(&some_locs));
+
 	let program_block = program_to_boc(&program_ast);
 
-	logger.println("\x1b[1mEXECUTION:\x1b[22m");
+	logger.print_line("\x1b[1mEXECUTION:\x1b[22m");
 	let mut machine = Machine {
 		execution: Execution {
 			execution_frame_stack: vec![ExecutionFrame {
@@ -159,6 +167,8 @@ fn main() {
 		machine.execution.perform_one_step();
 	}
 
+	// TODO: Attach messages to locations given to `Logger::print_src_ex`.
+	// TODO: Use the '·' character for line skips with multiple locations.
 	// TODO: Make user-friendly error reporting, not leaving any case.
 	// TODO: Make a `Logger` (that will supports everything), and make every step use it.
 	// TODO: Serialize blocks of code to bytes.
@@ -213,7 +223,7 @@ impl SourceCode {
 		SourceCode { content, line_start_byte_indices, name }
 	}
 
-	fn line_with_terminating_newline(&self, line_index: u32) -> &str {
+	fn line_with_potentially_terminating_newline(&self, line_index: u32) -> &str {
 		let line_index = line_index as usize;
 		let start_byte_index = self.line_start_byte_indices[line_index] as usize;
 		let is_last_line = line_index == self.line_count() - 1;
@@ -226,7 +236,7 @@ impl SourceCode {
 	}
 
 	fn line(&self, line_index: u32) -> &str {
-		let line = self.line_with_terminating_newline(line_index);
+		let line = self.line_with_potentially_terminating_newline(line_index);
 		if let Some(stripped_line) = line.strip_suffix('\n') {
 			stripped_line
 		} else {
@@ -255,7 +265,7 @@ impl SourceCode {
 	}
 }
 
-/// Represents an interval of some piece of source code.
+/// Represents an interval of some piece of source code, covering at least one character.
 #[derive(Clone)]
 struct Location {
 	src: Rc<SourceCode>,
@@ -278,8 +288,23 @@ impl Location {
 		self.byte_index_end = rhs.byte_index_end;
 	}
 
+	fn is_strictly_before(&self, rhs: &Location) -> bool {
+		assert!(Rc::ptr_eq(&self.src, &rhs.src));
+		self.byte_index_end < rhs.byte_index_start
+	}
+
+	fn covered_src(&self) -> &str {
+		let start = self.byte_index_start as usize;
+		let end = self.byte_index_end as usize;
+		&self.src.content[start..=end]
+	}
+
 	fn length_in_bytes(&self) -> usize {
 		self.byte_index_end as usize + 1 - self.byte_index_start as usize
+	}
+
+	fn length_in_characters(&self) -> usize {
+		self.covered_src().chars().count()
 	}
 
 	/// Split the `Location` into the biggest sub-`Location`s that do not cover multiple lines.
@@ -288,11 +313,9 @@ impl Location {
 	/// the `#`s in the mask `--#\n###\n#--\n` (including the `\n`s that are inbetween `#`s) will
 	/// be split into the `Location`s `--#\n---\n---\n`, `---\n###\n---\n` and `---\n---\n#--\n`
 	/// (none of them covering any `\n`).
+	///
+	/// A `Location` covering only `\n` characters will be split in nothing (empty vec).
 	fn split_across_lines(self) -> Vec<Location> {
-		if self.byte_index_start == self.byte_index_end {
-			// There is nothing to split in a one-byte-long `Location`.
-			return vec![self];
-		}
 		let mut src =
 			SourceCodeCharacterStream::starting_at(Rc::clone(&self.src), self.byte_index_start);
 		let mut vec: Vec<Location> = Vec::new();
@@ -735,8 +758,11 @@ fn program_to_boc(program: &Program) -> BlockOfCode {
 }
 
 struct ExecutionFrame {
+	/// Index of the next instruction to execute in `block_of_code.instructions`.
 	instruction_index: u32,
+	/// Block of code that is being executed in this frame.
 	block_of_code: BlockOfCode,
+	/// Stack of temporary (and anonymous) values used by ongoing expression evaluation.
 	temporary_value_stack: Vec<Object>,
 }
 
@@ -806,12 +832,8 @@ struct Logger {
 	enabled: bool,
 }
 
-fn is_strictly_sorted<T: std::cmp::PartialOrd>(vec: &[T]) -> bool {
-	vec.windows(2).all(|window| window[0] < window[1])
-}
-
 impl Logger {
-	fn println(&mut self, string: &str) {
+	fn print_line(&mut self, string: &str) {
 		if !self.enabled {
 			return;
 		}
@@ -822,44 +844,59 @@ impl Logger {
 	///
 	/// If some `Location`s are provided via `locs_to_print`, then the printing will
 	/// focus on these locations only instead of the whole source code.
+	/// These locations are expected to not overlap, be strictly ordered, and cover
+	/// pieces of `src` (no other `SourceCode`). There must be at least one location
+	/// (just pass `None` to print all the code, or just don't call this method to
+	/// print nothing).
 	fn print_src_ex(&mut self, src: Rc<SourceCode>, locs_to_print: Option<&[Location]>) {
+		if let Some(locs) = locs_to_print {
+			// Making sure the `Location` list verifies the constraints listed in the
+			// method documentation, and on which the rest of the method relies on to
+			// behave as expected.
+			assert!(!locs.is_empty());
+			for loc in locs {
+				assert!(Rc::ptr_eq(&loc.src, &src));
+			}
+			for window in locs.windows(2) {
+				assert!(window[0].is_strictly_before(&window[1]));
+			}
+		}
+
 		if !self.enabled {
 			return;
 		}
 
-		// If some `Location`s are to be focuced on, then it is a good thing to
-		// break them and group them by lines so that we can examine each line at a time
-		// to see which part of the line are covered by `Location`s to print.
+		// If some locations are to be focuced on, then it is a good thing to
+		// break them across line boundaries and group the pieces by line so that
+		// we can examine each line at a time to see which parts of the line are
+		// covered by pieces of locations to print.
 		struct LineWithLocs {
 			line_number: u32,
+			/// Pieces of locations in `locs_to_print` that cover the line numbered `line_number`.
 			locs: Vec<Location>,
 		}
-		let lwls_to_print = {
-			let line_locs_to_print = match locs_to_print {
-				Some(locs) => {
-					let mut line_locs_to_print = Vec::new();
-					for loc in locs.iter() {
-						line_locs_to_print.append(&mut loc.clone().split_across_lines());
+		let lwls_to_print = match locs_to_print {
+			Some(locs) => {
+				// Split the given locations into pieces that do not cover multiple lines.
+				let mut line_locs = Vec::new();
+				for loc in locs.iter() {
+					line_locs.append(&mut loc.clone().split_across_lines());
+				}
+				// Group pieces that cover parts of the same line together.
+				let mut lwls: Vec<LineWithLocs> = Vec::new();
+				for line_loc in line_locs {
+					let line_number = line_loc.line_number_start;
+					if matches!(lwls.last(), Some(lwl) if lwl.line_number == line_number) {
+						// Covers part of the same line as the previous piece.
+						lwls.last_mut().unwrap().locs.push(line_loc);
+					} else {
+						// Covers part of an other line, thus we start a new group.
+						lwls.push(LineWithLocs { line_number, locs: vec![line_loc] });
 					}
-					Some(line_locs_to_print)
-				},
-				None => None,
-			};
-			match line_locs_to_print {
-				Some(locs) => {
-					let mut lwls: Vec<LineWithLocs> = Vec::new();
-					for line_loc in locs {
-						let line_number = line_loc.line_number_start;
-						if matches!(lwls.last(), Some(lwl) if lwl.line_number == line_number) {
-							lwls.last_mut().unwrap().locs.push(line_loc);
-						} else {
-							lwls.push(LineWithLocs { line_number, locs: vec![line_loc] });
-						}
-					}
-					Some(lwls)
-				},
-				None => None,
-			}
+				}
+				Some(lwls)
+			},
+			None => None,
 		};
 
 		let line_number_max = match &lwls_to_print {
@@ -876,56 +913,163 @@ impl Logger {
 		//   9 | pr "some line of code (notice the padding before the '9')"
 		//  10 | pr "line of code that is aligned with the previous line"
 		// ```).
-		let line_number_digit_max = line_number_max.to_string().len();
+		let line_number_max_digits = line_number_max.to_string().len();
+		let blank_line_number = " ".repeat(line_number_max_digits);
 
 		let src_name = &src.name;
-		self.println(&format!(
-			"{nothing:line_number_digit_max$} ╭ {src_name}",
-			nothing = ""
-		));
+		self.print_line(&format!("{blank_line_number} ╭{src_name}"));
 
+		impl Logger {
+			fn print_line_with_number(
+				&mut self,
+				line: &str,
+				line_number_opt: Option<u32>,
+				line_number_max_digits: usize,
+				bar_ch: char,
+			) {
+				let line_number = if let Some(line_number) = line_number_opt {
+					format!("{line_number:line_number_max_digits$}")
+				} else {
+					" ".repeat(line_number_max_digits)
+				};
+				self.print_line(&format!("{line_number} {bar_ch} {line}"));
+			}
+		}
+		let mut end_of_bar_already_printed = false;
 		match lwls_to_print {
 			None => {
+				// Print the whole source code with line numbers. The easy case.
 				for line_number in 1..=line_number_max {
 					let line_index = line_number - 1;
 					let line = src.line(line_index);
-					self.println(&format!("{line_number:line_number_digit_max$} │ {line}"));
+					self.print_line_with_number(
+						line,
+						Some(line_number),
+						line_number_max_digits,
+						'│',
+					);
 				}
 			},
 			Some(lwls) => {
+				// Print parts of the source code, focussing on the locations that were given
+				// via `locs_to_print` and that are already split on '\n' characters and
+				// grouped by lines (and that are asserted to be strictly sorted and to not
+				// overlap). We will only print the lines that are (partly or entirely) covered
+				// by these locations, and will add cool formatting to place emphasis on
+				// covered parts.
 				for lwl in lwls {
 					let line_number = lwl.line_number;
 					let line_index = line_number - 1;
 					let line = src.line(line_index);
 					let line_start_byte_index = src.line_start_byte_indices[line_index as usize];
 
+					// Is to contain the content of `line` with added emphasis on parts
+					// covered by locations of `lwl.locs`.
 					let mut line_formatted = String::new();
+					// Is to contain whitespace and underline characters that match the position
+					// of the emphases parts of `line_formatted` to add to the emphasis (and to
+					// make sure the emphasis will be present even without colors or other
+					// ANSI escape code effects).
+					let mut underline = String::new();
+					// Allows to not underline whitespace at the beginning of lines (even if it
+					// is covered by a location), it is more pleasing to the eye that way.
+					let mut still_only_whitespace = true;
+					fn handle_character(
+						ch: char,
+						underline_ch: char,
+						line_formatted: &mut String,
+						underline: &mut String,
+						still_only_whitespace: &mut bool,
+					) {
+						// No underline until some non-whitespace character kicks in.
+						if !ch.is_ascii_whitespace() {
+							*still_only_whitespace = false;
+						}
+						let underline_ch = if *still_only_whitespace {
+							' '
+						} else {
+							underline_ch
+						};
+
+						if ch == '\t' {
+							// Tabs are a special case as they are quite wide while still
+							// counting as only one character (which would confuse the underline).
+							line_formatted.add_assign("    ");
+							underline.add_assign(&underline_ch.to_string().repeat(4));
+						} else {
+							line_formatted.push(ch);
+							underline.push(underline_ch);
+						}
+					}
 					let mut current_byte_index_in_line = 0;
 					for loc in lwl.locs {
-						let byte_index_start_in_line =
+						// Handle text that comes before the current location
+						// but also after the previous location in this line (if any).
+						let byte_index_loc_start_in_line =
 							(loc.byte_index_start - line_start_byte_index) as usize;
-						let byte_index_end_in_line =
-							(loc.byte_index_end - line_start_byte_index) as usize;
+						let line_piece_before_loc =
+							&line[current_byte_index_in_line..byte_index_loc_start_in_line];
+						for ch in line_piece_before_loc.chars() {
+							handle_character(
+								ch,
+								' ',
+								&mut line_formatted,
+								&mut underline,
+								&mut still_only_whitespace,
+							);
+						}
+						current_byte_index_in_line += line_piece_before_loc.len();
 
-						line_formatted +=
-							&line[current_byte_index_in_line..byte_index_start_in_line];
-
+						// Handle text that is covered by the current location, putting emphasis.
 						line_formatted += "\x1b[36m\x1b[1m";
-						line_formatted += &line[byte_index_start_in_line..=byte_index_end_in_line];
+						underline += "\x1b[36m";
+						for ch in loc.covered_src().chars() {
+							handle_character(
+								ch,
+								'─',
+								&mut line_formatted,
+								&mut underline,
+								&mut still_only_whitespace,
+							);
+						}
 						line_formatted += "\x1b[22m\x1b[39m";
-
-						current_byte_index_in_line = byte_index_end_in_line + 1;
+						underline += "\x1b[39m";
+						current_byte_index_in_line += loc.length_in_bytes();
 					}
+					// Handle text that comes after the last location in this line.
 					line_formatted += &line[current_byte_index_in_line..];
 
-					self.println(&format!(
-						"{line_number:line_number_digit_max$} │ {line_formatted}"
-					));
+					// The `line_formatted` and its `underline` are done and ready
+					// to be printed in all their glory.
+					self.print_line_with_number(
+						&line_formatted,
+						Some(line_number),
+						line_number_max_digits,
+						'│',
+					);
+					self.print_line_with_number(
+						&underline,
+						None,
+						line_number_max_digits,
+						if lwl.line_number == line_number_max {
+							// We try to not end the bar (between line numbers and line content)
+							// on a line that contains source code (as it does not look very good)
+							// but it does look good to end it on a line that contains underline
+							// (and it even does not look good to end it one line after the last
+							// underline line (if any)).
+							end_of_bar_already_printed = true;
+							'╰'
+						} else {
+							'│'
+						},
+					);
 				}
 			},
 		}
-		
-		self.println(&format!("{nothing:line_number_digit_max$} ╰", nothing = ""));
+
+		if !end_of_bar_already_printed {
+			self.print_line(&format!("{blank_line_number} ╰"));
+		}
 	}
 
 	fn print_src(&mut self, src: Rc<SourceCode>) {
