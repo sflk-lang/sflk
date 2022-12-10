@@ -168,7 +168,6 @@ fn main() {
 	}
 
 	// TODO: Attach messages to locations given to `Logger::print_src_ex`.
-	// TODO: Use the '·' character for line skips with multiple locations.
 	// TODO: Make user-friendly error reporting, not leaving any case.
 	// TODO: Make a `Logger` (that will supports everything), and make every step use it.
 	// TODO: Serialize blocks of code to bytes.
@@ -840,7 +839,7 @@ impl Logger {
 		println!("{}", string);
 	}
 
-	/// Prints a piece of the `src` source code.
+	/// Prints a piece of the given source code.
 	///
 	/// If some `Location`s are provided via `locs_to_print`, then the printing will
 	/// focus on these locations only instead of the whole source code.
@@ -872,6 +871,10 @@ impl Logger {
 		// covered by pieces of locations to print.
 		struct LineWithLocs {
 			line_number: u32,
+			/// Does the next `LineWithLocs` have a `line_number` that does not directly follows
+			/// the `line_number` of this `LineWithLocs`?
+			/// This is useful to get some small visual detail right.
+			just_before_gap: bool,
 			/// Pieces of locations in `locs_to_print` that cover the line numbered `line_number`.
 			locs: Vec<Location>,
 		}
@@ -887,11 +890,23 @@ impl Logger {
 				for line_loc in line_locs {
 					let line_number = line_loc.line_number_start;
 					if matches!(lwls.last(), Some(lwl) if lwl.line_number == line_number) {
-						// Covers part of the same line as the previous piece.
+						// This piece covers part of the same line as the previous piece,
+						// thus it gets in the same group.
 						lwls.last_mut().unwrap().locs.push(line_loc);
 					} else {
-						// Covers part of an other line, thus we start a new group.
-						lwls.push(LineWithLocs { line_number, locs: vec![line_loc] });
+						// This piece covers part of an other line than the previous piece,
+						// thus it gets in a new group.
+						if let Some(previous_lwl) = lwls.last_mut() {
+							// We also now get to know if the last group is about a line
+							// that is just before a gap in the sequence of lines to print.
+							previous_lwl.just_before_gap =
+								previous_lwl.line_number + 1 != line_number;
+						}
+						lwls.push(LineWithLocs {
+							line_number,
+							just_before_gap: false,
+							locs: vec![line_loc],
+						});
 					}
 				}
 				Some(lwls)
@@ -957,7 +972,7 @@ impl Logger {
 				// overlap). We will only print the lines that are (partly or entirely) covered
 				// by these locations, and will add cool formatting to place emphasis on
 				// covered parts.
-				for lwl in lwls {
+				for lwl in lwls.iter() {
 					let line_number = lwl.line_number;
 					let line_index = line_number - 1;
 					let line = src.line(line_index);
@@ -1002,7 +1017,7 @@ impl Logger {
 						}
 					}
 					let mut current_byte_index_in_line = 0;
-					for loc in lwl.locs {
+					for loc in lwl.locs.iter() {
 						// Handle text that comes before the current location
 						// but also after the previous location in this line (if any).
 						let byte_index_loc_start_in_line =
@@ -1059,6 +1074,8 @@ impl Logger {
 							// underline line (if any)).
 							end_of_bar_already_printed = true;
 							'╰'
+						} else if lwl.just_before_gap {
+							'·'
 						} else {
 							'│'
 						},
