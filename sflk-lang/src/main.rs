@@ -123,16 +123,25 @@ fn main() {
 	};
 
 	logger.print_line("\x1b[1mTOKENS:\x1b[22m");
-	let mut some_lwms = Vec::new();
+	let mut curly_lwms_for_a_temporary_test = Vec::new();
+	let mut first_line_lwms_for_a_temporary_test = Vec::new();
 	{
 		let mut i = 0;
 		loop {
 			let (token, loc) = tokenizer.peek(i);
 			if matches!(token, Token::OpenCurly | Token::CloseCurly) {
-				some_lwms.push({
+				curly_lwms_for_a_temporary_test.push({
 					LocationWithMessage {
 						loc: loc.clone(),
 						message: Some("curly~~ >w<".to_string()),
+					}
+				});
+			}
+			if loc.line_number_start == 1 {
+				first_line_lwms_for_a_temporary_test.push({
+					LocationWithMessage {
+						loc: loc.clone(),
+						message: Some(format!("token {}", token)),
 					}
 				});
 			}
@@ -156,7 +165,10 @@ fn main() {
 	}
 
 	logger.print_line("\x1b[1mTEST MULTIPLE LOCS AT THE SAME TIME:\x1b[22m");
-	logger.print_src_ex(Rc::clone(&src), Some(some_lwms));
+	logger.print_src_ex(Rc::clone(&src), Some(curly_lwms_for_a_temporary_test));
+
+	logger.print_line("\x1b[1mTEST MULTIPLE LOCS ON THE SAME LINE:\x1b[22m");
+	logger.print_src_ex(Rc::clone(&src), Some(first_line_lwms_for_a_temporary_test));
 
 	let program_block = program_to_boc(&program_ast);
 
@@ -174,27 +186,6 @@ fn main() {
 		machine.execution.perform_one_step();
 	}
 
-	// TODO: Currently, logging a location with a message prints stuff like
-	//   ╭tests/v0.4.x.test01.sflk
-	// 1 │ pr 8 pr 4
-	//   ╰      ──── print statement
-	// but it does not yet support an other style that would look like
-	//   ╭tests/v0.4.x.test01.sflk
-	// 1 │ pr 8 pr 4
-	//   ╰      ┬───
-	//          ╰ print statement
-	// . Such style takes more space than the previous one (thus is to remain
-	// optional for such cases where the previous style is possible), but if
-	// there is multiple locations with messages on the same line, then only
-	// the second style can support it, like so
-	//   ╭tests/v0.4.x.test01.sflk
-	// 1 │ pr 8 pr 4
-	//   ╰ ┬─── ┬───
-	//     ╰ print statement
-	//          ╰ also a print statement
-	// . The task presented here is to implement support for the second style
-	// and use it when the previous style is not usable.
-
 	// TODO: Allow user to select preferred style between
 	//   ╭tests/v0.4.x.test01.sflk
 	// 1 │ pr 8 pr 4
@@ -204,6 +195,18 @@ fn main() {
 	// 1 │ pr 8 pr 4
 	//   ╰      ┬───
 	//          ╰ print statement
+	// via a command line parameter.
+
+	// TODO: Allow user to select preferred style between
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ┬───
+	//          ╰ print statement
+	// and
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ───┬
+	//             ╰ print statement
 	// via a command line parameter.
 
 	// TODO: Make user-friendly error reporting, not leaving any case.
@@ -1055,29 +1058,51 @@ impl Logger {
 				// overlap). We will only print the lines that are (partly or entirely) covered
 				// by these locations, and will add cool formatting to place emphasis on
 				// covered parts.
-				for llwm in llwms.iter() {
+				for llwm in llwms.into_iter() {
 					let line_number = llwm.line_number;
 					let line_index = line_number - 1;
 					let line = src.line(line_index);
 					let line_start_byte_index = src.line_start_byte_indices[line_index as usize];
+					let mut current_byte_index_in_line = 0;
 
 					// Is to contain the content of `line` with added emphasis on parts
 					// covered by locations of `lwl.locs`.
 					let mut line_formatted = String::new();
+
 					// Is to contain whitespace and underline characters that match the position
 					// of the emphases parts of `line_formatted` to add to the emphasis (and to
 					// make sure the emphasis will be present even without colors or other
 					// ANSI escape code effects).
 					let mut underline = String::new();
+
+					// Some lines that may be added and used for the display of messages if the
+					// selected style or layout requires it. These lines will be rendered below
+					// the underline.
+					let mut message_under_underline_lines: Vec<MessageUnderUnderline> = Vec::new();
+					struct MessageUnderUnderline {
+						/// Sorted positions of pipes linking a line above to a line below.
+						other_pipes_going_through: Vec<usize>,
+						/// Position of a pipe linking a line above to this line.
+						pipe_end: usize,
+						/// Message that is to be printed after the end of the pipe at `pipe_end`.
+						message: String,
+					}
+
+					// Length in number of typical ASCII characters of the rendering of
+					// `line_formatted` in its current state.
+					let mut current_visible_length = 0;
+
 					// Allows to not underline whitespace at the beginning of lines (even if it
 					// is covered by a location), it is more pleasing to the eye that way.
 					let mut still_only_whitespace = true;
+
 					fn handle_character(
 						ch: char,
 						underline_ch: char,
 						line_formatted: &mut String,
 						underline: &mut String,
 						still_only_whitespace: &mut bool,
+						current_visible_length: &mut usize,
 					) {
 						// No underline until some non-whitespace character kicks in.
 						if !ch.is_ascii_whitespace() {
@@ -1088,19 +1113,25 @@ impl Logger {
 						} else {
 							underline_ch
 						};
+						// TODO: Add support for drawing a dashed underline like "╴╴╴╴"
+						// when having to underline leading whitespace.
 
 						if ch == '\t' {
 							// Tabs are a special case as they are quite wide while still
 							// counting as only one character (which would confuse the underline).
-							line_formatted.add_assign("    ");
-							underline.add_assign(&underline_ch.to_string().repeat(4));
+							const TAB_VISIBLE_LENGTH: usize = 4;
+							line_formatted.add_assign(&" ".repeat(TAB_VISIBLE_LENGTH));
+							underline
+								.add_assign(&underline_ch.to_string().repeat(TAB_VISIBLE_LENGTH));
+							*current_visible_length += TAB_VISIBLE_LENGTH;
 						} else {
 							line_formatted.push(ch);
 							underline.push(underline_ch);
+							*current_visible_length += 1;
 						}
 					}
-					let mut current_byte_index_in_line = 0;
-					for lwm_piece in llwm.lwm_pieces.iter() {
+
+					for lwm_piece in llwm.lwm_pieces.into_iter() {
 						// Handle text that comes before the current location
 						// but also after the previous location in this line (if any).
 						let byte_index_loc_start_in_line =
@@ -1114,33 +1145,65 @@ impl Logger {
 								&mut line_formatted,
 								&mut underline,
 								&mut still_only_whitespace,
+								&mut current_visible_length,
 							);
 						}
 						current_byte_index_in_line += line_piece_before_loc.len();
 
-						// Handle text that is covered by the current location, adding emphasis.
+						// Handle text that is covered by the current location, adding emphasis,
+						// and adding the potential message nearby.
+						enum MessagePlacementStyle {
+							Right,
+							BelowLeft,
+						}
+						let message_placement_style_opt = if lwm_piece.message.is_none() {
+							None
+						} else if lwm_piece.last_on_line {
+							Some(MessagePlacementStyle::Right)
+						} else {
+							Some(MessagePlacementStyle::BelowLeft)
+						};
+						let visible_length_before_current_emphasis = current_visible_length;
 						line_formatted += "\x1b[33m\x1b[1m";
 						underline += "\x1b[33m";
-						for ch in lwm_piece.loc.covered_src().chars() {
+						for (i, ch) in lwm_piece.loc.covered_src().chars().enumerate() {
+							let underline_ch = match message_placement_style_opt {
+								Some(MessagePlacementStyle::BelowLeft) if i == 0 => '┬',
+								_ => '─',
+							};
 							handle_character(
 								ch,
-								'─',
+								underline_ch,
 								&mut line_formatted,
 								&mut underline,
 								&mut still_only_whitespace,
+								&mut current_visible_length,
 							);
 						}
-						if let Some(message) = &lwm_piece.message {
-							if !lwm_piece.last_on_line {
-								todo!(
-									"Handle messages attached to locations that are followed by \
-									another location on the same line (on which they end)."
-								);
-								// Just uncomment this `todo!` to see how this case
-								// requires special care for a proper rendering.
+						if let Some(message) = lwm_piece.message {
+							match message_placement_style_opt {
+								None => unreachable!(),
+								Some(MessagePlacementStyle::Right) => {
+									underline += " ";
+									underline += &message;
+								},
+								Some(MessagePlacementStyle::BelowLeft) => {
+									let pipe_end = visible_length_before_current_emphasis;
+									let other_pipes_going_through = message_under_underline_lines
+										.iter()
+										.map(|muu| muu.pipe_end)
+										// It would be sorted in decreasing order without rev.
+										.rev()
+										.collect();
+									let message_under_underline = MessageUnderUnderline {
+										other_pipes_going_through,
+										pipe_end,
+										message,
+									};
+									message_under_underline_lines
+										.insert(0, message_under_underline);
+								},
 							}
-							underline += " ";
-							underline += message;
 						}
 						line_formatted += "\x1b[22m\x1b[39m";
 						underline += "\x1b[39m";
@@ -1157,24 +1220,52 @@ impl Logger {
 						line_number_max_digits,
 						'│',
 					);
+					let underline_bar_ch = if llwm.line_number == line_number_max {
+						// We try to not end the bar (between line numbers and line content)
+						// on a line that contains source code (as it does not look very good)
+						// but it does look good to end it on a line that contains underline
+						// (and it even does not look good to end it one line after the last
+						// underline line (if any)).
+						end_of_bar_already_printed = true;
+						'╰'
+					} else if llwm.just_before_gap {
+						'·'
+					} else {
+						'│'
+					};
 					self.print_line_with_number(
 						&underline,
 						None,
 						line_number_max_digits,
-						if llwm.line_number == line_number_max {
-							// We try to not end the bar (between line numbers and line content)
-							// on a line that contains source code (as it does not look very good)
-							// but it does look good to end it on a line that contains underline
-							// (and it even does not look good to end it one line after the last
-							// underline line (if any)).
-							end_of_bar_already_printed = true;
-							'╰'
-						} else if llwm.just_before_gap {
-							'·'
-						} else {
-							'│'
-						},
+						underline_bar_ch,
 					);
+					let underline_bar_ch = if end_of_bar_already_printed {
+						' '
+					} else {
+						underline_bar_ch
+					};
+					for muu in message_under_underline_lines {
+						let message = muu.message;
+						let mut line = String::new();
+						let mut line_visual_length = 0;
+						for pipe_position in muu.other_pipes_going_through {
+							line += &" ".repeat(pipe_position - line_visual_length);
+							line += "\x1b[33m";
+							line.push('│');
+							line += "\x1b[39m";
+							line_visual_length = pipe_position + 1;
+						}
+						line += &" ".repeat(muu.pipe_end - line_visual_length);
+						line += "\x1b[33m";
+						line += &format!("╰ {message}");
+						line += "\x1b[39m";
+						self.print_line_with_number(
+							&line,
+							None,
+							line_number_max_digits,
+							underline_bar_ch,
+						);
+					}
 				}
 			},
 		}
