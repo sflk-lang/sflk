@@ -86,6 +86,7 @@ fn main() {
 }
 
 use std::collections::VecDeque;
+use std::fmt;
 use std::rc::Rc;
 
 fn main() {
@@ -122,9 +123,12 @@ fn main() {
 		tokens_ahead: VecDeque::new(),
 	};
 
+	let style_cyan = TerminalStyle { bold: true, color: Some(TerminalColor::Cyan) };
+
 	logger.print_line("\x1b[1mTOKENS:\x1b[22m");
 	let mut curly_lwms_for_a_temporary_test = Vec::new();
 	let mut first_line_lwms_for_a_temporary_test = Vec::new();
+	let mut first_and_third_line_lwms_for_a_temporary_test = Vec::new();
 	{
 		let mut i = 0;
 		loop {
@@ -133,7 +137,8 @@ fn main() {
 				curly_lwms_for_a_temporary_test.push({
 					LocationWithMessage {
 						loc: loc.clone(),
-						message: Some("curly~~ >w<".to_string()),
+						style: style_cyan,
+						message: Some("curly moment".to_string()),
 					}
 				});
 			}
@@ -141,14 +146,24 @@ fn main() {
 				first_line_lwms_for_a_temporary_test.push({
 					LocationWithMessage {
 						loc: loc.clone(),
-						message: Some(format!("token {}", token)),
+						style: style_cyan,
+						message: Some(format!("token {token}")),
+					}
+				});
+			}
+			if loc.line_number_start == 1 || loc.line_number_start == 3 {
+				first_and_third_line_lwms_for_a_temporary_test.push({
+					LocationWithMessage {
+						loc: loc.clone(),
+						style: style_cyan,
+						message: Some(format!("token {token}")),
 					}
 				});
 			}
 			if matches!(token, Token::EndOfFile) {
 				break;
 			}
-			logger.print_loc(loc.clone(), Some(format!("token {}", token)));
+			logger.print_loc(loc.clone(), style_cyan, Some(format!("token {token}")));
 			i += 1;
 		}
 	}
@@ -160,15 +175,28 @@ fn main() {
 	for statement in program_ast.statements.iter() {
 		logger.print_loc(
 			statement.loc(),
+			style_cyan,
 			Some(statement.quick_description().to_string()),
 		);
 	}
 
 	logger.print_line("\x1b[1mTEST MULTIPLE LOCS AT THE SAME TIME:\x1b[22m");
-	logger.print_src_ex(Rc::clone(&src), Some(curly_lwms_for_a_temporary_test));
+	logger
+		.print_src_ex(Rc::clone(&src), Some(curly_lwms_for_a_temporary_test))
+		.unwrap();
 
 	logger.print_line("\x1b[1mTEST MULTIPLE LOCS ON THE SAME LINE:\x1b[22m");
-	logger.print_src_ex(Rc::clone(&src), Some(first_line_lwms_for_a_temporary_test));
+	logger
+		.print_src_ex(Rc::clone(&src), Some(first_line_lwms_for_a_temporary_test))
+		.unwrap();
+
+	logger.print_line("\x1b[1mTEST MULTIPLE LOCS PER LINE ON MULTIPLE LINES:\x1b[22m");
+	logger
+		.print_src_ex(
+			Rc::clone(&src),
+			Some(first_and_third_line_lwms_for_a_temporary_test),
+		)
+		.unwrap();
 
 	let program_block = program_to_boc(&program_ast);
 
@@ -465,8 +493,8 @@ enum Token {
 	OTHER,
 }
 
-impl std::fmt::Display for Token {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Token {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Token::KeywordPr => write!(f, "keyword pr"),
 			Token::KeywordDh => write!(f, "keyword dh"),
@@ -879,6 +907,49 @@ impl Execution {
 	}
 }
 
+#[derive(Clone, Copy)]
+enum TerminalColor {
+	Red,
+	Cyan,
+}
+
+#[derive(Clone, Copy)]
+struct TerminalStyle {
+	bold: bool,
+	color: Option<TerminalColor>,
+}
+
+impl TerminalColor {
+	fn open_foreground(&self, f: &mut dyn fmt::Write) -> fmt::Result {
+		match self {
+			TerminalColor::Red => write!(f, "\x1b[31m"),
+			TerminalColor::Cyan => write!(f, "\x1b[36m"),
+		}
+	}
+}
+
+impl TerminalStyle {
+	fn open(&self, f: &mut dyn fmt::Write) -> fmt::Result {
+		if self.bold {
+			write!(f, "\x1b[1m")?;
+		}
+		if let Some(ref color) = self.color {
+			color.open_foreground(f)?;
+		}
+		Ok(())
+	}
+
+	fn close(&self, f: &mut dyn fmt::Write) -> fmt::Result {
+		if self.color.is_some() {
+			write!(f, "\x1b[39m")?;
+		}
+		if self.bold {
+			write!(f, "\x1b[22m")?;
+		}
+		Ok(())
+	}
+}
+
 struct Logger {
 	/// If set to `false` then the logger will not print anything.
 	enabled: bool,
@@ -886,6 +957,7 @@ struct Logger {
 
 struct LocationWithMessage {
 	loc: Location,
+	style: TerminalStyle,
 	/// Message to print near the end of the code covered by `loc`.
 	message: Option<String>,
 }
@@ -907,7 +979,11 @@ impl Logger {
 	/// pieces of `src` (no other `SourceCode`). There must be at least one location
 	/// (just pass `None` to print all the code, or just don't call this method to
 	/// print nothing).
-	fn print_src_ex(&mut self, src: Rc<SourceCode>, lwms_opt: Option<Vec<LocationWithMessage>>) {
+	fn print_src_ex(
+		&mut self,
+		src: Rc<SourceCode>,
+		lwms_opt: Option<Vec<LocationWithMessage>>,
+	) -> fmt::Result {
 		if let Some(ref lwms) = lwms_opt {
 			// Making sure the `Location` list verifies the constraints listed in the
 			// method documentation, and on which the rest of the method relies on to
@@ -922,7 +998,7 @@ impl Logger {
 		}
 
 		if !self.enabled {
-			return;
+			return Ok(());
 		}
 
 		// If some locations are to be focuced on, then it is a good thing to
@@ -931,6 +1007,7 @@ impl Logger {
 		// covered by pieces of locations to print.
 		struct LocationWithMessagePiece {
 			loc: Location,
+			style: TerminalStyle,
 			message: Option<String>,
 			/// Is this location piece the last on its line?
 			last_on_line: bool,
@@ -958,6 +1035,7 @@ impl Logger {
 						.into_iter()
 						.map(|loc| LocationWithMessagePiece {
 							loc,
+							style: lwm.style,
 							message: None,
 							// Set to correct value later.
 							last_on_line: false,
@@ -1086,6 +1164,8 @@ impl Logger {
 						pipe_end: usize,
 						/// Message that is to be printed after the end of the pipe at `pipe_end`.
 						message: String,
+						/// Style with which to print the `message`.
+						style: TerminalStyle,
 					}
 
 					// Length in number of typical ASCII characters of the rendering of
@@ -1164,8 +1244,8 @@ impl Logger {
 							Some(MessagePlacementStyle::BelowLeft)
 						};
 						let visible_length_before_current_emphasis = current_visible_length;
-						line_formatted += "\x1b[33m\x1b[1m";
-						underline += "\x1b[33m";
+						lwm_piece.style.open(&mut line_formatted)?;
+						lwm_piece.style.open(&mut underline)?;
 						for (i, ch) in lwm_piece.loc.covered_src().chars().enumerate() {
 							let underline_ch = match message_placement_style_opt {
 								Some(MessagePlacementStyle::BelowLeft) if i == 0 => '┬',
@@ -1199,14 +1279,15 @@ impl Logger {
 										other_pipes_going_through,
 										pipe_end,
 										message,
+										style: lwm_piece.style,
 									};
 									message_under_underline_lines
 										.insert(0, message_under_underline);
 								},
 							}
 						}
-						line_formatted += "\x1b[22m\x1b[39m";
-						underline += "\x1b[39m";
+						lwm_piece.style.close(&mut line_formatted)?;
+						lwm_piece.style.close(&mut underline)?;
 						current_byte_index_in_line += lwm_piece.loc.length_in_bytes();
 					}
 					// Handle text that comes after the last location in this line.
@@ -1250,15 +1331,15 @@ impl Logger {
 						let mut line_visual_length = 0;
 						for pipe_position in muu.other_pipes_going_through {
 							line += &" ".repeat(pipe_position - line_visual_length);
-							line += "\x1b[33m";
+							muu.style.open(&mut line)?;
 							line.push('│');
-							line += "\x1b[39m";
+							muu.style.close(&mut line)?;
 							line_visual_length = pipe_position + 1;
 						}
 						line += &" ".repeat(muu.pipe_end - line_visual_length);
-						line += "\x1b[33m";
+						muu.style.open(&mut line)?;
 						line += &format!("╰ {message}");
-						line += "\x1b[39m";
+						muu.style.close(&mut line)?;
 						self.print_line_with_number(
 							&line,
 							None,
@@ -1273,16 +1354,19 @@ impl Logger {
 		if !end_of_bar_already_printed {
 			self.print_line(&format!("{blank_line_number} ╰"));
 		}
+
+		Ok(())
 	}
 
 	fn print_src(&mut self, src: Rc<SourceCode>) {
-		self.print_src_ex(src, None);
+		self.print_src_ex(src, None).unwrap();
 	}
 
-	fn print_loc(&mut self, loc: Location, message: Option<String>) {
+	fn print_loc(&mut self, loc: Location, style: TerminalStyle, message: Option<String>) {
 		self.print_src_ex(
 			Rc::clone(&loc.src),
-			Some(vec![LocationWithMessage { loc, message }]),
-		);
+			Some(vec![LocationWithMessage { loc, style, message }]),
+		)
+		.unwrap();
 	}
 }
