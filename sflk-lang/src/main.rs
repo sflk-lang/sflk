@@ -180,23 +180,48 @@ fn main() {
 		);
 	}
 
-	logger.print_line("\x1b[1mTEST MULTIPLE LOCS AT THE SAME TIME:\x1b[22m");
-	logger
-		.print_src_ex(Rc::clone(&src), Some(curly_lwms_for_a_temporary_test))
-		.unwrap();
+	let do_tests = match std::env::args().nth(3) {
+		Some(arg) => matches!(
+			arg.as_str(),
+			"-t" | "-test" | "-tests" | "--test" | "--tests"
+		),
+		None => false,
+	};
+	if do_tests {
+		logger.print_line("\x1b[1mTEST MULTIPLE LOCS AT THE SAME TIME:\x1b[22m");
+		logger
+			.print_src_ex(Rc::clone(&src), Some(curly_lwms_for_a_temporary_test))
+			.unwrap();
 
-	logger.print_line("\x1b[1mTEST MULTIPLE LOCS ON THE SAME LINE:\x1b[22m");
-	logger
-		.print_src_ex(Rc::clone(&src), Some(first_line_lwms_for_a_temporary_test))
-		.unwrap();
+		logger.print_line("\x1b[1mTEST MULTIPLE LOCS ON THE SAME LINE:\x1b[22m");
+		logger
+			.print_src_ex(Rc::clone(&src), Some(first_line_lwms_for_a_temporary_test))
+			.unwrap();
 
-	logger.print_line("\x1b[1mTEST MULTIPLE LOCS PER LINE ON MULTIPLE LINES:\x1b[22m");
-	logger
-		.print_src_ex(
-			Rc::clone(&src),
-			Some(first_and_third_line_lwms_for_a_temporary_test),
-		)
-		.unwrap();
+		logger.print_line("\x1b[1mTEST MULTIPLE LOCS PER LINE ON MULTIPLE LINES:\x1b[22m");
+		logger
+			.print_src_ex(
+				Rc::clone(&src),
+				Some(first_and_third_line_lwms_for_a_temporary_test),
+			)
+			.unwrap();
+	}
+
+	logger.print_line("\x1b[1mVISIT:\x1b[22m");
+	for statement in program_ast.statements.iter() {
+		statement.visit(&mut |node: &dyn AstNode| {
+			logger.print_loc(node.loc(), style_cyan, None);
+		});
+	}
+
+	logger.print_line("\x1b[1mERRORS:\x1b[22m");
+	for statement in program_ast.statements.iter() {
+		statement.visit(&mut |node: &dyn AstNode| {
+			if let Some(error) = node.error() {
+				error.log_to(&mut logger);
+			}
+		});
+	}
 
 	let program_block = program_to_boc(&program_ast);
 
@@ -214,29 +239,8 @@ fn main() {
 		machine.execution.perform_one_step();
 	}
 
-	// TODO: Allow user to select preferred style between
-	//   ╭tests/v0.4.x.test01.sflk
-	// 1 │ pr 8 pr 4
-	//   ╰      ──── print statement
-	// and
-	//   ╭tests/v0.4.x.test01.sflk
-	// 1 │ pr 8 pr 4
-	//   ╰      ┬───
-	//          ╰ print statement
-	// via a command line parameter.
-
-	// TODO: Allow user to select preferred style between
-	//   ╭tests/v0.4.x.test01.sflk
-	// 1 │ pr 8 pr 4
-	//   ╰      ┬───
-	//          ╰ print statement
-	// and
-	//   ╭tests/v0.4.x.test01.sflk
-	// 1 │ pr 8 pr 4
-	//   ╰      ───┬
-	//             ╰ print statement
-	// via a command line parameter.
-
+	// TODO: Allow `Location` to have a length of zero (in between 2 characters).
+	// TODO: Make `Program` impl `AstNode`.
 	// TODO: Make user-friendly error reporting, not leaving any case.
 	// TODO: Add indentation support to the `Logger`.
 	// TODO: Add tree support to the `Logger`.
@@ -372,10 +376,6 @@ impl Location {
 		self.byte_index_end as usize + 1 - self.byte_index_start as usize
 	}
 
-	fn length_in_characters(&self) -> usize {
-		self.covered_src().chars().count()
-	}
-
 	/// Split the `Location` into the biggest sub-`Location`s that do not cover multiple lines.
 	///
 	/// For example, in a code source of 3 lines of 3 characters each, a `Location` that covers
@@ -451,16 +451,17 @@ impl SourceCodeCharacterStream {
 	/// Pops the next character, returned with its location.
 	fn pop(&mut self) -> (Option<char>, Location) {
 		// The character that will be popped now is the "next" character.
-		let loc = Location {
-			src: Rc::clone(&self.src),
-			line_number_start: self.line_number_next,
-			byte_index_start: self.byte_index_next.try_into().unwrap(),
-			byte_index_end: self.byte_index_next.try_into().unwrap(),
-		};
+		let byte_index_start = self.byte_index_next.try_into().unwrap();
 		let ch_opt = self.peek(0);
 		if ch_opt.is_some() {
 			self.advance();
 		}
+		let loc = Location {
+			src: Rc::clone(&self.src),
+			line_number_start: self.line_number_next,
+			byte_index_start,
+			byte_index_end: (self.byte_index_next - 1).try_into().unwrap(),
+		};
 		(ch_opt, loc)
 	}
 
@@ -475,6 +476,7 @@ impl SourceCodeCharacterStream {
 	}
 }
 
+#[derive(Clone)]
 enum Token {
 	KeywordPr,
 	KeywordDh,
@@ -483,7 +485,7 @@ enum Token {
 	IntegerLiteral {
 		value: u32,
 	},
-	UnexpectedChar {
+	UnknownCharacter {
 		ch: char,
 	},
 	/// This token just marks the end of the source code
@@ -501,7 +503,7 @@ impl fmt::Display for Token {
 			Token::OpenCurly => write!(f, "open curly"),
 			Token::CloseCurly => write!(f, "close curly"),
 			Token::IntegerLiteral { value } => write!(f, "integer literal {value}"),
-			Token::UnexpectedChar { ch } => write!(f, "unexpected character {ch}"),
+			Token::UnknownCharacter { ch } => write!(f, "unknown character {ch}"),
 			Token::EndOfFile => write!(f, "end-of-file"),
 			Token::OTHER => write!(f, "some token"),
 		}
@@ -540,7 +542,7 @@ impl TokenStream {
 				let value = ch as u32 - '0' as u32;
 				(Token::IntegerLiteral { value }, first_loc)
 			},
-			Some(ch) => (Token::UnexpectedChar { ch }, first_loc),
+			Some(ch) => (Token::UnknownCharacter { ch }, first_loc),
 			None => (Token::EndOfFile, first_loc),
 		}
 	}
@@ -577,8 +579,32 @@ struct Parser {
 	tokenizer: TokenStreamPeekable,
 }
 
+enum AstNodeError {
+	UnexpectedToken(Token, Location),
+}
+
+impl Loggable for AstNodeError {
+	fn log_to(&self, logger: &mut Logger) {
+		let style_red = TerminalStyle { bold: true, color: Some(TerminalColor::Red) };
+		match self {
+			AstNodeError::UnexpectedToken(token, loc) => {
+				let src = Rc::clone(&loc.src);
+				let message = format!("unexpected token {token}");
+				let lwm = LocationWithMessage {
+					loc: loc.clone(),
+					style: style_red,
+					message: Some(message),
+				};
+				logger.print_src_ex(src, Some(vec![lwm])).unwrap();
+			},
+		};
+	}
+}
+
 trait AstNode {
 	fn loc(&self) -> Location;
+	fn visit(&self, f: &mut dyn FnMut(&dyn AstNode));
+	fn error(&self) -> Option<AstNodeError>;
 }
 
 struct IntegerLiteralExpression {
@@ -589,6 +615,14 @@ struct IntegerLiteralExpression {
 impl AstNode for IntegerLiteralExpression {
 	fn loc(&self) -> Location {
 		self.loc.clone()
+	}
+
+	fn visit(&self, f: &mut dyn FnMut(&dyn AstNode)) {
+		f(self);
+	}
+
+	fn error(&self) -> Option<AstNodeError> {
+		None
 	}
 }
 
@@ -603,6 +637,17 @@ impl AstNode for BlockOfCodeLiteralExpression {
 		self.open_curly_loc
 			.clone()
 			.concat(self.close_curly_loc.clone())
+	}
+
+	fn visit(&self, f: &mut dyn FnMut(&dyn AstNode)) {
+		f(self);
+		for statement in self.program.statements.iter() {
+			statement.visit(f);
+		}
+	}
+
+	fn error(&self) -> Option<AstNodeError> {
+		None
 	}
 }
 
@@ -620,6 +665,24 @@ impl AstNode for Expression {
 			Expression::ErrorUnexpectedToken(_token, loc) => loc.clone(),
 		}
 	}
+
+	fn visit(&self, f: &mut dyn FnMut(&dyn AstNode)) {
+		f(self);
+		match self {
+			Expression::IntegerLiteral(integer_literal) => integer_literal.visit(f),
+			Expression::BlockOfCodeLiteral(boc_literal) => boc_literal.visit(f),
+			Expression::ErrorUnexpectedToken(..) => (),
+		}
+	}
+
+	fn error(&self) -> Option<AstNodeError> {
+		match self {
+			Expression::ErrorUnexpectedToken(token, loc) => {
+				Some(AstNodeError::UnexpectedToken(token.clone(), loc.clone()))
+			},
+			_ => None,
+		}
+	}
 }
 
 struct PrintStatement {
@@ -631,6 +694,15 @@ impl AstNode for PrintStatement {
 	fn loc(&self) -> Location {
 		self.kw_pr_loc.clone().concat(self.expression.loc())
 	}
+
+	fn visit(&self, f: &mut dyn FnMut(&dyn AstNode)) {
+		f(self);
+		self.expression.visit(f);
+	}
+
+	fn error(&self) -> Option<AstNodeError> {
+		None
+	}
 }
 
 struct DoHereStatement {
@@ -641,6 +713,15 @@ struct DoHereStatement {
 impl AstNode for DoHereStatement {
 	fn loc(&self) -> Location {
 		self.kw_dh_loc.clone().concat(self.expression.loc())
+	}
+
+	fn visit(&self, f: &mut dyn FnMut(&dyn AstNode)) {
+		f(self);
+		self.expression.visit(f);
+	}
+
+	fn error(&self) -> Option<AstNodeError> {
+		None
 	}
 }
 
@@ -666,6 +747,24 @@ impl AstNode for Statement {
 			Statement::Print(print_statement) => print_statement.loc(),
 			Statement::DoHere(do_here_statement) => do_here_statement.loc(),
 			Statement::ErrorUnexpectedToken(_token, loc) => loc.clone(),
+		}
+	}
+
+	fn visit(&self, f: &mut dyn FnMut(&dyn AstNode)) {
+		f(self);
+		match self {
+			Statement::Print(print_statement) => print_statement.visit(f),
+			Statement::DoHere(do_here_statement) => do_here_statement.visit(f),
+			Statement::ErrorUnexpectedToken(..) => (),
+		}
+	}
+
+	fn error(&self) -> Option<AstNodeError> {
+		match self {
+			Statement::ErrorUnexpectedToken(token, loc) => {
+				Some(AstNodeError::UnexpectedToken(token.clone(), loc.clone()))
+			},
+			_ => None,
 		}
 	}
 }
@@ -908,43 +1007,51 @@ impl Execution {
 }
 
 #[derive(Clone, Copy)]
+/// Color that some character can be printed with in a terminal that supports
+/// [ANSI escape codes](https://en.wikipedia.org/wiki/ANSI_escape_code).
 enum TerminalColor {
 	Red,
 	Cyan,
 }
 
 #[derive(Clone, Copy)]
+/// Style (color, bold, stuff like that) that some character can be printed with in a terminal
+/// that supports [ANSI escape codes](https://en.wikipedia.org/wiki/ANSI_escape_code).
 struct TerminalStyle {
 	bold: bool,
 	color: Option<TerminalColor>,
 }
 
 impl TerminalColor {
-	fn open_foreground(&self, f: &mut dyn fmt::Write) -> fmt::Result {
+	/// Prints some escape codes to `target` so that what comes next
+	/// has its foreground in this color.
+	fn open_foreground(&self, target: &mut dyn fmt::Write) -> fmt::Result {
 		match self {
-			TerminalColor::Red => write!(f, "\x1b[31m"),
-			TerminalColor::Cyan => write!(f, "\x1b[36m"),
+			TerminalColor::Red => write!(target, "\x1b[31m"),
+			TerminalColor::Cyan => write!(target, "\x1b[36m"),
 		}
 	}
 }
 
 impl TerminalStyle {
-	fn open(&self, f: &mut dyn fmt::Write) -> fmt::Result {
+	/// Prints some escape codes to `target` so that what comes next is in this style.
+	fn open(&self, target: &mut dyn fmt::Write) -> fmt::Result {
 		if self.bold {
-			write!(f, "\x1b[1m")?;
+			write!(target, "\x1b[1m")?;
 		}
 		if let Some(ref color) = self.color {
-			color.open_foreground(f)?;
+			color.open_foreground(target)?;
 		}
 		Ok(())
 	}
 
-	fn close(&self, f: &mut dyn fmt::Write) -> fmt::Result {
+	/// Prints some escape codes to `target` to end the effects of the matching `open` call.
+	fn close(&self, target: &mut dyn fmt::Write) -> fmt::Result {
 		if self.color.is_some() {
-			write!(f, "\x1b[39m")?;
+			write!(target, "\x1b[39m")?;
 		}
 		if self.bold {
-			write!(f, "\x1b[22m")?;
+			write!(target, "\x1b[22m")?;
 		}
 		Ok(())
 	}
@@ -979,6 +1086,41 @@ impl Logger {
 	/// pieces of `src` (no other `SourceCode`). There must be at least one location
 	/// (just pass `None` to print all the code, or just don't call this method to
 	/// print nothing).
+	//
+	// TODO: Currently the body of this function is quite a mess (even if imho it is
+	// commented enough so that someone could understand what happens there in less
+	// than 20 years). It shall be rewritten to be more readable AND easily modifiable.
+	// Here comes the plan. Make a type that represents an infinite grid canvas of
+	// styled characters in which it is possible to "draw" lines with box drawing characters,
+	// write text, etc. All the characters being associated a `TerminalStyle`.
+	// Then make it possible to compose the content of such grids. Then make the `Logger`
+	// able to print such grids.
+	// This way, the current body of `print_src_ex` could be rewitten to be more about
+	// "painting" and "drawing" lines and text on a grid than about printing whole lines
+	// in one go (which is quite imprcatical in practice).
+	//
+	// TODO: Allow user to select preferred style between
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ──── print statement
+	// and
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ┬───
+	//          ╰ print statement
+	// via a command line parameter or something.
+	//
+	// TODO: Allow user to select preferred style between
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ┬───
+	//          ╰ print statement
+	// and
+	//   ╭tests/v0.4.x.test01.sflk
+	// 1 │ pr 8 pr 4
+	//   ╰      ───┬
+	//             ╰ print statement
+	// via a command line parameter or something.
 	fn print_src_ex(
 		&mut self,
 		src: Rc<SourceCode>,
@@ -1368,5 +1510,15 @@ impl Logger {
 			Some(vec![LocationWithMessage { loc, style, message }]),
 		)
 		.unwrap();
+	}
+}
+
+trait Loggable {
+	fn log_to(&self, logger: &mut Logger);
+}
+
+impl Logger {
+	fn log(&mut self, loggable: impl Loggable) {
+		loggable.log_to(self);
 	}
 }
